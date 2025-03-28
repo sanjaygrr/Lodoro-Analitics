@@ -1,0 +1,45 @@
+<?php
+/**
+ * @var Laminas\View\Renderer\PhpRenderer $this
+ * @var array $data   Ejemplo:
+ *      [
+ *         'api_config' => ['count' => 12, 'latest' => '2025-03-16 14:20:00'],
+ *         'bsale_documents' => ['count' => 45, 'latest' => 'N/A'],
+ *         // ...
+ *      ]
+ */
+?>
+<div class="container mt-4">
+    <h1 class="mb-4">Dashboard de Información</h1>
+    
+    <?php if (!empty($data)): ?>
+        <div class="row row-cols-1 row-cols-md-3 g-4">
+            <?php foreach ($data as $tableName => $info): ?>
+                <div class="col">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <?= $this->escapeHtml(ucfirst(str_replace('_', ' ', $tableName))) ?>
+                        </div>
+                        <div class="card-body">
+                            <p>
+                                <strong>Número de registros:</strong>
+                                <?= $this->escapeHtml($info['count'] ?? 'N/A') ?>
+                            </p>
+                            <p>
+                                <strong>Último registro:</strong>
+                                <?= $this->escapeHtml($info['latest'] ?? 'N/A') ?>
+                            </p>
+                        </div>
+                        <div class="card-footer">
+                            <a class="btn btn-primary" href="#">
+                                Ver detalles &raquo;
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    <?php else: ?>
+        <p>No se encontraron datos para mostrar en el dashboard.</p>
+    <?php endif; ?>
+</div>

@@ -1,0 +1,724 @@
+<?php
+/**
+ * Dashboard view.
+ *
+ * Se espera que $data sea un arreglo indexado, donde cada elemento es un arreglo asociativo con las siguientes claves:
+ * - table_name o TABLE_NAME
+ * - engine o ENGINE
+ * - table_rows o TABLE_ROWS
+ * - create_time o CREATE_TIME
+ * - update_time o UPDATE_TIME
+ */
+
+// Filtrar solamente las tablas que empiezan con "MKP"
+$filtered_data = [];
+foreach ($data as $row) {
+    $tableName = $row['TABLE_NAME'] ?? $row['table_name'] ?? '';
+    if (strpos($tableName, 'MKP') === 0) { // Solo incluir tablas que empiezan con "MKP"
+        $filtered_data[] = $row;
+    }
+}
+// Reemplazar $data con los datos filtrados
+$data = $filtered_data;
+?>
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <div class="header-content">
+            <h1 class="dashboard-title">
+                <i class="fas fa-database"></i>
+                <span>RESUMEN DE VENTAS</span>
+            </h1>
+        </div>
+    </div>
+
+    <?php if (!empty($data)): ?>
+        <!-- Tarjetas de estadísticas -->
+        <div class="stats-overview">
+            <div class="stats-card total-tables">
+                <div class="stats-icon">
+                    <i class="fas fa-table"></i>
+                </div>
+                <div class="stats-info">
+                    <h3><?= count($data) ?></h3>
+                    <p>MARKETPLACES</p>
+                </div>
+            </div>
+            
+            <?php 
+                $totalRows = 0;
+                $latestUpdate = null;
+                
+                foreach ($data as $row) {
+                    $rowCount = $row['TABLE_ROWS'] ?? $row['table_rows'] ?? 0;
+                    $totalRows += intval($rowCount);
+                    
+                    $updateTime = $row['UPDATE_TIME'] ?? $row['update_time'] ?? null;
+                    if ($updateTime && (!$latestUpdate || strtotime($updateTime) > strtotime($latestUpdate))) {
+                        $latestUpdate = $updateTime;
+                    }
+                }
+            ?>
+            
+            <div class="stats-card total-records">
+                <div class="stats-icon">
+                    <i class="fas fa-list"></i>
+                </div>
+                <div class="stats-info">
+                    <h3><?= number_format($totalRows) ?></h3>
+                    <p>Registros totales</p>
+                </div>
+            </div>
+            
+            <div class="stats-card largest-table">
+                <?php
+                    $largestTable = null;
+                    $maxRows = 0;
+                    
+                    foreach ($data as $row) {
+                        $rowCount = $row['TABLE_ROWS'] ?? $row['table_rows'] ?? 0;
+                        if ($rowCount > $maxRows) {
+                            $maxRows = $rowCount;
+                            $largestTable = $row['TABLE_NAME'] ?? $row['table_name'] ?? 'N/A';
+                        }
+                    }
+                ?>
+                <div class="stats-icon">
+                    <i class="fas fa-chart-bar"></i>
+                </div>
+                <div class="stats-info">
+                    <h3><?= $this->escapeHtml($largestTable) ?></h3>
+                    <p>Tabla más grande</p>
+                </div>
+            </div>
+            
+            <div class="stats-card last-update">
+                <div class="stats-icon">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="stats-info">
+                    <h3><?= $latestUpdate ? date('d/m/Y H:i', strtotime($latestUpdate)) : 'N/A' ?></h3>
+                    <p>Última actualización</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Búsqueda de tablas -->
+        <div class="search-container">
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="table-search" placeholder="Buscar en tablas MKP...">
+            </div>
+        </div>
+
+        <!-- Tarjetas de tablas -->
+        <div class="tables-grid" id="tables-container">
+            <?php foreach ($data as $row): 
+                $tableName  = $row['TABLE_NAME']   ?? $row['table_name']   ?? 'N/A';
+                $engine     = $row['ENGINE']       ?? $row['engine']       ?? 'N/A';
+                $tableRows  = $row['TABLE_ROWS']   ?? $row['table_rows']   ?? 0;
+                $createTime = $row['CREATE_TIME']  ?? $row['create_time']  ?? 'N/A';
+                $updateTime = $row['UPDATE_TIME']  ?? $row['update_time']  ?? 'N/A';
+                
+                // Calcular tamaño relativo para la barra de progreso
+                $percentRows = ($maxRows > 0) ? ($tableRows / $maxRows) * 100 : 0;
+            ?>
+                <div class="table-card" data-table-name="<?= strtolower($tableName) ?>">
+                    <div class="table-card-header">
+                        <h3 class="table-name">
+                            <i class="fas fa-table"></i>
+                            <?= $this->escapeHtml($tableName) ?>
+                        </h3>
+                        <span class="engine-badge"><?= $this->escapeHtml($engine) ?></span>
+                    </div>
+                    <div class="table-card-body">
+                        <div class="info-row">
+                            <div class="info-label">Registros:</div>
+                            <div class="info-value"><?= number_format($tableRows) ?></div>
+                        </div>
+                        <div class="progress-container">
+                            <div class="progress-bar" style="width: <?= $percentRows ?>%"></div>
+                        </div>
+                        <div class="info-row">
+                            <div class="info-label">Creación:</div>
+                            <div class="info-value">
+                                <?= $createTime !== 'N/A' ? date('d/m/Y', strtotime($createTime)) : 'N/A' ?>
+                            </div>
+                        </div>
+                        <div class="info-row">
+                            <div class="info-label">Actualización:</div>
+                            <div class="info-value">
+                                <?= $updateTime !== 'N/A' ? date('d/m/Y', strtotime($updateTime)) : 'N/A' ?>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-card-footer">
+                        <a class="view-details-btn" href="<?= $this->url('application', ['action' => 'detail', 'table' => $tableName]) ?>">
+                            <i class="fas fa-eye"></i> Ver detalles
+                        </a>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+        
+        <!-- Gráfico de distribución -->
+        <div class="chart-container">
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h2>
+                        <i class="fas fa-chart-column"></i>
+                        Distribución de Registros en Tablas MKP
+                    </h2>
+                </div>
+                <div class="chart-body">
+                    <canvas id="tableChart"></canvas>
+                </div>
+            </div>
+        </div>
+    <?php else: ?>
+        <div class="empty-state">
+            <div class="empty-icon">
+                <i class="fas fa-database"></i>
+            </div>
+            <h2>No hay tablas MKP disponibles</h2>
+            <p>No se encontraron tablas con el prefijo "MKP" en la base de datos.</p>
+        </div>
+    <?php endif; ?>
+</div>
+
+<!-- Incluir Font Awesome y Google Fonts -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
+
+<!-- Incluir Chart.js desde CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Estilos para el dashboard - se mantienen exactamente igual -->
+<style>
+:root {
+    /* Colores */
+    --primary: #4361ee;
+    --primary-light: #4895ef;
+    --primary-dark: #3f37c9;
+    --secondary: #6c757d;
+    --success: #4caf50;
+    --danger: #f44336;
+    --warning: #ff9800;
+    --info: #2196f3;
+    --dark: #212529;
+    --light: #f8f9fa;
+    --white: #ffffff;
+    --body-bg: #f5f7fb;
+    --card-bg: #ffffff;
+    --border-color: #e0e6ed;
+    --text-main: #3b3f5c;
+    --text-muted: #6c757d;
+    --shadow-sm: 0 2px 5px rgba(0, 0, 0, 0.05);
+    --shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    --shadow-lg: 0 1rem 3rem rgba(0, 0, 0, 0.175);
+
+    /* Fuentes */
+    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --border-radius: 0.5rem;
+    --transition-speed: 0.3s;
+}
+
+/* Resto de estilos CSS sin cambios */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: var(--font-family);
+    background-color: var(--body-bg);
+    color: var(--text-main);
+    line-height: 1.6;
+    overflow-x: hidden;
+}
+
+/* Contenedor principal */
+.dashboard-container {
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 1.5rem;
+}
+
+/* Encabezado del dashboard */
+.dashboard-header {
+    margin-bottom: 2rem;
+}
+
+.header-content {
+    text-align: center;
+}
+
+.dashboard-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--dark);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+}
+
+.dashboard-title i {
+    color: var(--primary);
+}
+
+/* Tarjetas de estadísticas */
+.stats-overview {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stats-card {
+    background-color: var(--card-bg);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-sm);
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    transition: transform var(--transition-speed), box-shadow var(--transition-speed);
+}
+
+.stats-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow);
+}
+
+.stats-icon {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: white;
+}
+
+.total-tables .stats-icon {
+    background-color: var(--primary);
+}
+
+.total-records .stats-icon {
+    background-color: var(--success);
+}
+
+.largest-table .stats-icon {
+    background-color: var(--warning);
+}
+
+.last-update .stats-icon {
+    background-color: var(--info);
+}
+
+.stats-info h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0;
+    line-height: 1.2;
+    color: var(--dark);
+}
+
+.stats-info p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+}
+
+/* Búsqueda */
+.search-container {
+    margin-bottom: 1.5rem;
+}
+
+.search-box {
+    position: relative;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.search-box i {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+}
+
+.search-box input {
+    width: 100%;
+    padding: 0.75rem 1rem 0.75rem 2.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    font-size: 0.95rem;
+    transition: all var(--transition-speed);
+}
+
+.search-box input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 0.25rem rgba(67, 97, 238, 0.25);
+}
+
+/* Rejilla de tarjetas de tablas */
+.tables-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.table-card {
+    background-color: var(--card-bg);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    transition: transform var(--transition-speed), box-shadow var(--transition-speed);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    border-top: 4px solid var(--primary);
+}
+
+.table-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow);
+}
+
+.table-card-header {
+    padding: 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.table-name {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--dark);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.table-name i {
+    color: var(--primary);
+    font-size: 1rem;
+}
+
+.engine-badge {
+    background-color: rgba(67, 97, 238, 0.1);
+    color: var(--primary);
+    padding: 0.25rem 0.75rem;
+    border-radius: 2rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.table-card-body {
+    padding: 1.25rem;
+    flex-grow: 1;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.info-label {
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
+.info-value {
+    font-weight: 500;
+    color: var(--dark);
+}
+
+.progress-container {
+    height: 6px;
+    background-color: #f0f0f0;
+    border-radius: 3px;
+    margin: 1rem 0;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(to right, var(--primary-light), var(--primary-dark));
+    border-radius: 3px;
+    transition: width 1s ease-in-out;
+}
+
+.table-card-footer {
+    padding: 1.25rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.view-details-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 0.625rem 1.25rem;
+    background-color: var(--primary);
+    color: white;
+    border-radius: var(--border-radius);
+    text-decoration: none;
+    font-weight: 500;
+    transition: all var(--transition-speed);
+    gap: 0.5rem;
+}
+
+.view-details-btn:hover {
+    background-color: var(--primary-dark);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Contenedor del gráfico */
+.chart-container {
+    margin-bottom: 2rem;
+}
+
+.chart-card {
+    background-color: var(--card-bg);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+
+.chart-header {
+    padding: 1.25rem;
+    background-color: var(--success);
+    color: white;
+}
+
+.chart-header h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.chart-body {
+    padding: 1.5rem;
+    height: 400px;
+}
+
+/* Estado vacío */
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background-color: var(--card-bg);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+}
+
+.empty-icon {
+    font-size: 4rem;
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+}
+
+.empty-state h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: var(--dark);
+}
+
+.empty-state p {
+    color: var(--text-muted);
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+/* Responsividad */
+@media (max-width: 768px) {
+    .dashboard-title {
+        font-size: 1.5rem;
+    }
+    
+    .stats-card {
+        padding: 1.25rem;
+    }
+    
+    .stats-icon {
+        width: 2.5rem;
+        height: 2.5rem;
+        font-size: 1.25rem;
+    }
+    
+    .stats-info h3 {
+        font-size: 1.25rem;
+    }
+    
+    .tables-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .chart-body {
+        height: 300px;
+    }
+}
+</style>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // Animación de entrada
+    const cards = document.querySelectorAll('.table-card, .stats-card');
+    cards.forEach((card, index) => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        
+        setTimeout(() => {
+            card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+            card.style.opacity = '1';
+            card.style.transform = 'translateY(0)';
+        }, 100 + (index * 50));
+    });
+    
+    // Búsqueda de tablas
+    const searchInput = document.getElementById('table-search');
+    const tablesContainer = document.getElementById('tables-container');
+    const tableCards = tablesContainer.querySelectorAll('.table-card');
+    
+    searchInput.addEventListener('keyup', function() {
+        const searchTerm = this.value.toLowerCase();
+        
+        tableCards.forEach(card => {
+            const tableName = card.getAttribute('data-table-name');
+            
+            if (tableName.includes(searchTerm)) {
+                card.style.display = 'flex';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    });
+    
+    // Configuración del gráfico
+    const chartCanvas = document.getElementById('tableChart');
+    
+    if (chartCanvas) {
+        // Obtener datos para el gráfico desde PHP (ya filtrados)
+        const dashboardData = <?= json_encode($data) ?>;
+        const labels = [];
+        const rowCounts = [];
+
+        dashboardData.forEach(function(row) {
+            const tableName = row.TABLE_NAME || row.table_name || 'N/A';
+            labels.push(tableName);
+            const count = row.TABLE_ROWS || row.table_rows || 0;
+            rowCounts.push(parseInt(count));
+        });
+
+        // Ordenar los datos para el gráfico (de mayor a menor)
+        const sortedData = labels.map((label, index) => ({
+            label,
+            value: rowCounts[index]
+        })).sort((a, b) => b.value - a.value);
+
+        // Limitar a las 15 tablas con más registros para mejor visualización
+        const topLabels = sortedData.slice(0, 15).map(item => item.label);
+        const topValues = sortedData.slice(0, 15).map(item => item.value);
+
+        // Colores para las barras
+        const colors = [];
+        for (let i = 0; i < topLabels.length; i++) {
+            const opacity = 0.7 + (0.3 * (i / topLabels.length));
+            colors.push(`rgba(67, 97, 238, ${opacity})`);
+        }
+
+        // Crear el gráfico
+        new Chart(chartCanvas, {
+            type: 'bar',
+            data: {
+                labels: topLabels,
+                datasets: [{
+                    label: 'Número de Registros',
+                    data: topValues,
+                    backgroundColor: colors,
+                    borderColor: 'rgba(67, 97, 238, 1)',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    maxBarThickness: 60
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleFont: {
+                            family: 'Inter',
+                            size: 14
+                        },
+                        bodyFont: {
+                            family: 'Inter',
+                            size: 13
+                        },
+                        padding: 12,
+                        displayColors: false,
+                        callbacks: {
+                            label: function(context) {
+                                return `Registros: ${context.parsed.y.toLocaleString()}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            autoSkip: false,
+                            maxRotation: 45,
+                            minRotation: 45,
+                            font: {
+                                family: 'Inter',
+                                size: 11
+                            }
+                        },
+                        grid: {
+                            display: false
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            font: {
+                                family: 'Inter',
+                                size: 12
+                            },
+                            callback: function(value) {
+                                return value.toLocaleString();
+                            }
+                        }
+                    }
+                },
+                animation: {
+                    duration: 2000,
+                    easing: 'easeOutQuart'
+                }
+            }
+        });
+    }
+});
+</script>

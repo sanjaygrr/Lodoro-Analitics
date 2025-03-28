@@ -1,0 +1,968 @@
+<?php
+/**
+ * @var Laminas\View\Renderer\PhpRenderer $this
+ */
+?>
+<?= $this->doctype() ?>
+<html lang="es">
+    <head>
+        <meta charset="utf-8">
+        <?= $this->headTitle('Lodoro Analytics')->setSeparator(' - ')->setAutoEscape(false) ?>
+
+        <?= $this->headMeta()
+            ->appendName('viewport', 'width=device-width, initial-scale=1.0')
+            ->appendHttpEquiv('X-UA-Compatible', 'IE=edge')
+        ?>
+
+        <!-- Favicon y estilos base -->
+        <?= $this->headLink([
+                'rel'  => 'shortcut icon',
+                'type' => 'image/vnd.microsoft.icon',
+                'href' => $this->basePath() . '/img/favicon.ico'
+            ])
+            ->prependStylesheet($this->basePath('css/style.css'))
+            ->prependStylesheet($this->basePath('css/bootstrap.min.css'))
+        ?>
+
+        <!-- Font Awesome para iconos -->
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        
+        <!-- Google Fonts - Inter -->
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
+
+        <!-- Estilos personalizados corregidos -->
+        <style>
+            :root {
+                --primary: #4361ee;
+                --secondary: #6c757d;
+                --success: #4caf50;
+                --danger: #f44336;
+                --warning: #ff9800;
+                --info: #2196f3;
+                --dark: #1e2843;
+                --darker: #151c30;
+                --light: #f8f9fa;
+                --white: #ffffff;
+                --body-bg: #f5f7fb;
+                --text-main: #3b3f5c;
+                --text-muted: #6c757d;
+                --text-light: #cbd5e1;
+                --border-color: #e0e6ed;
+                --shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+                --transition-speed: 0.3s;
+                --font-family: 'Inter', sans-serif;
+            }
+
+            body {
+                font-family: var(--font-family);
+                background-color: var(--body-bg);
+                margin: 0;
+                padding: 0;
+                overflow-x: hidden;
+            }
+
+            /* Contenedor principal */
+            .app-container {
+                display: flex;
+                min-height: 100vh;
+            }
+
+            /* Sidebar */
+            #sidebar {
+                background: linear-gradient(180deg, var(--dark) 0%, var(--darker) 100%);
+                color: var(--white);
+                min-height: 100vh;
+                transition: width var(--transition-speed) ease;
+                position: fixed;
+                top: 0;
+                left: 0;
+                z-index: 1000;
+                box-shadow: var(--shadow);
+                overflow-y: auto;
+                scrollbar-width: thin;
+            }
+
+            #sidebar::-webkit-scrollbar {
+                width: 4px;
+            }
+            
+            #sidebar::-webkit-scrollbar-track {
+                background: rgba(255,255,255,0.05);
+            }
+            
+            #sidebar::-webkit-scrollbar-thumb {
+                background-color: rgba(255,255,255,0.2);
+                border-radius: 4px;
+            }
+
+            /* Control de anchos */
+            .sidebar-collapsed {
+                width: 70px;
+            }
+
+            .sidebar-expanded {
+                width: 240px;
+            }
+
+            /* Cabecera del sidebar */
+            .sidebar-header {
+                padding: 1rem;
+                display: flex;
+                align-items: center;
+                height: 70px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            }
+
+            .logo-icon {
+                font-size: 1.5rem;
+                color: var(--primary);
+                width: 30px;
+                text-align: center;
+            }
+
+            .logo-text {
+                margin-left: 0.75rem;
+                font-size: 1.25rem;
+                font-weight: 600;
+                white-space: nowrap;
+                opacity: 0;
+                transition: opacity var(--transition-speed) ease;
+            }
+
+            .sidebar-expanded .logo-text {
+                opacity: 1;
+            }
+
+            .toggle-btn {
+                margin-left: auto;
+                background: transparent;
+                border: none;
+                color: var(--text-light);
+                cursor: pointer;
+                width: 28px;
+                height: 28px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all var(--transition-speed) ease;
+            }
+
+            .toggle-btn:hover {
+                background-color: rgba(255, 255, 255, 0.1);
+                color: var(--white);
+            }
+
+            /* Menú de navegación */
+            .nav-menu {
+                list-style: none;
+                padding: 1rem 0;
+                margin: 0;
+            }
+
+            .menu-header {
+                padding: 0.5rem 1rem;
+                font-size: 0.75rem;
+                text-transform: uppercase;
+                color: var(--text-light);
+                font-weight: 600;
+                opacity: 0;
+                transition: opacity var(--transition-speed) ease;
+                white-space: nowrap;
+            }
+
+            .sidebar-expanded .menu-header {
+                opacity: 1;
+            }
+
+            .nav-item {
+                margin: 0.25rem 0;
+                position: relative;
+            }
+
+            .nav-link {
+                display: flex;
+                align-items: center;
+                padding: 0.75rem 1rem;
+                color: var(--text-light);
+                text-decoration: none;
+                position: relative;
+                transition: all var(--transition-speed) ease;
+                border-radius: 0.25rem;
+                margin: 0 0.5rem;
+            }
+
+            .nav-link:hover, .nav-link.active {
+                color: var(--white);
+                background-color: rgba(255, 255, 255, 0.1);
+            }
+
+            .nav-link.active::before {
+                content: '';
+                position: absolute;
+                left: 0;
+                top: 0;
+                height: 100%;
+                width: 3px;
+                background-color: var(--primary);
+                border-radius: 0 2px 2px 0;
+            }
+
+            .nav-icon {
+                font-size: 1.25rem;
+                min-width: 30px;
+                text-align: center;
+            }
+
+            .nav-text {
+                margin-left: 0.75rem;
+                white-space: nowrap;
+                opacity: 0;
+                transition: opacity var(--transition-speed) ease;
+            }
+
+            .sidebar-expanded .nav-text {
+                opacity: 1;
+            }
+
+            /* Tooltip estilizado - CORREGIDO para asegurar visibilidad */
+            .tooltip-nav {
+                position: absolute;
+                left: 70px; /* Coincide con el ancho del sidebar colapsado */
+                top: 50%;
+                transform: translateY(-50%);
+                background-color: rgba(0, 0, 0, 0.9);
+                color: white;
+                padding: 0.5rem 0.75rem;
+                border-radius: 0.25rem;
+                font-size: 0.8rem;
+                white-space: nowrap;
+                pointer-events: none;
+                opacity: 0;
+                visibility: hidden;
+                z-index: 9999; /* Z-index alto para asegurar que esté por encima de todo */
+                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+            }
+
+            .tooltip-nav::before {
+                content: '';
+                position: absolute;
+                right: 100%;
+                top: 50%;
+                transform: translateY(-50%);
+                border-width: 6px;
+                border-style: solid;
+                border-color: transparent rgba(0, 0, 0, 0.9) transparent transparent;
+            }
+
+            /* CORREGIDO: Regla específica para mostrar tooltips en sidebar colapsado */
+            .sidebar-collapsed .nav-item:hover .tooltip-nav {
+                opacity: 1;
+                visibility: visible;
+                display: block;
+            }
+
+            .badge-new {
+                background-color: var(--primary);
+                color: white;
+                padding: 0.15rem 0.5rem;
+                border-radius: 10px;
+                font-size: 0.65rem;
+                margin-left: auto;
+                opacity: 0;
+                transition: opacity var(--transition-speed) ease;
+            }
+
+            .sidebar-expanded .badge-new {
+                opacity: 1;
+            }
+
+            /* Insignia de notificación - CORREGIDA */
+            .notification-badge {
+                position: absolute;
+                top: 5px;
+                right: 5px;
+                background-color: var(--danger);
+                color: white;
+                font-size: 0.65rem;
+                font-weight: 600;
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 1;
+            }
+
+            /* Separador */
+            .menu-divider {
+                height: 1px;
+                background-color: rgba(255, 255, 255, 0.1);
+                margin: 1rem 1rem;
+            }
+
+            /* Panel de notificaciones */
+            .notifications-panel {
+                position: fixed;
+                top: 0;
+                right: -320px;
+                width: 320px;
+                height: 100vh;
+                background-color: var(--white);
+                box-shadow: var(--shadow);
+                z-index: 1001;
+                transition: right var(--transition-speed) ease;
+                overflow-y: auto;
+            }
+
+            .notifications-panel.open {
+                right: 0;
+            }
+
+            .notifications-header {
+                padding: 1rem;
+                background-color: var(--primary);
+                color: white;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+
+            .notifications-title {
+                font-size: 1.1rem;
+                font-weight: 600;
+            }
+
+            .close-notifications {
+                background: transparent;
+                border: none;
+                color: white;
+                cursor: pointer;
+                width: 28px;
+                height: 28px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .close-notifications:hover {
+                background-color: rgba(255, 255, 255, 0.2);
+            }
+
+            .notifications-tabs {
+                display: flex;
+                border-bottom: 1px solid var(--border-color);
+            }
+
+            .notifications-tab {
+                flex: 1;
+                padding: 0.75rem;
+                text-align: center;
+                cursor: pointer;
+                border-bottom: 2px solid transparent;
+                color: var(--text-muted);
+                font-weight: 500;
+                transition: all var(--transition-speed) ease;
+            }
+
+            .notifications-tab.active {
+                border-bottom-color: var(--primary);
+                color: var(--primary);
+            }
+
+            .notifications-content {
+                padding: 0;
+            }
+
+            .notification-item {
+                padding: 1rem;
+                border-bottom: 1px solid var(--border-color);
+                display: flex;
+                align-items: center;
+                transition: background-color 0.2s ease;
+            }
+
+            .notification-item:hover {
+                background-color: rgba(67, 97, 238, 0.05);
+            }
+
+            .notification-icon {
+                width: 36px;
+                height: 36px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-right: 0.75rem;
+                flex-shrink: 0;
+            }
+
+            .notification-success {
+                background-color: rgba(76, 175, 80, 0.1);
+                color: var(--success);
+            }
+
+            .notification-info {
+                background-color: rgba(33, 150, 243, 0.1);
+                color: var(--info);
+            }
+
+            .notification-warning {
+                background-color: rgba(255, 152, 0, 0.1);
+                color: var(--warning);
+            }
+
+            .notification-danger {
+                background-color: rgba(244, 67, 54, 0.1);
+                color: var(--danger);
+            }
+
+            .notification-content {
+                flex: 1;
+            }
+
+            .notification-title {
+                font-weight: 500;
+                font-size: 0.875rem;
+                margin-bottom: 0.25rem;
+                color: var(--text-main);
+            }
+
+            .notification-desc {
+                font-size: 0.75rem;
+                color: var(--text-muted);
+                margin-bottom: 0.25rem;
+            }
+
+            .notification-time {
+                font-size: 0.7rem;
+                color: var(--text-muted);
+            }
+
+            .notification-actions {
+                margin-top: 0.5rem;
+            }
+
+            .notification-btn {
+                font-size: 0.75rem;
+                padding: 0.15rem 0.5rem;
+                border-radius: 0.25rem;
+                border: none;
+                cursor: pointer;
+                margin-right: 0.5rem;
+                background-color: var(--primary);
+                color: white;
+            }
+
+            .notification-all {
+                display: block;
+                text-align: center;
+                padding: 0.75rem;
+                background-color: var(--light);
+                color: var(--text-main);
+                text-decoration: none;
+                font-size: 0.875rem;
+                font-weight: 500;
+            }
+
+            .notification-all:hover {
+                background-color: rgba(67, 97, 238, 0.05);
+            }
+
+            /* Overlay para notificaciones en móvil */
+            .overlay-notifications {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.5);
+                z-index: 1000;
+                opacity: 0;
+                visibility: hidden;
+                transition: opacity var(--transition-speed) ease;
+            }
+
+            .overlay-notifications.open {
+                opacity: 1;
+                visibility: visible;
+            }
+
+            /* Panel de usuario */
+            .user-panel {
+                padding: 1rem;
+                border-top: 1px solid rgba(255, 255, 255, 0.1);
+                position: sticky;
+                bottom: 0;
+                background-color: var(--darker);
+                display: flex;
+                align-items: center;
+            }
+
+            .user-avatar {
+                width: 36px;
+                height: 36px;
+                border-radius: 50%;
+                background-color: var(--primary);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-weight: 600;
+                flex-shrink: 0;
+            }
+
+            .user-info {
+                margin-left: 0.75rem;
+                opacity: 0;
+                transition: opacity var(--transition-speed) ease;
+                overflow: hidden;
+            }
+
+            .sidebar-expanded .user-info {
+                opacity: 1;
+            }
+
+            .user-name {
+                font-weight: 500;
+                font-size: 0.875rem;
+                white-space: nowrap;
+                color: white;
+            }
+
+            .user-role {
+                font-size: 0.75rem;
+                color: var(--text-light);
+                white-space: nowrap;
+            }
+
+            /* Contenido principal */
+            .main-content {
+                flex: 1;
+                margin-left: 70px;
+                padding: 1.5rem;
+                transition: margin-left var(--transition-speed) ease;
+            }
+
+            .sidebar-expanded ~ .main-content {
+                margin-left: 240px;
+            }
+
+            /* Navbar superior */
+            .top-navbar {
+                background-color: var(--white);
+                padding: 0.75rem 1.5rem;
+                box-shadow: var(--shadow);
+                margin-bottom: 1.5rem;
+                border-radius: 0.5rem;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+
+            .page-title {
+                font-size: 1.25rem;
+                font-weight: 600;
+                color: var(--text-main);
+                margin: 0;
+            }
+
+            .navbar-actions {
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+            }
+
+            .navbar-icon {
+                width: 36px;
+                height: 36px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                position: relative;
+                color: var(--text-muted);
+                transition: all var(--transition-speed) ease;
+            }
+
+            .navbar-icon:hover {
+                background-color: rgba(67, 97, 238, 0.1);
+                color: var(--primary);
+            }
+
+            /* Responsividad */
+            @media (max-width: 992px) {
+                #sidebar {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    height: 100%;
+                    z-index: 1000;
+                    transform: translateX(-100%);
+                    transition: transform var(--transition-speed) ease;
+                }
+                
+                #sidebar.sidebar-collapsed,
+                #sidebar.sidebar-expanded {
+                    transform: translateX(0);
+                }
+                
+                .main-content {
+                    margin-left: 0 !important;
+                }
+                
+                .overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background-color: rgba(0, 0, 0, 0.5);
+                    z-index: 999;
+                    display: none;
+                }
+                
+                .sidebar-expanded ~ .overlay {
+                    display: block;
+                }
+
+                .notifications-panel {
+                    width: 100%;
+                    max-width: 320px;
+                }
+            }
+        </style>
+
+        <?= $this->headScript() ?>
+    </head>
+    <body>
+        <div class="app-container">
+            <!-- Sidebar / Navbar lateral -->
+            <div id="sidebar" class="sidebar-collapsed">
+                <div class="sidebar-header">
+                    <div class="logo-icon">
+                        <i class="fas fa-chart-pie"></i>
+                    </div>
+                    <div class="logo-text">Lodoro Analytics</div>
+                    <button class="toggle-btn" id="toggleBtn" title="Expandir/Colapsar">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+                
+                <ul class="nav-menu">
+                    <li class="menu-header">Principal</li>
+                    
+                    <li class="nav-item">
+                        <a href="<?= $this->url('home') ?>" class="nav-link active">
+                            <div class="nav-icon">
+                                <i class="fas fa-tachometer-alt"></i>
+                            </div>
+                            <span class="nav-text">Dashboard</span>
+                        </a>
+                        <div class="tooltip-nav">Dashboard</div>
+                    </li>
+                    
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <div class="nav-icon">
+                                <i class="fas fa-table"></i>
+                            </div>
+                            <span class="nav-text">Tablas</span>
+                        </a>
+                        <div class="tooltip-nav">Tablas</div>
+                    </li>
+                    
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <div class="nav-icon">
+                                <i class="fas fa-chart-bar"></i>
+                            </div>
+                            <span class="nav-text">Estadísticas</span>
+                            <span class="badge-new">Nuevo</span>
+                        </a>
+                        <div class="tooltip-nav">Estadísticas</div>
+                    </li>
+                    
+                    <div class="menu-divider"></div>
+                    <li class="menu-header">Reportes</li>
+                    
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <div class="nav-icon">
+                                <i class="fas fa-file-alt"></i>
+                            </div>
+                            <span class="nav-text">Reportería</span>
+                            <span class="notification-badge">3</span>
+                        </a>
+                        <div class="tooltip-nav">Reportería</div>
+                    </li>
+                    
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <div class="nav-icon">
+                                <i class="fas fa-download"></i>
+                            </div>
+                            <span class="nav-text">Exportar</span>
+                        </a>
+                        <div class="tooltip-nav">Exportar</div>
+                    </li>
+                    
+                    <div class="menu-divider"></div>
+                    <li class="menu-header">Sistema</li>
+                    
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <div class="nav-icon">
+                                <i class="fas fa-cog"></i>
+                            </div>
+                            <span class="nav-text">Configuración</span>
+                        </a>
+                        <div class="tooltip-nav">Configuración</div>
+                    </li>
+                    
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <div class="nav-icon">
+                                <i class="fas fa-question-circle"></i>
+                            </div>
+                            <span class="nav-text">Ayuda</span>
+                        </a>
+                        <div class="tooltip-nav">Ayuda</div>
+                    </li>
+                    
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" id="notificationsBtn">
+                            <div class="nav-icon">
+                                <i class="fas fa-bell"></i>
+                            </div>
+                            <span class="nav-text">Notificaciones</span>
+                            <span class="notification-badge">5</span>
+                        </a>
+                        <div class="tooltip-nav">Notificaciones</div>
+                    </li>
+                </ul>
+                
+                <!-- Panel de usuario -->
+                <div class="user-panel">
+                    <div class="user-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="user-info">
+                        <div class="user-name">Admin</div>
+                        <div class="user-role">Administrador</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Overlay para dispositivos móviles -->
+            <div class="overlay"></div>
+            
+            <!-- Panel de notificaciones -->
+            <div class="notifications-panel" id="notificationsPanel">
+                <div class="notifications-header">
+                    <div class="notifications-title">Notificaciones</div>
+                    <button class="close-notifications" id="closeNotifications">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="notifications-tabs">
+                    <div class="notifications-tab active">Todas (5)</div>
+                    <div class="notifications-tab">No leídas (3)</div>
+                </div>
+                <div class="notifications-content">
+                    <div class="notification-item">
+                        <div class="notification-icon notification-success">
+                            <i class="fas fa-check"></i>
+                        </div>
+                        <div class="notification-content">
+                            <div class="notification-title">Base de datos actualizada</div>
+                            <div class="notification-desc">La sincronización se completó exitosamente</div>
+                            <div class="notification-time">Hace 5 minutos</div>
+                        </div>
+                    </div>
+                    <div class="notification-item">
+                        <div class="notification-icon notification-info">
+                            <i class="fas fa-info"></i>
+                        </div>
+                        <div class="notification-content">
+                            <div class="notification-title">Nuevo reporte disponible</div>
+                            <div class="notification-desc">El reporte de ventas de marzo está listo</div>
+                            <div class="notification-time">Hace 2 horas</div>
+                            <div class="notification-actions">
+                                <button class="notification-btn">Ver reporte</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="notification-item">
+                        <div class="notification-icon notification-warning">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <div class="notification-content">
+                            <div class="notification-title">Advertencia de sistema</div>
+                            <div class="notification-desc">El espacio de almacenamiento está al 80%</div>
+                            <div class="notification-time">Hace 5 horas</div>
+                        </div>
+                    </div>
+                    <div class="notification-item">
+                        <div class="notification-icon notification-danger">
+                            <i class="fas fa-exclamation-circle"></i>
+                        </div>
+                        <div class="notification-content">
+                            <div class="notification-title">Error de sincronización</div>
+                            <div class="notification-desc">Fallo en la conexión con API externa</div>
+                            <div class="notification-time">Ayer</div>
+                            <div class="notification-actions">
+                                <button class="notification-btn">Reintentar</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="notification-item">
+                        <div class="notification-icon notification-info">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div class="notification-content">
+                            <div class="notification-title">Nuevo usuario registrado</div>
+                            <div class="notification-desc">Maria López se unió al sistema</div>
+                            <div class="notification-time">Hace 2 días</div>
+                        </div>
+                    </div>
+                    <a href="#" class="notification-all">Ver todas las notificaciones</a>
+                </div>
+            </div>
+            
+            <!-- Overlay para notificaciones en móvil -->
+            <div class="overlay-notifications" id="overlayNotifications"></div>
+            
+            <!-- Contenido principal -->
+            <div class="main-content">
+                <!-- Navbar superior -->
+                <div class="top-navbar">
+                    <h1 class="page-title">Dashboard</h1>
+                    <div class="navbar-actions">
+                        <div class="navbar-icon" id="navNotificationsBtn" title="Notificaciones">
+                            <i class="fas fa-bell"></i>
+                            <span class="notification-badge">5</span>
+                        </div>
+                        <div class="navbar-icon" title="Perfil">
+                            <i class="fas fa-user"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Contenido de la página -->
+                <?= $this->content ?>
+            </div>
+        </div>
+
+        <?= $this->inlineScript()->prependFile($this->basePath('js/bootstrap.min.js')) ?>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+
+        <!-- Script corregido para toggle y tooltips -->
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log("DOM cargado, inicializando sidebar...");
+                
+                // Referencias a elementos del DOM
+                const sidebar = document.getElementById('sidebar');
+                const toggleBtn = document.getElementById('toggleBtn');
+                const overlay = document.querySelector('.overlay');
+                const notificationsBtn = document.getElementById('notificationsBtn');
+                const navNotificationsBtn = document.getElementById('navNotificationsBtn');
+                const notificationsPanel = document.getElementById('notificationsPanel');
+                const closeNotifications = document.getElementById('closeNotifications');
+                const overlayNotifications = document.getElementById('overlayNotifications');
+                
+                // Verificación de elementos
+                if (!sidebar) console.error("Elemento sidebar no encontrado");
+                if (!toggleBtn) console.error("Botón de toggle no encontrado");
+                
+                // Toggle del sidebar - CORREGIDO
+                toggleBtn.addEventListener('click', function() {
+                    console.log("Toggle sidebar clicked");
+                    
+                    if (sidebar.classList.contains('sidebar-collapsed')) {
+                        console.log("Expandiendo sidebar");
+                        sidebar.classList.remove('sidebar-collapsed');
+                        sidebar.classList.add('sidebar-expanded');
+                        toggleBtn.querySelector('i').classList.remove('fa-chevron-right');
+                        toggleBtn.querySelector('i').classList.add('fa-chevron-left');
+                    } else {
+                        console.log("Colapsando sidebar");
+                        sidebar.classList.remove('sidebar-expanded');
+                        sidebar.classList.add('sidebar-collapsed');
+                        toggleBtn.querySelector('i').classList.remove('fa-chevron-left');
+                        toggleBtn.querySelector('i').classList.add('fa-chevron-right');
+                    }
+                });
+                
+                // Cerrar sidebar con overlay en dispositivos móviles
+                if (overlay) {
+                    overlay.addEventListener('click', function() {
+                        sidebar.classList.remove('sidebar-expanded');
+                        sidebar.classList.add('sidebar-collapsed');
+                        toggleBtn.querySelector('i').classList.remove('fa-chevron-left');
+                        toggleBtn.querySelector('i').classList.add('fa-chevron-right');
+                    });
+                }
+                
+                // Marcar menú activo según la ruta actual
+                const currentPath = window.location.pathname;
+                const navLinks = document.querySelectorAll('.nav-link');
+                
+                navLinks.forEach(link => {
+                    const href = link.getAttribute('href');
+                    if (href && currentPath.includes(href) && href !== '#') {
+                        link.classList.add('active');
+                    }
+                });
+                
+                // Toggle del panel de notificaciones
+                function toggleNotifications() {
+                    notificationsPanel.classList.toggle('open');
+                    overlayNotifications.classList.toggle('open');
+                }
+                
+                if (notificationsBtn) {
+                    notificationsBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        toggleNotifications();
+                    });
+                }
+                
+                if (navNotificationsBtn) {
+                    navNotificationsBtn.addEventListener('click', function() {
+                        toggleNotifications();
+                    });
+                }
+                
+                if (closeNotifications) {
+                    closeNotifications.addEventListener('click', function() {
+                        notificationsPanel.classList.remove('open');
+                        overlayNotifications.classList.remove('open');
+                    });
+                }
+                
+                if (overlayNotifications) {
+                    overlayNotifications.addEventListener('click', function() {
+                        notificationsPanel.classList.remove('open');
+                        overlayNotifications.classList.remove('open');
+                    });
+                }
+                
+                // Tabs de notificaciones
+                const tabs = document.querySelectorAll('.notifications-tab');
+                tabs.forEach(tab => {
+                    tab.addEventListener('click', function() {
+                        tabs.forEach(t => t.classList.remove('active'));
+                        this.classList.add('active');
+                    });
+                });
+                
+                console.log("Inicialización de sidebar completada");
+            });
+        </script>
+    </body>
+</html>
