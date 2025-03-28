@@ -1,2326 +1,2356 @@
 <?php
-/**
- * Detail view.
- *
- * @var Laminas\View\Renderer\PhpRenderer $this
- * @var string $table       Nombre de la tabla.
- * @var array  $data        Datos (filas) de la tabla.
- * @var int    $page        Página actual.
- * @var int    $limit       Límites por página.
- * @var int    $totalPages  Total de páginas.
- * @var int    $total       Total de registros.
- * @var string $search      Término de búsqueda global.
- * @var array  $filters     Filtros aplicados.
- */
+    /**
+     * Detail view.
+     *
+     * @var Laminas\View\Renderer\PhpRenderer $this
+     * @var string $table       Nombre de la tabla.
+     * @var array  $data        Datos (filas) de la tabla.
+     * @var int    $page        Página actual.
+     * @var int    $limit       Límites por página.
+     * @var int    $totalPages  Total de páginas.
+     * @var int    $total       Total de registros.
+     * @var string $search      Término de búsqueda global.
+     * @var array  $filters     Filtros aplicados.
+     */
 
-// Función para formatear los nombres de las columnas
-function formatColumnName($column) {
-    // Mapeo específico para ciertos campos
-    $specialCases = [
-        'id' => 'ID',
-        'id_documento' => 'ID Documento',
-        'precio_despues_descuento' => 'Precio con Descuento',
-        'nombre_estado' => 'Estado',
-        'numero_documento_cliente' => 'Documento Cliente',
-        'codigo_sku' => 'SKU',
-        'numero_boleta' => 'N° Boleta',
-        'tipo_factura_origen' => 'Tipo de Factura',
-        'base_imponible' => 'Base Imponible',
-        'precio_sin_impuesto' => 'Precio sin Impuesto',
-        'fecha_creacion' => 'Fecha de Creación'
-    ];
-    
-    // Si existe en casos especiales, retornar el nombre personalizado
-    if (array_key_exists($column, $specialCases)) {
-        return $specialCases[$column];
-    }
-    
-    // Convertir guiones bajos a espacios y capitalizar cada palabra
-    $words = explode('_', $column);
-    $words = array_map('ucfirst', $words);
-    return implode(' ', $words);
-}
-
-// Función para formatear fechas a DD/MM/AAAA
-function formatDateForDisplay($dateString) {
-    if (empty($dateString)) {
-        return '';
-    }
-    
-    // Intentar convertir la fecha con diferentes formatos posibles
-    $formats = ['Y-m-d H:i:s', 'Y-m-d H:i', 'Y-m-d'];
-    $timestamp = false;
-    
-    foreach ($formats as $format) {
-        $date = DateTime::createFromFormat($format, $dateString);
-        if ($date !== false) {
-            $timestamp = $date->getTimestamp();
-            break;
+    // Función para formatear los nombres de las columnas
+    function formatColumnName($column) {
+        // Mapeo específico para ciertos campos
+        $specialCases = [
+            'id' => 'ID',
+            'id_documento' => 'ID Documento',
+            'precio_despues_descuento' => 'Precio con Descuento',
+            'nombre_estado' => 'Estado',
+            'numero_documento_cliente' => 'Documento Cliente',
+            'codigo_sku' => 'SKU',
+            'numero_boleta' => 'N° Boleta',
+            'tipo_factura_origen' => 'Tipo de Factura',
+            'base_imponible' => 'Base Imponible',
+            'precio_sin_impuesto' => 'Precio sin Impuesto',
+            'fecha_creacion' => 'Fecha de Creación'
+        ];
+        
+        // Si existe en casos especiales, retornar el nombre personalizado
+        if (array_key_exists($column, $specialCases)) {
+            return $specialCases[$column];
         }
+        
+        // Convertir guiones bajos a espacios y capitalizar cada palabra
+        $words = explode('_', $column);
+        $words = array_map('ucfirst', $words);
+        return implode(' ', $words);
     }
-    
-    if ($timestamp === false) {
-        // Si no se pudo parsear con los formatos anteriores, intentar con strtotime
-        $timestamp = strtotime($dateString);
-    }
-    
-    // Si se pudo convertir, formatear como DD/MM/AAAA
-    if ($timestamp !== false) {
-        return date('d/m/Y', $timestamp);
-    }
-    
-    // Si no se pudo convertir, devolver la cadena original
-    return $dateString;
-}
 
-// Función para determinar si un campo es tipo fecha basado en su nombre
-function isDateField($fieldName) {
-    return preg_match('/(fecha|date|time|created|updated|modificado|creado)/i', $fieldName);
-}
-?>
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Detalle de <?= $this->escapeHtml($table) ?></title>
-    
-    <!-- Font Awesome, Google Fonts, jQuery y jQuery UI -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.13.2/themes/base/jquery-ui.min.css">
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
-</head>
-<body>
-
-<div class="dashboard-container">
-    <!-- Resumen de información -->
-    <div class="info-summary">
-        <div class="summary-card">
-            <div class="summary-header">
-                <i class="fas fa-info-circle"></i>
-                <h3>Resumen de Información</h3>
-            </div>
-            <div class="summary-content">
-                <div class="summary-item">
-                    <span class="summary-label">Tabla:</span>
-                    <span class="summary-value"><?= $this->escapeHtml($table) ?></span>
-                </div>
-                <div class="summary-item">
-                    <span class="summary-label">Total de registros:</span>
-                    <span class="summary-value"><?= $total ?></span>
-                </div>
-                <div class="summary-item">
-                    <span class="summary-label">Página actual:</span>
-                    <span class="summary-value"><?= $page ?> de <?= $totalPages ?></span>
-                </div>
-                <div class="summary-item">
-                    <span class="summary-label">Registros por página:</span>
-                    <span class="summary-value"><?= $limit ?></span>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="dashboard-header">
-        <div class="header-content">
-            <h1 class="page-title">
-                <i class="fas fa-table"></i>
-                <span class="title-text"><?= $this->escapeHtml($table) ?></span>
-            </h1>
-            <div class="action-buttons">
-                <button class="btn btn-primary" id="toggle-filters">
-                    <i class="fas fa-filter"></i>
-                    <span>Filtros</span>
-                </button>
-                <button class="btn btn-secondary" id="clear-filters">
-                    <i class="fas fa-eraser"></i>
-                    <span>Limpiar</span>
-                </button>
-                <button class="btn btn-success" id="export-csv">
-                    <i class="fas fa-download"></i>
-                    <span>Exportar</span>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <div class="dashboard-content">
-        <!-- Dashboard de resumen con KPIs y gráficos -->
-        <?php if (!empty($data)): 
-            // Función para formatear valores numéricos como moneda
-            function formatCurrency($amount) {
-                return '$ ' . number_format($amount, 2, ',', '.');
+    // Función para formatear fechas a DD/MM/AAAA
+    function formatDateForDisplay($dateString) {
+        if (empty($dateString)) {
+            return '';
+        }
+        
+        // Intentar convertir la fecha con diferentes formatos posibles
+        $formats = ['Y-m-d H:i:s', 'Y-m-d H:i', 'Y-m-d'];
+        $timestamp = false;
+        
+        foreach ($formats as $format) {
+            $date = DateTime::createFromFormat($format, $dateString);
+            if ($date !== false) {
+                $timestamp = $date->getTimestamp();
+                break;
             }
-            
-            // Preprocesar datos para KPIs y gráficos
-            $totalVentas = 0;
-            $totalImpuestos = 0;
-            $totalCosto = 0;
-            $totalMargen = 0;
-            
-            // Contadores para visualizaciones
-            $ventasPorMes = [];
-            $margenPorMes = [];
-            $ventasPorCliente = [];
-            $ventasPorProducto = [];
-            $topProductos = [];
-            
-            // Procesar cada fila para extraer datos relevantes
-            foreach ($data as $row) {
-                // Datos financieros
-                $precio = isset($row['precio_despues_descuento']) ? floatval($row['precio_despues_descuento']) : 0;
-                $costo = isset($row['costo']) ? floatval($row['costo']) : 0;
-                $impuesto = isset($row['impuesto']) ? floatval($row['impuesto']) : 0;
-                $margen = $precio - $costo;
+        }
+        
+        if ($timestamp === false) {
+            // Si no se pudo parsear con los formatos anteriores, intentar con strtotime
+            $timestamp = strtotime($dateString);
+        }
+        
+        // Si se pudo convertir, formatear como DD/MM/AAAA
+        if ($timestamp !== false) {
+            return date('d/m/Y', $timestamp);
+        }
+        
+        // Si no se pudo convertir, devolver la cadena original
+        return $dateString;
+    }
+
+    // Función para determinar si un campo es tipo fecha basado en su nombre
+    function isDateField($fieldName) {
+        return preg_match('/(fecha|date|time|created|updated|modificado|creado)/i', $fieldName);
+    }
+    ?>
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Detalle de <?= $this->escapeHtml($table) ?></title>
+        
+        <!-- Font Awesome, Google Fonts, jQuery y jQuery UI -->
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.13.2/themes/base/jquery-ui.min.css">
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+        <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+    </head>
+    <body>
+
+    <div class="dashboard-container">
+        <!-- Resumen de información -->
+        <div class="info-summary">
+            <div class="summary-card">
+                <div class="summary-header">
+                    <i class="fas fa-info-circle"></i>
+                    <h3>Resumen de Información</h3>
+                </div>
+                <div class="summary-content">
+                    <div class="summary-item">
+                        <span class="summary-label">Tabla:</span>
+                        <span class="summary-value"><?= $this->escapeHtml($table) ?></span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Total de registros:</span>
+                        <span class="summary-value"><?= $total ?></span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Página actual:</span>
+                        <span class="summary-value"><?= $page ?> de <?= $totalPages ?></span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Registros por página:</span>
+                        <span class="summary-value"><?= $limit ?></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard-header">
+            <div class="header-content">
+                <h1 class="page-title">
+                    <i class="fas fa-table"></i>
+                    <span class="title-text"><?= $this->escapeHtml($table) ?></span>
+                </h1>
+                <div class="action-buttons">
+                    <button class="btn btn-primary" id="toggle-filters">
+                        <i class="fas fa-filter"></i>
+                        <span>Filtros</span>
+                    </button>
+                    <button class="btn btn-secondary" id="clear-filters">
+                        <i class="fas fa-eraser"></i>
+                        <span>Limpiar</span>
+                    </button>
+                    <button class="btn btn-success" id="export-csv">
+                        <i class="fas fa-download"></i>
+                        <span>Exportar</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard-content">
+            <!-- Dashboard de resumen con KPIs y gráficos -->
+            <?php if (!empty($data)): 
+                // Función para formatear valores numéricos como moneda
+                function formatCurrency($amount) {
+                    return '$ ' . number_format($amount, 2, ',', '.');
+                }
                 
-                $totalVentas += $precio;
-                $totalImpuestos += $impuesto;
-                $totalCosto += $costo;
-                $totalMargen += $margen;
+                // Preprocesar datos para KPIs y gráficos
+                $totalVentas = 0;
+                $totalImpuestos = 0;
+                $totalCosto = 0;
+                $totalMargen = 0;
                 
-                // Extraer fecha para agrupación por mes
-                $fechaCreacion = '';
-                if (isset($row['fecha_creacion'])) {
-                    $fecha = null;
-                    $formatos = ['Y-m-d H:i:s', 'Y-m-d H:i', 'Y-m-d', 'd/m/Y'];
+                // Contadores para visualizaciones
+                $ventasPorMes = [];
+                $margenPorMes = [];
+                $ventasPorCliente = [];
+                $ventasPorProducto = [];
+                $topProductos = [];
+                
+                // Procesar cada fila para extraer datos relevantes
+                foreach ($data as $row) {
+                    // Datos financieros
+                    $precio = isset($row['precio_despues_descuento']) ? floatval($row['precio_despues_descuento']) : 0;
+                    $costo = isset($row['costo']) ? floatval($row['costo']) : 0;
+                    $impuesto = isset($row['impuesto']) ? floatval($row['impuesto']) : 0;
+                    $margen = $precio - $costo;
                     
-                    foreach ($formatos as $formato) {
-                        $fechaObj = DateTime::createFromFormat($formato, $row['fecha_creacion']);
-                        if ($fechaObj !== false) {
-                            $fecha = $fechaObj;
-                            break;
-                        }
-                    }
+                    $totalVentas += $precio;
+                    $totalImpuestos += $impuesto;
+                    $totalCosto += $costo;
+                    $totalMargen += $margen;
                     
-                    if ($fecha) {
-                        $mes = $fecha->format('Y-m');
-                        $mesNombre = $fecha->format('M Y');
+                    // Extraer fecha para agrupación por mes
+                    $fechaCreacion = '';
+                    if (isset($row['fecha_creacion'])) {
+                        $fecha = null;
+                        $formatos = ['Y-m-d H:i:s', 'Y-m-d H:i', 'Y-m-d', 'd/m/Y'];
                         
-                        // Agrupar ventas por mes
-                        if (!isset($ventasPorMes[$mes])) {
-                            $ventasPorMes[$mes] = [
-                                'nombre' => $mesNombre,
-                                'ventas' => 0,
-                                'impuestos' => 0,
-                                'costo' => 0,
-                                'margen' => 0,
-                                'cantidad' => 0
-                            ];
-                        }
-                        
-                        $ventasPorMes[$mes]['ventas'] += $precio;
-                        $ventasPorMes[$mes]['impuestos'] += $impuesto;
-                        $ventasPorMes[$mes]['costo'] += $costo;
-                        $ventasPorMes[$mes]['margen'] += $margen;
-                        $ventasPorMes[$mes]['cantidad']++;
-                    }
-                }
-                
-                // Agrupar por cliente
-                $nombreCliente = isset($row['nombre_cliente']) ? $row['nombre_cliente'] : 'Sin especificar';
-                if (!empty($nombreCliente)) {
-                    if (!isset($ventasPorCliente[$nombreCliente])) {
-                        $ventasPorCliente[$nombreCliente] = 0;
-                    }
-                    $ventasPorCliente[$nombreCliente] += $precio;
-                }
-                
-                // Agrupar por producto
-                $nombreProducto = isset($row['nombre_producto']) ? $row['nombre_producto'] : '';
-                $sku = isset($row['codigo_sku']) ? $row['codigo_sku'] : '';
-                $productoKey = !empty($nombreProducto) ? $nombreProducto : $sku;
-                
-                if (!empty($productoKey)) {
-                    if (!isset($ventasPorProducto[$productoKey])) {
-                        $ventasPorProducto[$productoKey] = [
-                            'ventas' => 0,
-                            'cantidad' => 0,
-                            'margen' => 0
-                        ];
-                    }
-                    $ventasPorProducto[$productoKey]['ventas'] += $precio;
-                    $ventasPorProducto[$productoKey]['cantidad']++;
-                    $ventasPorProducto[$productoKey]['margen'] += $margen;
-                }
-            }
-            
-            // Ordenar ventas por mes (cronológicamente)
-            ksort($ventasPorMes);
-            
-            // Obtener los 5 clientes con más ventas
-            arsort($ventasPorCliente);
-            $topClientes = array_slice($ventasPorCliente, 0, 20, true);
-            
-            // Obtener los 10 productos más vendidos (por valor)
-            uasort($ventasPorProducto, function($a, $b) {
-                return $b['ventas'] <=> $a['ventas'];
-            });
-            $topProductos = array_slice($ventasPorProducto, 0, 10, true);
-            
-            // Calcular porcentajes para KPIs
-            $margenPromedio = $totalVentas > 0 ? ($totalMargen / $totalVentas * 100) : 0;
-            
-            // Preparar datos para gráficos en formato JSON
-            $datosVentasMes = [];
-            $datosMargenMes = [];
-            
-            foreach ($ventasPorMes as $mes => $info) {
-                $datosVentasMes[] = [
-                    'mes' => $info['nombre'],
-                    'ventas' => round($info['ventas'], 2),
-                    'costo' => round($info['costo'], 2)
-                ];
-                
-                $datosMargenMes[] = [
-                    'mes' => $info['nombre'],
-                    'margen' => round($info['margen'], 2),
-                    'porcentaje' => $info['ventas'] > 0 ? round(($info['margen'] / $info['ventas'] * 100), 2) : 0
-                ];
-            }
-            
-            $jsonVentasMes = json_encode($datosVentasMes);
-            $jsonMargenMes = json_encode($datosMargenMes);
-            
-            // Preparar datos para gráfico de clientes
-            $datosClientes = [];
-            foreach ($topClientes as $cliente => $ventas) {
-                $datosClientes[] = [
-                    'nombre' => $cliente,
-                    'ventas' => round($ventas, 2)
-                ];
-            }
-            $jsonClientes = json_encode($datosClientes);
-            
-            // Preparar datos para gráfico de productos
-            $datosProductos = [];
-            foreach ($topProductos as $producto => $info) {
-                $datosProductos[] = [
-                    'nombre' => $producto,
-                    'ventas' => round($info['ventas'], 2),
-                    'cantidad' => $info['cantidad'],
-                    'margen' => round($info['margen'], 2)
-                ];
-            }
-            $jsonProductos = json_encode($datosProductos);
-        ?>
-
-        <div class="dashboard-summary">
-            <div class="dashboard-header">
-                <div class="header-content">
-                    <h2 class="section-title">
-                        <i class="fas fa-chart-line"></i>
-                        <span>Dashboard de Resumen</span>
-                    </h2>
-                    <div class="dashboard-actions">
-                        <button class="btn btn-primary" id="toggle-charts">
-                            <i class="fas fa-chart-bar"></i>
-                            <span>Mostrar/Ocultar Gráficos</span>
-                        </button>
-                        <div class="date-filter">
-                            <i class="fas fa-calendar-alt"></i>
-                            <select id="periodo-select" class="period-select">
-                                <option value="todos">Todos los períodos</option>
-                                <?php foreach ($ventasPorMes as $mes => $info): ?>
-                                    <option value="<?= $mes ?>"><?= $info['nombre'] ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Tarjetas de KPIs -->
-            <div class="kpi-container">
-                <div class="kpi-card">
-                    <div class="kpi-icon">
-                        <i class="fas fa-dollar-sign"></i>
-                    </div>
-                    <div class="kpi-content">
-                        <h3 class="kpi-title">Ventas Totales</h3>
-                        <div class="kpi-value"><?= formatCurrency($totalVentas) ?></div>
-                        <div class="kpi-description">
-                            <?= count($data) ?> transacciones
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="kpi-card">
-                    <div class="kpi-icon">
-                        <i class="fas fa-percentage"></i>
-                    </div>
-                    <div class="kpi-content">
-                        <h3 class="kpi-title">Margen Promedio</h3>
-                        <div class="kpi-value"><?= number_format($margenPromedio, 2) ?>%</div>
-                        <div class="kpi-description">
-                            Total: <?= formatCurrency($totalMargen) ?>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="kpi-card">
-                    <div class="kpi-icon">
-                        <i class="fas fa-shopping-cart"></i>
-                    </div>
-                    <div class="kpi-content">
-                        <h3 class="kpi-title">Valor Promedio</h3>
-                        <div class="kpi-value">
-                            <?= formatCurrency($totalVentas / (count($data) ?: 1)) ?>
-                        </div>
-                        <div class="kpi-description">
-                            Por transacción
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="kpi-card">
-                    <div class="kpi-icon">
-                        <i class="fas fa-chart-pie"></i>
-                    </div>
-                    <div class="kpi-content">
-                        <h3 class="kpi-title">Impuestos</h3>
-                        <div class="kpi-value"><?= formatCurrency($totalImpuestos) ?></div>
-                        <div class="kpi-description">
-                            <?= number_format($totalImpuestos / ($totalVentas ?: 1) * 100, 2) ?>% del total
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Sección de gráficos -->
-            <div id="charts-section" class="charts-container">
-                <div class="chart-row">
-                    <div class="chart-card">
-                        <div class="chart-header">
-                            <h3 class="chart-title">Ventas por Mes</h3>
-                        </div>
-                        <div class="chart-body">
-                            <canvas id="ventasMesChart"></canvas>
-                        </div>
-                    </div>
-                    
-                    <div class="chart-card">
-                        <div class="chart-header">
-                            <h3 class="chart-title">Margen por Mes</h3>
-                        </div>
-                        <div class="chart-body">
-                            <canvas id="margenMesChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="chart-row">
-                    <div class="chart-card">
-                        <div class="chart-header">
-                            <h3 class="chart-title">Top 5 Clientes</h3>
-                        </div>
-                        <div class="chart-body">
-                            <canvas id="clientesChart"></canvas>
-                        </div>
-                    </div>
-                    
-                    <div class="chart-card">
-                        <div class="chart-header">
-                            <h3 class="chart-title">Top 10 Productos</h3>
-                        </div>
-                        <div class="chart-body">
-                            <canvas id="productosChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Incluir Chart.js -->
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
-
-        <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Inicializar los gráficos
-            const ventasMesData = <?= $jsonVentasMes ?>;
-            const margenMesData = <?= $jsonMargenMes ?>;
-            const clientesData = <?= $jsonClientes ?>;
-            const productosData = <?= $jsonProductos ?>;
-            
-            // Colores para los gráficos
-            const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#4361ee';
-            const secondaryColor = getComputedStyle(document.documentElement).getPropertyValue('--secondary').trim() || '#6c757d';
-            const successColor = getComputedStyle(document.documentElement).getPropertyValue('--success').trim() || '#4caf50';
-            const warningColor = getComputedStyle(document.documentElement).getPropertyValue('--warning').trim() || '#ff9800';
-            const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--primary-light').trim() || '#4895ef';
-            
-            // Mostrar/ocultar sección de gráficos
-            const toggleChartsBtn = document.getElementById('toggle-charts');
-            const chartsSection = document.getElementById('charts-section');
-            
-            toggleChartsBtn.addEventListener('click', function() {
-                if (chartsSection.style.display === 'none') {
-                    chartsSection.style.display = 'block';
-                    // Redimensionar gráficos para que se rendericen correctamente
-                    setTimeout(() => {
-                        window.dispatchEvent(new Event('resize'));
-                    }, 100);
-                } else {
-                    chartsSection.style.display = 'none';
-                }
-            });
-            
-            // Gráfico de ventas por mes
-            let ventasMesChart = null;
-            if (document.getElementById('ventasMesChart')) {
-                ventasMesChart = new Chart(
-                    document.getElementById('ventasMesChart').getContext('2d'),
-                    {
-                        type: 'bar',
-                        data: {
-                            labels: ventasMesData.map(item => item.mes),
-                            datasets: [
-                                {
-                                    label: 'Ventas',
-                                    data: ventasMesData.map(item => item.ventas),
-                                    backgroundColor: primaryColor,
-                                    borderColor: primaryColor,
-                                    borderWidth: 1
-                                },
-                                {
-                                    label: 'Costo',
-                                    data: ventasMesData.map(item => item.costo),
-                                    backgroundColor: secondaryColor,
-                                    borderColor: secondaryColor,
-                                    borderWidth: 1
-                                }
-                            ]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                title: {
-                                    display: false
-                                },
-                                legend: {
-                                    position: 'top',
-                                    align: 'end'
-                                },
-                                tooltip: {
-                                    callbacks: {
-                                        label: function(context) {
-                                            return context.dataset.label + ': $ ' + 
-                                                new Intl.NumberFormat('es-CL').format(context.raw.toFixed(2));
-                                        }
-                                    }
-                                }
-                            },
-                            scales: {
-                                y: {
-                                    beginAtZero: true,
-                                    ticks: {
-                                        callback: function(value) {
-                                            return '$ ' + new Intl.NumberFormat('es-CL').format(value);
-                                        }
-                                    }
-                                }
+                        foreach ($formatos as $formato) {
+                            $fechaObj = DateTime::createFromFormat($formato, $row['fecha_creacion']);
+                            if ($fechaObj !== false) {
+                                $fecha = $fechaObj;
+                                break;
                             }
                         }
+                        
+                        if ($fecha) {
+                            $mes = $fecha->format('Y-m');
+                            $mesNombre = $fecha->format('M Y');
+                            
+                            // Agrupar ventas por mes
+                            if (!isset($ventasPorMes[$mes])) {
+                                $ventasPorMes[$mes] = [
+                                    'nombre' => $mesNombre,
+                                    'ventas' => 0,
+                                    'impuestos' => 0,
+                                    'costo' => 0,
+                                    'margen' => 0,
+                                    'cantidad' => 0
+                                ];
+                            }
+                            
+                            $ventasPorMes[$mes]['ventas'] += $precio;
+                            $ventasPorMes[$mes]['impuestos'] += $impuesto;
+                            $ventasPorMes[$mes]['costo'] += $costo;
+                            $ventasPorMes[$mes]['margen'] += $margen;
+                            $ventasPorMes[$mes]['cantidad']++;
+                        }
                     }
-                );
-            }
-            
-            // Gráfico de margen por mes
-            let margenMesChart = null;
-            if (document.getElementById('margenMesChart')) {
-                margenMesChart = new Chart(
-                    document.getElementById('margenMesChart').getContext('2d'),
-                    {
-                        type: 'line',
-                        data: {
-                            labels: margenMesData.map(item => item.mes),
-                            datasets: [
-                                {
-                                    label: 'Margen ($)',
-                                    data: margenMesData.map(item => item.margen),
-                                    backgroundColor: 'rgba(76, 175, 80, 0.2)',
-                                    borderColor: successColor,
-                                    borderWidth: 2,
-                                    fill: true,
-                                    tension: 0.2,
-                                    yAxisID: 'y'
-                                },
-                                {
-                                    label: 'Margen (%)',
-                                    data: margenMesData.map(item => item.porcentaje),
-                                    backgroundColor: 'rgba(255, 152, 0, 0.2)',
-                                    borderColor: warningColor,
-                                    borderWidth: 2,
-                                    borderDash: [5, 5],
-                                    fill: false,
-                                    tension: 0.2,
-                                    yAxisID: 'y1'
-                                }
-                            ]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    position: 'top',
-                                    align: 'end'
-                                },
-                                tooltip: {
-                                    callbacks: {
-                                        label: function(context) {
-                                            if (context.dataset.label.includes('$')) {
+                    
+                    // Agrupar por cliente
+                    $nombreCliente = isset($row['nombre_cliente']) ? $row['nombre_cliente'] : 'Sin especificar';
+                    if (!empty($nombreCliente)) {
+                        if (!isset($ventasPorCliente[$nombreCliente])) {
+                            $ventasPorCliente[$nombreCliente] = 0;
+                        }
+                        $ventasPorCliente[$nombreCliente] += $precio;
+                    }
+                    
+                    // Agrupar por producto
+                    $nombreProducto = isset($row['nombre_producto']) ? $row['nombre_producto'] : '';
+                    $sku = isset($row['codigo_sku']) ? $row['codigo_sku'] : '';
+                    $productoKey = !empty($nombreProducto) ? $nombreProducto : $sku;
+                    
+                    if (!empty($productoKey)) {
+                        if (!isset($ventasPorProducto[$productoKey])) {
+                            $ventasPorProducto[$productoKey] = [
+                                'ventas' => 0,
+                                'cantidad' => 0,
+                                'margen' => 0
+                            ];
+                        }
+                        $ventasPorProducto[$productoKey]['ventas'] += $precio;
+                        $ventasPorProducto[$productoKey]['cantidad']++;
+                        $ventasPorProducto[$productoKey]['margen'] += $margen;
+                    }
+                }
+                
+                // Ordenar ventas por mes (cronológicamente)
+                ksort($ventasPorMes);
+                
+                // Obtener los 5 clientes con más ventas
+                arsort($ventasPorCliente);
+                $topClientes = array_slice($ventasPorCliente, 0, 20, true);
+                
+                // Obtener los 10 productos más vendidos (por valor)
+                uasort($ventasPorProducto, function($a, $b) {
+                    return $b['ventas'] <=> $a['ventas'];
+                });
+                $topProductos = array_slice($ventasPorProducto, 0, 10, true);
+                
+                // Calcular porcentajes para KPIs
+                $margenPromedio = $totalVentas > 0 ? ($totalMargen / $totalVentas * 100) : 0;
+                
+                // Preparar datos para gráficos en formato JSON
+                $datosVentasMes = [];
+                $datosMargenMes = [];
+                
+                foreach ($ventasPorMes as $mes => $info) {
+                    $datosVentasMes[] = [
+                        'mes' => $info['nombre'],
+                        'ventas' => round($info['ventas'], 2),
+                        'costo' => round($info['costo'], 2)
+                    ];
+                    
+                    $datosMargenMes[] = [
+                        'mes' => $info['nombre'],
+                        'margen' => round($info['margen'], 2),
+                        'porcentaje' => $info['ventas'] > 0 ? round(($info['margen'] / $info['ventas'] * 100), 2) : 0
+                    ];
+                }
+                
+                $jsonVentasMes = json_encode($datosVentasMes);
+                $jsonMargenMes = json_encode($datosMargenMes);
+                
+                // Preparar datos para gráfico de clientes
+                $datosClientes = [];
+                foreach ($topClientes as $cliente => $ventas) {
+                    $datosClientes[] = [
+                        'nombre' => $cliente,
+                        'ventas' => round($ventas, 2)
+                    ];
+                }
+                $jsonClientes = json_encode($datosClientes);
+                
+                // Preparar datos para gráfico de productos
+                $datosProductos = [];
+                foreach ($topProductos as $producto => $info) {
+                    $datosProductos[] = [
+                        'nombre' => $producto,
+                        'ventas' => round($info['ventas'], 2),
+                        'cantidad' => $info['cantidad'],
+                        'margen' => round($info['margen'], 2)
+                    ];
+                }
+                $jsonProductos = json_encode($datosProductos);
+            ?>
+
+            <div class="dashboard-summary">
+                <div class="dashboard-header">
+                    <div class="header-content">
+                        <h2 class="section-title">
+                            <i class="fas fa-chart-line"></i>
+                            <span>Dashboard de Resumen</span>
+                        </h2>
+                        <div class="dashboard-actions">
+                            <button class="btn btn-primary" id="toggle-charts">
+                                <i class="fas fa-chart-bar"></i>
+                                <span>Mostrar/Ocultar Gráficos</span>
+                            </button>
+                            <div class="date-filter">
+                                <i class="fas fa-calendar-alt"></i>
+                                <select id="periodo-select" class="period-select">
+                                    <option value="todos">Todos los períodos</option>
+                                    <?php foreach ($ventasPorMes as $mes => $info): ?>
+                                        <option value="<?= $mes ?>"><?= $info['nombre'] ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tarjetas de KPIs -->
+                <div class="kpi-container">
+                    <div class="kpi-card">
+                        <div class="kpi-icon">
+                            <i class="fas fa-dollar-sign"></i>
+                        </div>
+                        <div class="kpi-content">
+                            <h3 class="kpi-title">Ventas Totales</h3>
+                            <div class="kpi-value"><?= formatCurrency($totalVentas) ?></div>
+                            <div class="kpi-description">
+                                <?= count($data) ?> transacciones
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="kpi-card">
+                        <div class="kpi-icon">
+                            <i class="fas fa-percentage"></i>
+                        </div>
+                        <div class="kpi-content">
+                            <h3 class="kpi-title">Margen Promedio</h3>
+                            <div class="kpi-value"><?= number_format($margenPromedio, 2) ?>%</div>
+                            <div class="kpi-description">
+                                Total: <?= formatCurrency($totalMargen) ?>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="kpi-card">
+                        <div class="kpi-icon">
+                            <i class="fas fa-shopping-cart"></i>
+                        </div>
+                        <div class="kpi-content">
+                            <h3 class="kpi-title">Valor Promedio</h3>
+                            <div class="kpi-value">
+                                <?= formatCurrency($totalVentas / (count($data) ?: 1)) ?>
+                            </div>
+                            <div class="kpi-description">
+                                Por transacción
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="kpi-card">
+                        <div class="kpi-icon">
+                            <i class="fas fa-chart-pie"></i>
+                        </div>
+                        <div class="kpi-content">
+                            <h3 class="kpi-title">Impuestos</h3>
+                            <div class="kpi-value"><?= formatCurrency($totalImpuestos) ?></div>
+                            <div class="kpi-description">
+                                <?= number_format($totalImpuestos / ($totalVentas ?: 1) * 100, 2) ?>% del total
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Sección de gráficos -->
+                <div id="charts-section" class="charts-container">
+                    <div class="chart-row">
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <h3 class="chart-title">Ventas por Mes</h3>
+                            </div>
+                            <div class="chart-body">
+                                <canvas id="ventasMesChart"></canvas>
+                            </div>
+                        </div>
+                        
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <h3 class="chart-title">Margen por Mes</h3>
+                            </div>
+                            <div class="chart-body">
+                                <canvas id="margenMesChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-row">
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <h3 class="chart-title">Top 5 Clientes</h3>
+                            </div>
+                            <div class="chart-body">
+                                <canvas id="clientesChart"></canvas>
+                            </div>
+                        </div>
+                        
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <h3 class="chart-title">Top 10 Productos</h3>
+                            </div>
+                            <div class="chart-body">
+                                <canvas id="productosChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Incluir Chart.js -->
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+
+            <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                // Inicializar los gráficos
+                const ventasMesData = <?= $jsonVentasMes ?>;
+                const margenMesData = <?= $jsonMargenMes ?>;
+                const clientesData = <?= $jsonClientes ?>;
+                const productosData = <?= $jsonProductos ?>;
+                
+                // Colores para los gráficos
+                const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#4361ee';
+                const secondaryColor = getComputedStyle(document.documentElement).getPropertyValue('--secondary').trim() || '#6c757d';
+                const successColor = getComputedStyle(document.documentElement).getPropertyValue('--success').trim() || '#4caf50';
+                const warningColor = getComputedStyle(document.documentElement).getPropertyValue('--warning').trim() || '#ff9800';
+                const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--primary-light').trim() || '#4895ef';
+                
+                // Mostrar/ocultar sección de gráficos
+                const toggleChartsBtn = document.getElementById('toggle-charts');
+                const chartsSection = document.getElementById('charts-section');
+                
+                toggleChartsBtn.addEventListener('click', function() {
+                    if (chartsSection.style.display === 'none') {
+                        chartsSection.style.display = 'block';
+                        // Redimensionar gráficos para que se rendericen correctamente
+                        setTimeout(() => {
+                            window.dispatchEvent(new Event('resize'));
+                        }, 100);
+                    } else {
+                        chartsSection.style.display = 'none';
+                    }
+                });
+                
+                // Gráfico de ventas por mes
+                let ventasMesChart = null;
+                if (document.getElementById('ventasMesChart')) {
+                    ventasMesChart = new Chart(
+                        document.getElementById('ventasMesChart').getContext('2d'),
+                        {
+                            type: 'bar',
+                            data: {
+                                labels: ventasMesData.map(item => item.mes),
+                                datasets: [
+                                    {
+                                        label: 'Ventas',
+                                        data: ventasMesData.map(item => item.ventas),
+                                        backgroundColor: primaryColor,
+                                        borderColor: primaryColor,
+                                        borderWidth: 1
+                                    },
+                                    {
+                                        label: 'Costo',
+                                        data: ventasMesData.map(item => item.costo),
+                                        backgroundColor: secondaryColor,
+                                        borderColor: secondaryColor,
+                                        borderWidth: 1
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    title: {
+                                        display: false
+                                    },
+                                    legend: {
+                                        position: 'top',
+                                        align: 'end'
+                                    },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: function(context) {
                                                 return context.dataset.label + ': $ ' + 
                                                     new Intl.NumberFormat('es-CL').format(context.raw.toFixed(2));
-                                            } else {
-                                                return context.dataset.label + ': ' + 
-                                                    context.raw.toFixed(2) + '%';
+                                            }
+                                        }
+                                    }
+                                },
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        ticks: {
+                                            callback: function(value) {
+                                                return '$ ' + new Intl.NumberFormat('es-CL').format(value);
                                             }
                                         }
                                     }
                                 }
-                            },
-                            scales: {
-                                y: {
-                                    beginAtZero: true,
-                                    position: 'left',
-                                    ticks: {
-                                        callback: function(value) {
-                                            return '$ ' + new Intl.NumberFormat('es-CL').format(value);
-                                        }
-                                    }
-                                },
-                                y1: {
-                                    beginAtZero: true,
-                                    position: 'right',
-                                    max: 100,
-                                    grid: {
-                                        drawOnChartArea: false
+                            }
+                        }
+                    );
+                }
+                
+                // Gráfico de margen por mes
+                let margenMesChart = null;
+                if (document.getElementById('margenMesChart')) {
+                    margenMesChart = new Chart(
+                        document.getElementById('margenMesChart').getContext('2d'),
+                        {
+                            type: 'line',
+                            data: {
+                                labels: margenMesData.map(item => item.mes),
+                                datasets: [
+                                    {
+                                        label: 'Margen ($)',
+                                        data: margenMesData.map(item => item.margen),
+                                        backgroundColor: 'rgba(76, 175, 80, 0.2)',
+                                        borderColor: successColor,
+                                        borderWidth: 2,
+                                        fill: true,
+                                        tension: 0.2,
+                                        yAxisID: 'y'
                                     },
-                                    ticks: {
-                                        callback: function(value) {
-                                            return value + '%';
-                                        }
+                                    {
+                                        label: 'Margen (%)',
+                                        data: margenMesData.map(item => item.porcentaje),
+                                        backgroundColor: 'rgba(255, 152, 0, 0.2)',
+                                        borderColor: warningColor,
+                                        borderWidth: 2,
+                                        borderDash: [5, 5],
+                                        fill: false,
+                                        tension: 0.2,
+                                        yAxisID: 'y1'
                                     }
-                                }
-                            }
-                        }
-                    }
-                );
-            }
-            
-            // Gráfico de clientes
-            let clientesChart = null;
-            if (document.getElementById('clientesChart')) {
-                clientesChart = new Chart(
-                    document.getElementById('clientesChart').getContext('2d'),
-                    {
-                        type: 'doughnut',
-                        data: {
-                            labels: clientesData.map(item => item.nombre),
-                            datasets: [
-                                {
-                                    data: clientesData.map(item => item.ventas),
-                                    backgroundColor: [
-                                        primaryColor,
-                                        accentColor,
-                                        successColor,
-                                        warningColor,
-                                        '#9c27b0'
-                                    ],
-                                    borderWidth: 1
-                                }
-                            ]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    position: 'right'
-                                },
-                                tooltip: {
-                                    callbacks: {
-                                        label: function(context) {
-                                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                            const percentage = Math.round((context.raw / total * 100) * 10) / 10;
-                                            return context.label + ': $ ' + 
-                                                new Intl.NumberFormat('es-CL').format(context.raw.toFixed(2)) +
-                                                ' (' + percentage + '%)';
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                );
-            }
-            
-            // Gráfico de productos
-            let productosChart = null;
-            if (document.getElementById('productosChart')) {
-                // En Chart.js 3.x, 'horizontalBar' se reemplaza por configurando 'indexAxis' a 'y'
-                productosChart = new Chart(
-                    document.getElementById('productosChart').getContext('2d'),
-                    {
-                        type: 'bar',
-                        data: {
-                            labels: productosData.map(item => {
-                                // Acortar nombres largos para mejor visualización
-                                const nombre = item.nombre;
-                                return nombre.length > 25 ? nombre.substring(0, 22) + '...' : nombre;
-                            }),
-                            datasets: [
-                                {
-                                    label: 'Ventas ($)',
-                                    data: productosData.map(item => item.ventas),
-                                    backgroundColor: primaryColor,
-                                    borderColor: primaryColor,
-                                    borderWidth: 1
-                                }
-                            ]
-                        },
-                        options: {
-                            indexAxis: 'y',
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    position: 'top',
-                                    align: 'end'
-                                },
-                                tooltip: {
-                                    callbacks: {
-                                        title: function(tooltipItems) {
-                                            // Mostrar nombre completo en tooltip
-                                            const index = tooltipItems[0].dataIndex;
-                                            return productosData[index].nombre;
-                                        },
-                                        label: function(context) {
-                                            const index = context.dataIndex;
-                                            const item = productosData[index];
-                                            let output = [];
-                                            
-                                            output.push('Ventas: $ ' + new Intl.NumberFormat('es-CL').format(item.ventas.toFixed(2)));
-                                            output.push('Cantidad: ' + item.cantidad);
-                                            output.push('Margen: $ ' + new Intl.NumberFormat('es-CL').format(item.margen.toFixed(2)));
-                                            
-                                            return output;
-                                        }
-                                    }
-                                }
+                                ]
                             },
-                            scales: {
-                                x: {
-                                    beginAtZero: true,
-                                    ticks: {
-                                        callback: function(value) {
-                                            return '$ ' + new Intl.NumberFormat('es-CL').format(value);
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: {
+                                        position: 'top',
+                                        align: 'end'
+                                    },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: function(context) {
+                                                if (context.dataset.label.includes('$')) {
+                                                    return context.dataset.label + ': $ ' + 
+                                                        new Intl.NumberFormat('es-CL').format(context.raw.toFixed(2));
+                                                } else {
+                                                    return context.dataset.label + ': ' + 
+                                                        context.raw.toFixed(2) + '%';
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        position: 'left',
+                                        ticks: {
+                                            callback: function(value) {
+                                                return '$ ' + new Intl.NumberFormat('es-CL').format(value);
+                                            }
+                                        }
+                                    },
+                                    y1: {
+                                        beginAtZero: true,
+                                        position: 'right',
+                                        max: 100,
+                                        grid: {
+                                            drawOnChartArea: false
+                                        },
+                                        ticks: {
+                                            callback: function(value) {
+                                                return value + '%';
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
-                    }
-                );
+                    );
+                }
+                
+                // Gráfico de clientes
+                let clientesChart = null;
+                if (document.getElementById('clientesChart')) {
+                    clientesChart = new Chart(
+                        document.getElementById('clientesChart').getContext('2d'),
+                        {
+                            type: 'doughnut',
+                            data: {
+                                labels: clientesData.map(item => item.nombre),
+                                datasets: [
+                                    {
+                                        data: clientesData.map(item => item.ventas),
+                                        backgroundColor: [
+                                            primaryColor,
+                                            accentColor,
+                                            successColor,
+                                            warningColor,
+                                            '#9c27b0'
+                                        ],
+                                        borderWidth: 1
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: {
+                                        position: 'right'
+                                    },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: function(context) {
+                                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                                const percentage = Math.round((context.raw / total * 100) * 10) / 10;
+                                                return context.label + ': $ ' + 
+                                                    new Intl.NumberFormat('es-CL').format(context.raw.toFixed(2)) +
+                                                    ' (' + percentage + '%)';
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    );
+                }
+                
+                // Gráfico de productos
+                let productosChart = null;
+                if (document.getElementById('productosChart')) {
+                    // En Chart.js 3.x, 'horizontalBar' se reemplaza por configurando 'indexAxis' a 'y'
+                    productosChart = new Chart(
+                        document.getElementById('productosChart').getContext('2d'),
+                        {
+                            type: 'bar',
+                            data: {
+                                labels: productosData.map(item => {
+                                    // Acortar nombres largos para mejor visualización
+                                    const nombre = item.nombre;
+                                    return nombre.length > 25 ? nombre.substring(0, 22) + '...' : nombre;
+                                }),
+                                datasets: [
+                                    {
+                                        label: 'Ventas ($)',
+                                        data: productosData.map(item => item.ventas),
+                                        backgroundColor: primaryColor,
+                                        borderColor: primaryColor,
+                                        borderWidth: 1
+                                    }
+                                ]
+                            },
+                            options: {
+                                indexAxis: 'y',
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: {
+                                        position: 'top',
+                                        align: 'end'
+                                    },
+                                    tooltip: {
+                                        callbacks: {
+                                            title: function(tooltipItems) {
+                                                // Mostrar nombre completo en tooltip
+                                                const index = tooltipItems[0].dataIndex;
+                                                return productosData[index].nombre;
+                                            },
+                                            label: function(context) {
+                                                const index = context.dataIndex;
+                                                const item = productosData[index];
+                                                let output = [];
+                                                
+                                                output.push('Ventas: $ ' + new Intl.NumberFormat('es-CL').format(item.ventas.toFixed(2)));
+                                                output.push('Cantidad: ' + item.cantidad);
+                                                output.push('Margen: $ ' + new Intl.NumberFormat('es-CL').format(item.margen.toFixed(2)));
+                                                
+                                                return output;
+                                            }
+                                        }
+                                    }
+                                },
+                                scales: {
+                                    x: {
+                                        beginAtZero: true,
+                                        ticks: {
+                                            callback: function(value) {
+                                                return '$ ' + new Intl.NumberFormat('es-CL').format(value);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    );
+                }
+                
+                // Filtro por período
+                const periodoSelect = document.getElementById('periodo-select');
+                if (periodoSelect) {
+                    periodoSelect.addEventListener('change', function() {
+                        const periodo = this.value;
+                        if (periodo === 'todos') {
+                            // Reiniciar gráficos a todos los datos
+                            alert('Mostrando datos de todos los períodos');
+                            window.location.reload(); // Simplificado - podría mejorarse para no recargar toda la página
+                        } else {
+                            // Filtrar datos por período
+                            alert('Filtrando por período: ' + periodo);
+                            // Aquí iría la implementación para filtrar los datos por mes
+                            // Para una implementación completa, utilizaríamos AJAX para obtener los datos filtrados
+                        }
+                    });
+                }
+            });
+            </script>
+
+            <style>
+            /* Estilos para el dashboard de resumen */
+            .dashboard-summary {
+                margin-bottom: 2rem;
             }
-            
-            // Filtro por período
-            const periodoSelect = document.getElementById('periodo-select');
-            if (periodoSelect) {
-                periodoSelect.addEventListener('change', function() {
-                    const periodo = this.value;
-                    if (periodo === 'todos') {
-                        // Reiniciar gráficos a todos los datos
-                        alert('Mostrando datos de todos los períodos');
-                        window.location.reload(); // Simplificado - podría mejorarse para no recargar toda la página
-                    } else {
-                        // Filtrar datos por período
-                        alert('Filtrando por período: ' + periodo);
-                        // Aquí iría la implementación para filtrar los datos por mes
-                        // Para una implementación completa, utilizaríamos AJAX para obtener los datos filtrados
-                    }
-                });
-            }
-        });
-        </script>
 
-        <style>
-        /* Estilos para el dashboard de resumen */
-        .dashboard-summary {
-            margin-bottom: 2rem;
-        }
-
-        .section-title {
-            font-size: 1.5rem;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .section-title i {
-            color: var(--primary);
-        }
-
-        .dashboard-actions {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .date-filter {
-            display: flex;
-            align-items: center;
-            background-color: var(--light);
-            border-radius: var(--border-radius);
-            padding: 0.5rem 1rem;
-            border: 1px solid var(--border-color);
-        }
-
-        .date-filter i {
-            color: var(--primary);
-            margin-right: 0.5rem;
-        }
-
-        .period-select {
-            background: none;
-            border: none;
-            font-size: 0.875rem;
-            color: var(--text-main);
-            cursor: pointer;
-            padding-right: 1rem;
-        }
-
-        .period-select:focus {
-            outline: none;
-        }
-
-        /* Tarjetas de KPIs */
-        .kpi-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .kpi-card {
-            background-color: var(--card-bg);
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow);
-            padding: 1.5rem;
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            border: 1px solid var(--border-color);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-
-        .kpi-card:hover {
-            transform: translateY(-5px);
-            box-shadow: var(--shadow-lg);
-        }
-
-        .kpi-icon {
-            width: 3.5rem;
-            height: 3.5rem;
-            border-radius: 50%;
-            background-color: rgba(67, 97, 238, 0.1);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-
-        .kpi-icon i {
-            font-size: 1.5rem;
-            color: var(--primary);
-        }
-
-        .kpi-content {
-            flex-grow: 1;
-        }
-
-        .kpi-title {
-            font-size: 0.875rem;
-            color: var(--text-muted);
-            margin-bottom: 0.25rem;
-        }
-
-        .kpi-value {
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: var(--text-main);
-            margin-bottom: 0.25rem;
-        }
-
-        .kpi-description {
-            font-size: 0.813rem;
-            color: var(--text-muted);
-        }
-
-        /* Contenedor de gráficos */
-        .charts-container {
-            margin-bottom: 1.5rem;
-        }
-
-        .chart-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .chart-card {
-            background-color: var(--card-bg);
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow);
-            overflow: hidden;
-            border: 1px solid var(--border-color);
-        }
-
-        .chart-header {
-            padding: 1rem 1.5rem;
-            border-bottom: 1px solid var(--border-color);
-            background-color: var(--light);
-        }
-
-        .chart-title {
-            font-size: 1rem;
-            font-weight: 600;
-            color: var(--text-main);
-            margin: 0;
-        }
-
-        .chart-body {
-            padding: 1.5rem;
-            height: 300px;
-            position: relative;
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .kpi-container {
-                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            }
-            
-            .chart-row {
-                grid-template-columns: 1fr;
-            }
-            
-            .chart-card {
+            .section-title {
+                font-size: 1.5rem;
                 margin-bottom: 1rem;
-            }
-            
-            .dashboard-actions {
-                flex-direction: column;
-                align-items: flex-start;
+                display: flex;
+                align-items: center;
                 gap: 0.75rem;
             }
-            
-            .date-filter {
-                width: 100%;
-                justify-content: space-between;
+
+            .section-title i {
+                color: var(--primary);
             }
-        }
 
-        /* Compatibilidad con Chart.js 3.x */
-        canvas {
-            max-width: 100%;
-        }
-        </style>
+            .dashboard-actions {
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+            }
 
-        <?php endif; // Fin del condicional para el dashboard ?>
+            .date-filter {
+                display: flex;
+                align-items: center;
+                background-color: var(--light);
+                border-radius: var(--border-radius);
+                padding: 0.5rem 1rem;
+                border: 1px solid var(--border-color);
+            }
 
-        <?php if (!empty($data)): ?>
-            <?php
-                // Obtener encabezados del primer registro
-                $allHeaders = array_keys($data[0]);
+            .date-filter i {
+                color: var(--primary);
+                margin-right: 0.5rem;
+            }
+
+            .period-select {
+                background: none;
+                border: none;
+                font-size: 0.875rem;
+                color: var(--text-main);
+                cursor: pointer;
+                padding-right: 1rem;
+            }
+
+            .period-select:focus {
+                outline: none;
+            }
+
+            /* Tarjetas de KPIs */
+            .kpi-container {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+                gap: 1.5rem;
+                margin-bottom: 1.5rem;
+            }
+
+            .kpi-card {
+                background-color: var(--card-bg);
+                border-radius: var(--border-radius);
+                box-shadow: var(--shadow);
+                padding: 1.5rem;
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+                border: 1px solid var(--border-color);
+                transition: transform 0.3s ease, box-shadow 0.3s ease;
+            }
+
+            .kpi-card:hover {
+                transform: translateY(-5px);
+                box-shadow: var(--shadow-lg);
+            }
+
+            .kpi-icon {
+                width: 3.5rem;
+                height: 3.5rem;
+                border-radius: 50%;
+                background-color: rgba(67, 97, 238, 0.1);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+            }
+
+            .kpi-icon i {
+                font-size: 1.5rem;
+                color: var(--primary);
+            }
+
+            .kpi-content {
+                flex-grow: 1;
+            }
+
+            .kpi-title {
+                font-size: 0.875rem;
+                color: var(--text-muted);
+                margin-bottom: 0.25rem;
+            }
+
+            .kpi-value {
+                font-size: 1.5rem;
+                font-weight: 600;
+                color: var(--text-main);
+                margin-bottom: 0.25rem;
+            }
+
+            .kpi-description {
+                font-size: 0.813rem;
+                color: var(--text-muted);
+            }
+
+            /* Contenedor de gráficos */
+            .charts-container {
+                margin-bottom: 1.5rem;
+            }
+
+            .chart-row {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+                gap: 1.5rem;
+                margin-bottom: 1.5rem;
+            }
+
+            .chart-card {
+                background-color: var(--card-bg);
+                border-radius: var(--border-radius);
+                box-shadow: var(--shadow);
+                overflow: hidden;
+                border: 1px solid var(--border-color);
+            }
+
+            .chart-header {
+                padding: 1rem 1.5rem;
+                border-bottom: 1px solid var(--border-color);
+                background-color: var(--light);
+            }
+
+            .chart-title {
+                font-size: 1rem;
+                font-weight: 600;
+                color: var(--text-main);
+                margin: 0;
+            }
+
+            .chart-body {
+                padding: 1.5rem;
+                height: 300px;
+                position: relative;
+            }
+
+            /* Responsive */
+            @media (max-width: 768px) {
+                .kpi-container {
+                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                }
                 
-                // Definir columnas que no deben mostrarse
-                $hiddenColumns = ['id_estado', 'url_pdf_boleta'];
+                .chart-row {
+                    grid-template-columns: 1fr;
+                }
                 
-                // Filtrar los headers para excluir las columnas ocultas
-                $headers = array_filter($allHeaders, function($header) use ($hiddenColumns) {
-                    return !in_array($header, $hiddenColumns);
-                });
-            ?>
-            
-            <!-- Panel de filtros elegante -->
-            <div id="filters-panel" class="filters-panel" style="display:none;">
-                <div class="filters-wrapper">
-                    <div class="filters-header">
-                        <h3>Filtros de búsqueda</h3>
-                        <span class="filters-subtitle">Filtra la tabla por columnas específicas</span>
-                    </div>
-                    <div class="filters-grid">
-                        <?php 
-                        $index = 0;
-                        foreach ($headers as $header): 
-                        ?>
-                            <div class="filter-cell">
-                                <label class="filter-label"><?= formatColumnName($header) ?></label>
-                                <?php 
-                                    // Detectar si es un campo de fecha basado en el nombre
-                                    $isDateField = isDateField($header);
-                                    
-                                    if ($isDateField): 
-                                    // Procesar valores de fecha
-                                    $fieldValue = isset($filters[$header]) ? $filters[$header] : '';
-                                ?>
-                                    <div class="filter-input-group">
-                                        <i class="fas fa-calendar-alt filter-icon"></i>
-                                        <input type="text" 
-                                               class="filter-input datepicker" 
-                                               id="filter_<?= $index ?>"
-                                               data-column="<?= $this->escapeHtml($header) ?>" 
-                                               data-column-index="<?= $index ?>"
-                                               data-is-date="1"
-                                               value="<?= $fieldValue ?>"
-                                               placeholder="Seleccionar fecha...">
-                                        <button type="button" class="filter-btn" onclick="applyServerFilter('<?= $this->escapeJs($header) ?>')">
-                                            <i class="fas fa-search"></i>
-                                        </button>
-                                    </div>
-                                <?php else: ?>
-                                    <div class="filter-input-group">
-                                        <i class="fas fa-search filter-icon"></i>
-                                        <input type="text" class="filter-input column-filter" 
-                                               id="filter_<?= $index ?>"
-                                               data-column="<?= $this->escapeHtml($header) ?>" 
-                                               data-column-index="<?= $index ?>" 
-                                               data-is-date="0"
-                                               value="<?= isset($filters[$header]) ? $this->escapeHtml($filters[$header]) : '' ?>"
-                                               placeholder="Filtrar...">
-                                    </div>
-                                <?php endif; ?>
-                            </div>
-                        <?php 
-                        $index++;
-                        endforeach; 
-                        ?>
-                    </div>
-                    <div class="filters-footer">
-                        <button type="button" id="apply-all-filters" class="btn btn-primary">
-                            <i class="fas fa-database"></i> Buscar en toda la base de datos
-                        </button>
-                    </div>
-                </div>
-            </div>
+                .chart-card {
+                    margin-bottom: 1rem;
+                }
+                
+                .dashboard-actions {
+                    flex-direction: column;
+                    align-items: flex-start;
+                    gap: 0.75rem;
+                }
+                
+                .date-filter {
+                    width: 100%;
+                    justify-content: space-between;
+                }
+            }
 
-            <!-- Tarjeta de tabla con scroll horizontal -->
-            <div class="table-card">
-                <div class="table-card-header">
-                    <div class="header-left">
-                        <span class="records-info">Mostrando <span id="visible-count"><?= count($data) ?></span> de <span id="total-count"><?= $total ?></span> registros</span>
-                    </div>
-                    <div class="header-right">
-                        <div class="search-box">
-                            <i class="fas fa-search search-icon"></i>
-                            <input type="text" id="global-search" class="search-input" 
-                                   value="<?= $this->escapeHtml($search) ?>"
-                                   placeholder="Buscar en todos los campos...">
-                            <button type="button" id="global-search-btn" class="btn btn-sm btn-primary">
-                                <i class="fas fa-search"></i>
+            /* Compatibilidad con Chart.js 3.x */
+            canvas {
+                max-width: 100%;
+            }
+            </style>
+
+            <?php endif; // Fin del condicional para el dashboard ?>
+
+            <?php if (!empty($data)): ?>
+                <?php
+                    // Obtener encabezados del primer registro
+                    $allHeaders = array_keys($data[0]);
+                    
+                    // Definir columnas que no deben mostrarse
+                    $hiddenColumns = ['id_estado', 'url_pdf_boleta', 'link_factura'];
+                    
+                    // Filtrar los headers para excluir las columnas ocultas
+                    $headers = array_filter($allHeaders, function($header) use ($hiddenColumns) {
+                        return !in_array($header, $hiddenColumns);
+                    });
+                ?>
+                
+                <!-- Panel de filtros elegante -->
+                <div id="filters-panel" class="filters-panel" style="display:none;">
+                    <div class="filters-wrapper">
+                        <div class="filters-header">
+                            <h3>Filtros de búsqueda</h3>
+                            <span class="filters-subtitle">Filtra la tabla por columnas específicas</span>
+                        </div>
+                        <div class="filters-grid">
+                            <?php 
+                            $index = 0;
+                            foreach ($headers as $header): 
+                            ?>
+                                <div class="filter-cell">
+                                    <label class="filter-label"><?= formatColumnName($header) ?></label>
+                                    <?php 
+                                        // Detectar si es un campo de fecha basado en el nombre
+                                        $isDateField = isDateField($header);
+                                        
+                                        if ($isDateField): 
+                                        // Procesar valores de fecha
+                                        $fieldValue = isset($filters[$header]) ? $filters[$header] : '';
+                                    ?>
+                                        <div class="filter-input-group">
+                                            <i class="fas fa-calendar-alt filter-icon"></i>
+                                            <input type="text" 
+                                                class="filter-input datepicker" 
+                                                id="filter_<?= $index ?>"
+                                                data-column="<?= $this->escapeHtml($header) ?>" 
+                                                data-column-index="<?= $index ?>"
+                                                data-is-date="1"
+                                                value="<?= $fieldValue ?>"
+                                                placeholder="Seleccionar fecha...">
+                                            <button type="button" class="filter-btn" onclick="applyServerFilter('<?= $this->escapeJs($header) ?>')">
+                                                <i class="fas fa-search"></i>
+                                            </button>
+                                        </div>
+                                    <?php else: ?>
+                                        <div class="filter-input-group">
+                                            <i class="fas fa-search filter-icon"></i>
+                                            <input type="text" class="filter-input column-filter" 
+                                                id="filter_<?= $index ?>"
+                                                data-column="<?= $this->escapeHtml($header) ?>" 
+                                                data-column-index="<?= $index ?>" 
+                                                data-is-date="0"
+                                                value="<?= isset($filters[$header]) ? $this->escapeHtml($filters[$header]) : '' ?>"
+                                                placeholder="Filtrar...">
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                            <?php 
+                            $index++;
+                            endforeach; 
+                            ?>
+                        </div>
+                        <div class="filters-footer">
+                            <button type="button" id="apply-all-filters" class="btn btn-primary">
+                                <i class="fas fa-database"></i> Buscar en toda la base de datos
                             </button>
                         </div>
                     </div>
                 </div>
-                
-                <!-- Contenedor con scroll horizontal -->
-                <div class="table-scroll-container">
-                    <table id="detailTable" class="data-table">
-                        <thead>
-                            <tr>
-                                <?php foreach ($headers as $header): ?>
-                                    <th data-column="<?= $header ?>"><?= formatColumnName($header) ?></th>
-                                <?php endforeach; ?>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($data as $row): ?>
+
+                <!-- Tarjeta de tabla con scroll horizontal -->
+                <div class="table-card">
+                    <div class="table-card-header">
+                        <div class="header-left">
+                            <span class="records-info">Mostrando <span id="visible-count"><?= count($data) ?></span> de <span id="total-count"><?= $total ?></span> registros</span>
+                        </div>
+                        <div class="header-right">
+                            <div class="search-box">
+                                <i class="fas fa-search search-icon"></i>
+                                <input type="text" id="global-search" class="search-input" 
+                                    value="<?= $this->escapeHtml($search) ?>"
+                                    placeholder="Buscar en todos los campos...">
+                                <button type="button" id="global-search-btn" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Contenedor con scroll horizontal -->
+                    <div class="table-scroll-container">
+                        <table id="detailTable" class="data-table">
+                            <thead>
                                 <tr>
                                     <?php foreach ($headers as $header): ?>
-                                        <?php
-                                            // Obtener el valor de la celda, teniendo en cuenta posible uso de lowercase
-                                            $cellValue = $row[$header] ?? $row[strtolower($header)] ?? '';
-                                            
-                                            // Comprobar si es un campo de fecha
-                                            $isDate = isDateField($header);
-                                            
-                                            // Formatear fecha si es necesario
-                                            if ($isDate && !empty($cellValue)) {
-                                                $cellValue = formatDateForDisplay($cellValue);
-                                            }
-                                        ?>
-                                        
-                                        <?php if ($header === 'numero_boleta' && isset($row['url_pdf_boleta']) && !empty($row['url_pdf_boleta'])): ?>
-                                        <td>
-                                            <a href="<?= $this->escapeHtmlAttr($row['url_pdf_boleta']) ?>" 
-                                               target="_blank" 
-                                               class="boleta-link" 
-                                               title="Ver boleta">
-                                                <i class="fas fa-file-pdf"></i>
-                                                <?= $this->escapeHtml($cellValue) ?>
-                                            </a>
-                                        </td>
-                                        <?php else: ?>
-                                        <td><?= $this->escapeHtml($cellValue) ?></td>
-                                        <?php endif; ?>
+                                        <th data-column="<?= $header ?>"><?= formatColumnName($header) ?></th>
                                     <?php endforeach; ?>
                                 </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($data as $row): ?>
+                                    <tr>
+                                        <?php foreach ($headers as $header): ?>
+                                            <?php
+                                                // Obtener el valor de la celda, teniendo en cuenta posible uso de lowercase
+                                                $cellValue = $row[$header] ?? $row[strtolower($header)] ?? '';
+                                                
+                                                // Comprobar si es un campo de fecha
+                                                $isDate = isDateField($header);
+                                                
+                                                // Formatear fecha si es necesario
+                                                if ($isDate && !empty($cellValue)) {
+                                                    $cellValue = formatDateForDisplay($cellValue);
+                                                }
+                                            ?>
+                                            
+                                            <?php if ($header === 'numero_boleta' && isset($row['url_pdf_boleta']) && !empty($row['url_pdf_boleta'])): ?>
+                                            <td>
+                                                <a href="<?= $this->escapeHtmlAttr($row['url_pdf_boleta']) ?>" 
+                                                target="_blank" 
+                                                class="boleta-link" 
+                                                title="Ver boleta">
+                                                    <i class="fas fa-file-pdf"></i>
+                                                    <?= $this->escapeHtml($cellValue) ?>
+                                                </a>
+                                            </td>
+                                            <?php elseif ($header === 'nro_solicitud_de_pago' && isset($row['link_factura']) && !empty($row['link_factura'])): ?>
+                                            <td>
+                                                <a href="<?= $this->escapeHtmlAttr($row['link_factura']) ?>" 
+                                                target="_blank" 
+                                                class="boleta-link" 
+                                                title="Ver factura">
+                                                    <i class="fas fa-file-invoice-dollar"></i>
+                                                    <?= $this->escapeHtml($cellValue) ?>
+                                                </a>
+                                            </td>
+                                            <?php else: ?>
+                                            <td><?= $this->escapeHtml($cellValue) ?></td>
+                                            <?php endif; ?>
+                                        <?php endforeach; ?>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="table-card-footer">
+                        <div class="footer-left">
+                            <div class="page-size">
+                                <span>Mostrar</span>
+                                <select id="page-size-select">
+                                    <option value="10" <?= $limit == 10 ? 'selected' : '' ?>>10</option>
+                                    <option value="20" <?= $limit == 20 ? 'selected' : '' ?>>20</option>
+                                    <option value="30" <?= $limit == 30 ? 'selected' : '' ?>>30</option>
+                                    <option value="50" <?= $limit == 50 ? 'selected' : '' ?>>50</option>
+                                </select>
+                                <span>registros</span>
+                            </div>
+                        </div>
+                        <div class="footer-right">
+                            <!-- Paginación basada en enlaces directos -->
+                            <div class="pagination-container" id="pagination-area">
+                                <?php if ($totalPages > 1): 
+                                    // Construir base de URL de paginación
+                                    $paginationParams = [];
+                                    if ($limit != 20) {
+                                        $paginationParams['limit'] = $limit;
+                                    }
+                                    if (!empty($search)) {
+                                        $paginationParams['search'] = $search;
+                                    }
+                                    foreach ($filters as $key => $value) {
+                                        $paginationParams['filter_' . $key] = $value;
+                                    }
+                                    $queryString = http_build_query($paginationParams);
+                                    $baseUrl = $this->url('application', ['action' => 'detail', 'table' => $table]);
+                                    $baseUrl .= empty($queryString) ? '?' : ('?' . $queryString . '&');
+                                ?>
+                                    <!-- Primera página -->
+                                    <a href="<?= $baseUrl ?>page=1" 
+                                    class="pagination-button <?= $page <= 1 ? 'disabled' : '' ?>">
+                                        <i class="fas fa-angle-double-left"></i>
+                                    </a>
+                                    
+                                    <!-- Página anterior -->
+                                    <a href="<?= $baseUrl ?>page=<?= max(1, $page - 1) ?>" 
+                                    class="pagination-button <?= $page <= 1 ? 'disabled' : '' ?>">
+                                        <i class="fas fa-angle-left"></i>
+                                    </a>
+                                    
+                                    <!-- Páginas numeradas -->
+                                    <?php
+                                        $startPage = max(1, $page - 1);
+                                        $endPage = min($totalPages, $page + 1);
+                                        
+                                        if ($startPage > 1):
+                                    ?>
+                                        <a href="<?= $baseUrl ?>page=1" 
+                                        class="pagination-button">1</a>
+                                        
+                                        <?php if ($startPage > 2): ?>
+                                            <span class="pagination-button disabled">...</span>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
+                                    
+                                    <?php for ($i = $startPage; $i <= $endPage; $i++): ?>
+                                        <a href="<?= $baseUrl ?>page=<?= $i ?>" 
+                                        class="pagination-button <?= $i == $page ? 'active' : '' ?>">
+                                            <?= $i ?>
+                                        </a>
+                                    <?php endfor; ?>
+                                    
+                                    <?php if ($endPage < $totalPages): ?>
+                                        <?php if ($endPage < $totalPages - 1): ?>
+                                            <span class="pagination-button disabled">...</span>
+                                        <?php endif; ?>
+                                        
+                                        <a href="<?= $baseUrl ?>page=<?= $totalPages ?>" 
+                                        class="pagination-button">
+                                            <?= $totalPages ?>
+                                        </a>
+                                    <?php endif; ?>
+                                    
+                                    <!-- Página siguiente -->
+                                    <a href="<?= $baseUrl ?>page=<?= min($totalPages, $page + 1) ?>" 
+                                    class="pagination-button <?= $page >= $totalPages ? 'disabled' : '' ?>">
+                                        <i class="fas fa-angle-right"></i>
+                                    </a>
+                                    
+                                    <!-- Última página -->
+                                    <a href="<?= $baseUrl ?>page=<?= $totalPages ?>" 
+                                    class="pagination-button <?= $page >= $totalPages ? 'disabled' : '' ?>">
+                                        <i class="fas fa-angle-double-right"></i>
+                                    </a>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
-                <div class="table-card-footer">
-                    <div class="footer-left">
-                        <div class="page-size">
-                            <span>Mostrar</span>
-                            <select id="page-size-select">
-                                <option value="10" <?= $limit == 10 ? 'selected' : '' ?>>10</option>
-                                <option value="20" <?= $limit == 20 ? 'selected' : '' ?>>20</option>
-                                <option value="30" <?= $limit == 30 ? 'selected' : '' ?>>30</option>
-                                <option value="50" <?= $limit == 50 ? 'selected' : '' ?>>50</option>
-                            </select>
-                            <span>registros</span>
-                        </div>
+            <?php else: ?>
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        <i class="fas fa-database"></i>
                     </div>
-                    <div class="footer-right">
-                        <!-- Paginación basada en enlaces directos -->
-                        <div class="pagination-container" id="pagination-area">
-                            <?php if ($totalPages > 1): 
-                                // Construir base de URL de paginación
-                                $paginationParams = [];
-                                if ($limit != 20) {
-                                    $paginationParams['limit'] = $limit;
-                                }
-                                if (!empty($search)) {
-                                    $paginationParams['search'] = $search;
-                                }
-                                foreach ($filters as $key => $value) {
-                                    $paginationParams['filter_' . $key] = $value;
-                                }
-                                $queryString = http_build_query($paginationParams);
-                                $baseUrl = $this->url('application', ['action' => 'detail', 'table' => $table]);
-                                $baseUrl .= empty($queryString) ? '?' : ('?' . $queryString . '&');
-                            ?>
-                                <!-- Primera página -->
-                                <a href="<?= $baseUrl ?>page=1" 
-                                   class="pagination-button <?= $page <= 1 ? 'disabled' : '' ?>">
-                                    <i class="fas fa-angle-double-left"></i>
-                                </a>
-                                
-                                <!-- Página anterior -->
-                                <a href="<?= $baseUrl ?>page=<?= max(1, $page - 1) ?>" 
-                                   class="pagination-button <?= $page <= 1 ? 'disabled' : '' ?>">
-                                    <i class="fas fa-angle-left"></i>
-                                </a>
-                                
-                                <!-- Páginas numeradas -->
-                                <?php
-                                    $startPage = max(1, $page - 1);
-                                    $endPage = min($totalPages, $page + 1);
-                                    
-                                    if ($startPage > 1):
-                                ?>
-                                    <a href="<?= $baseUrl ?>page=1" 
-                                       class="pagination-button">1</a>
-                                    
-                                    <?php if ($startPage > 2): ?>
-                                        <span class="pagination-button disabled">...</span>
-                                    <?php endif; ?>
-                                <?php endif; ?>
-                                
-                                <?php for ($i = $startPage; $i <= $endPage; $i++): ?>
-                                    <a href="<?= $baseUrl ?>page=<?= $i ?>" 
-                                       class="pagination-button <?= $i == $page ? 'active' : '' ?>">
-                                        <?= $i ?>
-                                    </a>
-                                <?php endfor; ?>
-                                
-                                <?php if ($endPage < $totalPages): ?>
-                                    <?php if ($endPage < $totalPages - 1): ?>
-                                        <span class="pagination-button disabled">...</span>
-                                    <?php endif; ?>
-                                    
-                                    <a href="<?= $baseUrl ?>page=<?= $totalPages ?>" 
-                                       class="pagination-button">
-                                        <?= $totalPages ?>
-                                    </a>
-                                <?php endif; ?>
-                                
-                                <!-- Página siguiente -->
-                                <a href="<?= $baseUrl ?>page=<?= min($totalPages, $page + 1) ?>" 
-                                   class="pagination-button <?= $page >= $totalPages ? 'disabled' : '' ?>">
-                                    <i class="fas fa-angle-right"></i>
-                                </a>
-                                
-                                <!-- Última página -->
-                                <a href="<?= $baseUrl ?>page=<?= $totalPages ?>" 
-                                   class="pagination-button <?= $page >= $totalPages ? 'disabled' : '' ?>">
-                                    <i class="fas fa-angle-double-right"></i>
-                                </a>
-                            <?php endif; ?>
-                        </div>
-                    </div>
+                    <h2>No hay datos disponibles</h2>
+                    <p>No se encontraron registros en la tabla seleccionada.</p>
                 </div>
-            </div>
-            
-        <?php else: ?>
-            <div class="empty-state">
-                <div class="empty-state-icon">
-                    <i class="fas fa-database"></i>
-                </div>
-                <h2>No hay datos disponibles</h2>
-                <p>No se encontraron registros en la tabla seleccionada.</p>
-            </div>
-        <?php endif; ?>
+            <?php endif; ?>
 
-        <!-- Formulario oculto para manejar filtros y paginación -->
-        <form id="tableForm" method="GET" action="<?= $this->url('application', ['action' => 'detail', 'table' => $table]) ?>">
-            <input type="hidden" name="page" id="page-input" value="<?= $page ?>">
-            <input type="hidden" name="limit" id="limit-input" value="<?= $limit ?>">
-            <input type="hidden" name="search" id="search-input" value="<?= $this->escapeHtml($search) ?>">
-            
-            <!-- Los filtros se agregarán dinámicamente con JavaScript -->
-            <?php foreach ($filters as $filterKey => $filterValue): ?>
-                <input type="hidden" name="filter_<?= $this->escapeHtml($filterKey) ?>" value="<?= $this->escapeHtml($filterValue) ?>">
-            <?php endforeach; ?>
-        </form>
+            <!-- Formulario oculto para manejar filtros y paginación -->
+            <form id="tableForm" method="GET" action="<?= $this->url('application', ['action' => 'detail', 'table' => $table]) ?>">
+                <input type="hidden" name="page" id="page-input" value="<?= $page ?>">
+                <input type="hidden" name="limit" id="limit-input" value="<?= $limit ?>">
+                <input type="hidden" name="search" id="search-input" value="<?= $this->escapeHtml($search) ?>">
+                
+                <!-- Los filtros se agregarán dinámicamente con JavaScript -->
+                <?php foreach ($filters as $filterKey => $filterValue): ?>
+                    <input type="hidden" name="filter_<?= $this->escapeHtml($filterKey) ?>" value="<?= $this->escapeHtml($filterValue) ?>">
+                <?php endforeach; ?>
+            </form>
 
-        <div class="dashboard-footer">
-            <a href="<?= $this->url('application', ['action' => 'dashboard']) ?>" class="btn btn-back">
-                <i class="fas fa-arrow-left"></i>
-                <span>Volver al Dashboard</span>
-            </a>
+            <div class="dashboard-footer">
+                <a href="<?= $this->url('application', ['action' => 'dashboard']) ?>" class="btn btn-back">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Volver al Dashboard</span>
+                </a>
+            </div>
         </div>
     </div>
-</div>
 
-<!-- Estilos elegantes pero funcionales -->
-<style>
-:root {
-    /* Colores */
-    --primary: #4361ee;
-    --primary-light: #4895ef;
-    --primary-dark: #3f37c9;
-    --secondary: #6c757d;
-    --success: #4caf50;
-    --danger: #f44336;
-    --warning: #ff9800;
-    --info: #2196f3;
-    --dark: #212529;
-    --light: #f8f9fa;
-    --white: #ffffff;
-    --body-bg: #f5f7fb;
-    --card-bg: #ffffff;
-    --border-color: #e0e6ed;
-    --text-main: #3b3f5c;
-    --text-muted: #6c757d;
-    --shadow-sm: 0 2px 5px rgba(0, 0, 0, 0.05);
-    --shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-    --shadow-lg: 0 1rem 3rem rgba(0, 0, 0, 0.175);
-
-    /* Fuentes */
-    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    --border-radius: 0.5rem;
-    --transition-speed: 0.3s;
-}
-
-/* Estilos básicos */
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
-
-body {
-    font-family: var(--font-family);
-    background-color: var(--body-bg);
-    color: var(--text-main);
-    line-height: 1.6;
-    overflow-x: hidden;
-}
-
-/* NUEVOS ESTILOS PARA EL HIPERVÍNCULO DE BOLETA */
-.boleta-link {
-    display: inline-flex;
-    align-items: center;
-    color: var(--primary);
-    text-decoration: none;
-    font-weight: 500;
-    transition: all 0.2s ease;
-}
-
-.boleta-link i {
-    margin-right: 6px;
-    font-size: 14px;
-}
-
-.boleta-link:hover {
-    color: var(--primary-dark);
-    text-decoration: underline;
-}
-
-/* Estilos para el datepicker */
-.ui-datepicker {
-    font-family: var(--font-family);
-    font-size: 0.875rem;
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow);
-    border: 1px solid var(--border-color);
-    padding: 0.5rem;
-    width: 300px;
-    z-index: 9999 !important;
-}
-
-.ui-datepicker .ui-datepicker-header {
-    background-color: var(--primary-light);
-    color: white;
-    border-radius: var(--border-radius) var(--border-radius) 0 0;
-    padding: 0.5rem;
-}
-
-.ui-datepicker .ui-datepicker-title {
-    font-weight: 600;
-}
-
-.ui-datepicker .ui-datepicker-prev,
-.ui-datepicker .ui-datepicker-next {
-    background-color: rgba(255, 255, 255, 0.3);
-    border-radius: 50%;
-    cursor: pointer;
-}
-
-.ui-datepicker .ui-datepicker-prev:hover,
-.ui-datepicker .ui-datepicker-next:hover {
-    background-color: rgba(255, 255, 255, 0.5);
-}
-
-.ui-datepicker table {
-    width: 100%;
-    font-size: 0.875rem;
-    border-collapse: collapse;
-    margin-top: 0.25rem;
-}
-
-.ui-datepicker th {
-    background-color: var(--light);
-    color: var(--text-main);
-    font-weight: 600;
-    text-align: center;
-    padding: 0.5rem 0;
-}
-
-.ui-datepicker td {
-    border: none;
-    padding: 1px;
-}
-
-.ui-datepicker td span,
-.ui-datepicker td a {
-    display: block;
-    padding: 0.5rem;
-    text-align: center;
-    text-decoration: none;
-    border-radius: 50%;
-    color: var(--text-main);
-}
-
-.ui-datepicker td a:hover {
-    background-color: var(--light);
-}
-
-.ui-datepicker .ui-state-active {
-    background-color: var(--primary);
-    color: white !important;
-}
-
-.ui-datepicker .ui-state-highlight {
-    background-color: rgba(67, 97, 238, 0.1);
-    color: var(--primary);
-    border: 1px solid var(--primary-light);
-}
-
-/* Botón de filtro */
-.filter-btn {
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: var(--primary);
-    border: none;
-    color: white;
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 5;
-}
-
-.filter-btn:hover {
-    background: var(--primary-dark);
-}
-
-/* Personalización del icono de calendario */
-.filter-input-group .fa-calendar-alt {
-    color: var(--primary);
-}
-
-/* Estilos específicos para campos de fecha */
-.datepicker {
-    cursor: pointer;
-    background-color: rgba(67, 97, 238, 0.02);
-    padding-right: 40px !important;
-}
-
-/* Estilos específicos para encabezados de tabla */
-.data-table th {
-    min-width: 120px; /* Ancho mínimo para las columnas */
-    max-width: 250px; /* Ancho máximo para evitar encabezados muy anchos */
-}
-
-/* Ajustes específicos para algunas columnas */
-.data-table th:nth-child(1) { /* ID */
-    min-width: 60px;
-    max-width: 80px;
-}
-
-.data-table th[data-column="nombre_cliente"],
-.data-table th[data-column="nombre_producto"] {
-    min-width: 180px;
-}
-
-.data-table th[data-column="direccion_facturacion1"],
-.data-table th[data-column="direccion_facturacion2"] {
-    min-width: 200px;
-}
-
-/* Contenedor principal */
-.dashboard-container {
-    width: 100%;
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 1.5rem;
-}
-
-/* Resumen de información */
-.info-summary {
-    margin-bottom: 1.5rem;
-}
-
-.summary-card {
-    background-color: var(--card-bg);
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow);
-    border: 1px solid var(--border-color);
-    overflow: hidden;
-}
-
-.summary-header {
-    padding: 1rem 1.5rem;
-    background-color: var(--primary-light);
-    color: white;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.summary-header i {
-    font-size: 1.25rem;
-}
-
-.summary-header h3 {
-    font-size: 1.125rem;
-    font-weight: 600;
-    margin: 0;
-}
-
-.summary-content {
-    padding: 1rem 1.5rem;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1.5rem;
-}
-
-.summary-item {
-    flex: 1;
-    min-width: 200px;
-}
-
-.summary-label {
-    display: block;
-    font-size: 0.875rem;
-    color: var(--text-muted);
-    margin-bottom: 0.25rem;
-}
-
-.summary-value {
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: var(--text-main);
-}
-
-/* Encabezado */
-.dashboard-header {
-    margin-bottom: 1.5rem;
-}
-
-.header-content {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-}
-
-.page-title {
-    font-size: 1.75rem;
-    font-weight: 600;
-    color: var(--dark);
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.page-title i {
-    color: var(--primary);
-    font-size: 1.5rem;
-}
-
-.action-buttons {
-    display: flex;
-    gap: 0.625rem;
-    flex-wrap: wrap;
-}
-
-/* Botones */
-.btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.625rem 1.25rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    border-radius: var(--border-radius);
-    transition: all var(--transition-speed);
-    border: none;
-    cursor: pointer;
-    gap: 0.5rem;
-    text-decoration: none;
-    box-shadow: var(--shadow-sm);
-}
-
-.btn-sm {
-    padding: 0.375rem 0.75rem;
-    font-size: 0.813rem;
-}
-
-.btn i {
-    font-size: 0.875rem;
-}
-
-.btn:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow);
-}
-
-.btn-primary {
-    background-color: var(--primary);
-    color: white;
-}
-
-.btn-primary:hover {
-    background-color: var(--primary-dark);
-}
-
-.btn-secondary {
-    background-color: var(--secondary);
-    color: white;
-}
-
-.btn-secondary:hover {
-    background-color: #5a6268;
-}
-
-.btn-success {
-    background-color: var(--success);
-    color: white;
-}
-
-.btn-success:hover {
-    background-color: #3d8b40;
-}
-
-.btn-back {
-    background-color: var(--light);
-    color: var(--text-main);
-    border: 1px solid var(--border-color);
-}
-
-.btn-back:hover {
-    background-color: #e9ecef;
-}
-
-/* Panel de filtros */
-.filters-panel {
-    background-color: var(--card-bg);
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow);
-    margin-bottom: 1.5rem;
-    overflow: hidden;
-    border: 1px solid var(--border-color);
-}
-
-.filters-wrapper {
-    padding: 1.5rem;
-}
-
-.filters-header {
-    margin-bottom: 1.25rem;
-    border-bottom: 1px solid var(--border-color);
-    padding-bottom: 1rem;
-}
-
-.filters-header h3 {
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: var(--dark);
-    margin-bottom: 0.25rem;
-}
-
-.filters-subtitle {
-    font-size: 0.875rem;
-    color: var(--text-muted);
-}
-
-.filters-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-}
-
-.filter-cell {
-    margin-bottom: 0.5rem;
-}
-
-.filter-label {
-    display: block;
-    font-size: 0.875rem;
-    font-weight: 500;
-    margin-bottom: 0.5rem;
-    color: var(--primary-dark);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.filter-input-group {
-    position: relative;
-}
-
-.filter-icon {
-    position: absolute;
-    left: 0.75rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--text-muted);
-    font-size: 0.875rem;
-}
-
-.filter-input {
-    width: 100%;
-    padding: 0.625rem 0.75rem 0.625rem 2.25rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    font-size: 0.875rem;
-    transition: all var(--transition-speed);
-}
-
-.filter-input:focus {
-    outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 0.2rem rgba(67, 97, 238, 0.25);
-}
-
-.filter-input.active-filter {
-    border-color: var(--primary);
-    background-color: rgba(67, 97, 238, 0.05);
-}
-
-/* Tarjeta de tabla */
-.table-card {
-    background-color: var(--card-bg);
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow);
-    margin-bottom: 1.5rem;
-    overflow: hidden;
-    border: 1px solid var(--border-color);
-}
-
-.table-card-header {
-    padding: 1rem 1.5rem;
-    background-color: var(--light);
-    border-bottom: 1px solid var(--border-color);
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-}
-
-.records-info {
-    font-size: 0.875rem;
-    color: var(--text-muted);
-}
-
-.search-box {
-    position: relative;
-    display: flex;
-    align-items: center;
-}
-
-.search-icon {
-    position: absolute;
-    left: 0.75rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--text-muted);
-}
-
-.search-input {
-    padding: 0.5rem 0.75rem 0.5rem 2.25rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    border-top-right-radius: 0;
-    border-bottom-right-radius: 0;
-    font-size: 0.875rem;
-    width: 250px;
-    transition: all var(--transition-speed);
-}
-
-.search-input:focus {
-    outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 0.2rem rgba(67, 97, 238, 0.25);
-}
-
-.search-box .btn {
-    border-radius: var(--border-radius);
-    border-top-left-radius: 0;
-    border-bottom-left-radius: 0;
-    padding: 0.5rem 0.75rem;
-    margin-left: -1px;
-}
-
-/* CRUCIAL: El contenedor de scroll para la tabla */
-.table-scroll-container {
-    width: 100%;
-    overflow-x: auto;
-    position: relative;
-    max-height: none; /* Asegura que no hay límite de altura */
-}
-
-/* Tabla de datos */
-.data-table {
-    width: 100%;
-    border-collapse: collapse;
-    white-space: nowrap;
-}
-
-.data-table thead tr {
-    background-color: rgba(67, 97, 238, 0.05);
-}
-
-.data-table th {
-    padding: 1rem 1.5rem;
-    text-align: left;
-    font-weight: 600;
-    color: var(--primary-dark);
-    border-bottom: 2px solid var(--primary-light);
-    position: sticky;
-    top: 0;
-    background-color: rgba(248, 249, 250, 0.95);
-    z-index: 10;
-    white-space: normal; /* Permitir que el texto se ajuste */
-    vertical-align: middle;
-    font-size: 0.9rem;
-    line-height: 1.3;
-}
-
-.data-table td {
-    padding: 0.875rem 1.5rem;
-    border-bottom: 1px solid var(--border-color);
-    color: var(--text-main);
-    font-size: 0.875rem;
-}
-
-.data-table tbody tr {
-    transition: all var(--transition-speed);
-}
-
-.data-table tbody tr:hover {
-    background-color: rgba(67, 97, 238, 0.03);
-}
-
-.data-table tbody tr.highlight-row {
-    background-color: rgba(255, 193, 7, 0.1);
-}
-
-/* Pie de tabla */
-.table-card-footer {
-    padding: 1rem 1.5rem;
-    background-color: var(--light);
-    border-top: 1px solid var(--border-color);
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-}
-
-.page-size {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.875rem;
-    color: var(--text-muted);
-}
-
-#page-size-select {
-    padding: 0.375rem 0.75rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    background-color: white;
-    font-size: 0.875rem;
-}
-
-/* Paginación */
-.pagination-container {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-}
-
-.pagination-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 2rem;
-    height: 2rem;
-    border-radius: 50%;
-    font-size: 0.875rem;
-    background-color: white;
-    color: var(--text-main);
-    border: 1px solid var(--border-color);
-    cursor: pointer;
-    transition: all var(--transition-speed);
-    text-decoration: none;
-}
-
-.pagination-button:hover:not(.disabled):not(.active) {
-    background-color: var(--light);
-    border-color: var(--primary-light);
-    color: var(--primary);
-}
-
-.pagination-button.active {
-    background-color: var(--primary);
-    border-color: var(--primary);
-    color: white;
-}
-
-.pagination-button.disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    pointer-events: none;
-}
-
-/* Pie de dashboard */
-.dashboard-footer {
-    margin-top: 1.5rem;
-    display: flex;
-    justify-content: center;
-}
-
-/* Estado vacío */
-.empty-state {
-    text-align: center;
-    padding: 4rem 1rem;
-    background-color: var(--card-bg);
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow);
-}
-
-.empty-state-icon {
-    font-size: 3rem;
-    color: var(--text-muted);
-    margin-bottom: 1.5rem;
-}
-
-.empty-state h2 {
-    font-size: 1.5rem;
-    margin-bottom: 1rem;
-    color: var(--text-main);
-}
-
-.empty-state p {
-    font-size: 1rem;
-    color: var(--text-muted);
-}
-
-/* Scrollbar personalizado */
-::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-}
-
-::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
-}
-
-/* Ocultar el formulario */
-#tableForm {
-    display: none;
-}
-
-/* Responsividad */
-@media (max-width: 768px) {
-    .dashboard-container {
-        padding: 1rem;
+    <!-- Estilos elegantes pero funcionales -->
+    <style>
+    :root {
+        /* Colores */
+        --primary: #4361ee;
+        --primary-light: #4895ef;
+        --primary-dark: #3f37c9;
+        --secondary: #6c757d;
+        --success: #4caf50;
+        --danger: #f44336;
+        --warning: #ff9800;
+        --info: #2196f3;
+        --dark: #212529;
+        --light: #f8f9fa;
+        --white: #ffffff;
+        --body-bg: #f5f7fb;
+        --card-bg: #ffffff;
+        --border-color: #e0e6ed;
+        --text-main: #3b3f5c;
+        --text-muted: #6c757d;
+        --shadow-sm: 0 2px 5px rgba(0, 0, 0, 0.05);
+        --shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        --shadow-lg: 0 1rem 3rem rgba(0, 0, 0, 0.175);
+
+        /* Fuentes */
+        --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        --border-radius: 0.5rem;
+        --transition-speed: 0.3s;
     }
-    
+
+    /* Estilos básicos */
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+
+    body {
+        font-family: var(--font-family);
+        background-color: var(--body-bg);
+        color: var(--text-main);
+        line-height: 1.6;
+        overflow-x: hidden;
+    }
+
+    /* NUEVOS ESTILOS PARA EL HIPERVÍNCULO DE BOLETA */
+    .boleta-link {
+        display: inline-flex;
+        align-items: center;
+        color: var(--primary);
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .boleta-link i {
+        margin-right: 6px;
+        font-size: 14px;
+    }
+
+    .boleta-link:hover {
+        color: var(--primary-dark);
+        text-decoration: underline;
+    }
+
+    /* Estilos para el enlace de factura */
+    .factura-link {
+        display: inline-flex;
+        align-items: center;
+        color: var(--info);
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .factura-link i {
+        margin-right: 6px;
+        font-size: 14px;
+    }
+
+    .factura-link:hover {
+        color: #0d6efd;
+        text-decoration: underline;
+    }
+
+    /* Estilos para el datepicker */
+    .ui-datepicker {
+        font-family: var(--font-family);
+        font-size: 0.875rem;
+        border-radius: var(--border-radius);
+        box-shadow: var(--shadow);
+        border: 1px solid var(--border-color);
+        padding: 0.5rem;
+        width: 300px;
+        z-index: 9999 !important;
+    }
+
+    .ui-datepicker .ui-datepicker-header {
+        background-color: var(--primary-light);
+        color: white;
+        border-radius: var(--border-radius) var(--border-radius) 0 0;
+        padding: 0.5rem;
+    }
+
+    .ui-datepicker .ui-datepicker-title {
+        font-weight: 600;
+    }
+
+    .ui-datepicker .ui-datepicker-prev,
+    .ui-datepicker .ui-datepicker-next {
+        background-color: rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        cursor: pointer;
+    }
+
+    .ui-datepicker .ui-datepicker-prev:hover,
+    .ui-datepicker .ui-datepicker-next:hover {
+        background-color: rgba(255, 255, 255, 0.5);
+    }
+
+    .ui-datepicker table {
+        width: 100%;
+        font-size: 0.875rem;
+        border-collapse: collapse;
+        margin-top: 0.25rem;
+    }
+
+    .ui-datepicker th {
+        background-color: var(--light);
+        color: var(--text-main);
+        font-weight: 600;
+        text-align: center;
+        padding: 0.5rem 0;
+    }
+
+    .ui-datepicker td {
+        border: none;
+        padding: 1px;
+    }
+
+    .ui-datepicker td span,
+    .ui-datepicker td a {
+        display: block;
+        padding: 0.5rem;
+        text-align: center;
+        text-decoration: none;
+        border-radius: 50%;
+        color: var(--text-main);
+    }
+
+    .ui-datepicker td a:hover {
+        background-color: var(--light);
+    }
+
+    .ui-datepicker .ui-state-active {
+        background-color: var(--primary);
+        color: white !important;
+    }
+
+    .ui-datepicker .ui-state-highlight {
+        background-color: rgba(67, 97, 238, 0.1);
+        color: var(--primary);
+        border: 1px solid var(--primary-light);
+    }
+
+    /* Botón de filtro */
+    .filter-btn {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: var(--primary);
+        border: none;
+        color: white;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 5;
+    }
+
+    .filter-btn:hover {
+        background: var(--primary-dark);
+    }
+
+    /* Personalización del icono de calendario */
+    .filter-input-group .fa-calendar-alt {
+        color: var(--primary);
+    }
+
+    /* Estilos específicos para campos de fecha */
+    .datepicker {
+        cursor: pointer;
+        background-color: rgba(67, 97, 238, 0.02);
+        padding-right: 40px !important;
+    }
+
+    /* Estilos específicos para encabezados de tabla */
+    .data-table th {
+        min-width: 120px; /* Ancho mínimo para las columnas */
+        max-width: 250px; /* Ancho máximo para evitar encabezados muy anchos */
+    }
+
+    /* Ajustes específicos para algunas columnas */
+    .data-table th:nth-child(1) { /* ID */
+        min-width: 60px;
+        max-width: 80px;
+    }
+
+    .data-table th[data-column="nombre_cliente"],
+    .data-table th[data-column="nombre_producto"] {
+        min-width: 180px;
+    }
+
+    .data-table th[data-column="direccion_facturacion1"],
+    .data-table th[data-column="direccion_facturacion2"] {
+        min-width: 200px;
+    }
+
+    /* Contenedor principal */
+    .dashboard-container {
+        width: 100%;
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 1.5rem;
+    }
+
+    /* Resumen de información */
+    .info-summary {
+        margin-bottom: 1.5rem;
+    }
+
+    .summary-card {
+        background-color: var(--card-bg);
+        border-radius: var(--border-radius);
+        box-shadow: var(--shadow);
+        border: 1px solid var(--border-color);
+        overflow: hidden;
+    }
+
+    .summary-header {
+        padding: 1rem 1.5rem;
+        background-color: var(--primary-light);
+        color: white;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .summary-header i {
+        font-size: 1.25rem;
+    }
+
+    .summary-header h3 {
+        font-size: 1.125rem;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .summary-content {
+        padding: 1rem 1.5rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1.5rem;
+    }
+
+    .summary-item {
+        flex: 1;
+        min-width: 200px;
+    }
+
+    .summary-label {
+        display: block;
+        font-size: 0.875rem;
+        color: var(--text-muted);
+        margin-bottom: 0.25rem;
+    }
+
+    .summary-value {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: var(--text-main);
+    }
+
+    /* Encabezado */
+    .dashboard-header {
+        margin-bottom: 1.5rem;
+    }
+
+    .header-content {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+    }
+
     .page-title {
+        font-size: 1.75rem;
+        font-weight: 600;
+        color: var(--dark);
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .page-title i {
+        color: var(--primary);
         font-size: 1.5rem;
     }
-    
+
+    .action-buttons {
+        display: flex;
+        gap: 0.625rem;
+        flex-wrap: wrap;
+    }
+
+    /* Botones */
     .btn {
-        padding: 0.5rem 1rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.625rem 1.25rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        border-radius: var(--border-radius);
+        transition: all var(--transition-speed);
+        border: none;
+        cursor: pointer;
+        gap: 0.5rem;
+        text-decoration: none;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .btn-sm {
+        padding: 0.375rem 0.75rem;
         font-size: 0.813rem;
     }
-    
-    .search-input {
-        width: 180px;
+
+    .btn i {
+        font-size: 0.875rem;
     }
-    
-    .search-input:focus {
-        width: 220px;
+
+    .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow);
     }
-    
-    .header-content, .table-card-header, .table-card-footer {
-        flex-direction: column;
-        align-items: stretch;
+
+    .btn-primary {
+        background-color: var(--primary);
+        color: white;
     }
-    
-    .header-right, .footer-right {
+
+    .btn-primary:hover {
+        background-color: var(--primary-dark);
+    }
+
+    .btn-secondary {
+        background-color: var(--secondary);
+        color: white;
+    }
+
+    .btn-secondary:hover {
+        background-color: #5a6268;
+    }
+
+    .btn-success {
+        background-color: var(--success);
+        color: white;
+    }
+
+    .btn-success:hover {
+        background-color: #3d8b40;
+    }
+
+    .btn-back {
+        background-color: var(--light);
+        color: var(--text-main);
+        border: 1px solid var(--border-color);
+    }
+
+    .btn-back:hover {
+        background-color: #e9ecef;
+    }
+
+    /* Panel de filtros */
+    .filters-panel {
+        background-color: var(--card-bg);
+        border-radius: var(--border-radius);
+        box-shadow: var(--shadow);
+        margin-bottom: 1.5rem;
+        overflow: hidden;
+        border: 1px solid var(--border-color);
+    }
+
+    .filters-wrapper {
+        padding: 1.5rem;
+    }
+
+    .filters-header {
+        margin-bottom: 1.25rem;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 1rem;
+    }
+
+    .filters-header h3 {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: var(--dark);
+        margin-bottom: 0.25rem;
+    }
+
+    .filters-subtitle {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+    }
+
+    .filters-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .filter-cell {
+        margin-bottom: 0.5rem;
+    }
+
+    .filter-label {
+        display: block;
+        font-size: 0.875rem;
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+        color: var(--primary-dark);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .filter-input-group {
+        position: relative;
+    }
+
+    .filter-icon {
+        position: absolute;
+        left: 0.75rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-muted);
+        font-size: 0.875rem;
+    }
+
+    .filter-input {
         width: 100%;
-        margin-top: 0.5rem;
+        padding: 0.625rem 0.75rem 0.625rem 2.25rem;
+        border: 1px solid var(--border-color);
+        border-radius: var(--border-radius);
+        font-size: 0.875rem;
+        transition: all var(--transition-speed);
     }
-    
+
+    .filter-input:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 0.2rem rgba(67, 97, 238, 0.25);
+    }
+
+    .filter-input.active-filter {
+        border-color: var(--primary);
+        background-color: rgba(67, 97, 238, 0.05);
+    }
+
+    /* Tarjeta de tabla */
+    .table-card {
+        background-color: var(--card-bg);
+        border-radius: var(--border-radius);
+        box-shadow: var(--shadow);
+        margin-bottom: 1.5rem;
+        overflow: hidden;
+        border: 1px solid var(--border-color);
+    }
+
+    .table-card-header {
+        padding: 1rem 1.5rem;
+        background-color: var(--light);
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .records-info {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+    }
+
+    .search-box {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 0.75rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-muted);
+    }
+
+    .search-input {
+        padding: 0.5rem 0.75rem 0.5rem 2.25rem;
+        border: 1px solid var(--border-color);
+        border-radius: var(--border-radius);
+        border-top-right-radius: 0;
+        border-bottom-right-radius: 0;
+        font-size: 0.875rem;
+        width: 250px;
+        transition: all var(--transition-speed);
+    }
+
+    .search-input:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 0.2rem rgba(67, 97, 238, 0.25);
+    }
+
+    .search-box .btn {
+        border-radius: var(--border-radius);
+        border-top-left-radius: 0;
+        border-bottom-left-radius: 0;
+        padding: 0.5rem 0.75rem;
+        margin-left: -1px;
+    }
+
+    /* CRUCIAL: El contenedor de scroll para la tabla */
+    .table-scroll-container {
+        width: 100%;
+        overflow-x: auto;
+        position: relative;
+        max-height: none; /* Asegura que no hay límite de altura */
+    }
+
+    /* Tabla de datos */
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        white-space: nowrap;
+    }
+
+    .data-table thead tr {
+        background-color: rgba(67, 97, 238, 0.05);
+    }
+
+    .data-table th {
+        padding: 1rem 1.5rem;
+        text-align: left;
+        font-weight: 600;
+        color: var(--primary-dark);
+        border-bottom: 2px solid var(--primary-light);
+        position: sticky;
+        top: 0;
+        background-color: rgba(248, 249, 250, 0.95);
+        z-index: 10;
+        white-space: normal; /* Permitir que el texto se ajuste */
+        vertical-align: middle;
+        font-size: 0.9rem;
+        line-height: 1.3;
+    }
+
+    .data-table td {
+        padding: 0.875rem 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+        color: var(--text-main);
+        font-size: 0.875rem;
+    }
+
+    .data-table tbody tr {
+        transition: all var(--transition-speed);
+    }
+
+    .data-table tbody tr:hover {
+        background-color: rgba(67, 97, 238, 0.03);
+    }
+
+    .data-table tbody tr.highlight-row {
+        background-color: rgba(255, 193, 7, 0.1);
+    }
+
+    /* Pie de tabla */
+    .table-card-footer {
+        padding: 1rem 1.5rem;
+        background-color: var(--light);
+        border-top: 1px solid var(--border-color);
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .page-size {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+        color: var(--text-muted);
+    }
+
+    #page-size-select {
+        padding: 0.375rem 0.75rem;
+        border: 1px solid var(--border-color);
+        border-radius: var(--border-radius);
+        background-color: white;
+        font-size: 0.875rem;
+    }
+
+    /* Paginación */
     .pagination-container {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .pagination-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        border-radius: 50%;
+        font-size: 0.875rem;
+        background-color: white;
+        color: var(--text-main);
+        border: 1px solid var(--border-color);
+        cursor: pointer;
+        transition: all var(--transition-speed);
+        text-decoration: none;
+    }
+
+    .pagination-button:hover:not(.disabled):not(.active) {
+        background-color: var(--light);
+        border-color: var(--primary-light);
+        color: var(--primary);
+    }
+
+    .pagination-button.active {
+        background-color: var(--primary);
+        border-color: var(--primary);
+        color: white;
+    }
+
+    .pagination-button.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        pointer-events: none;
+    }
+
+    /* Pie de dashboard */
+    .dashboard-footer {
+        margin-top: 1.5rem;
+        display: flex;
         justify-content: center;
     }
-    
-    .summary-content {
-        flex-direction: column;
-    }
-    
-    /* Responsive datepicker */
-    .ui-datepicker {
-        width: 280px;
-        left: 50% !important;
-        transform: translateX(-50%);
-    }
-}
-</style>
 
-<script>
-// Esperamos a que el documento esté completamente cargado
-$(document).ready(function() {
-    console.log("Documento cargado");
-    
-    // Función para formatear fecha para mostrar
-    function formatDateForDisplay(dateString) {
-        if (!dateString) return '';
-        
-        // Crear un objeto Date a partir de la cadena
-        const date = new Date(dateString);
-        if (isNaN(date.getTime())) return dateString; // Si no es una fecha válida, devolver original
-        
-        // Formatear como DD/MM/YYYY
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0'); // Mes es base 0
-        const year = date.getFullYear();
-        
-        return `${day}/${month}/${year}`;
+    /* Estado vacío */
+    .empty-state {
+        text-align: center;
+        padding: 4rem 1rem;
+        background-color: var(--card-bg);
+        border-radius: var(--border-radius);
+        box-shadow: var(--shadow);
     }
-    
-    // Función para formatear fecha para el servidor
-    function formatDateForServer(dateString) {
-        if (!dateString) return '';
-        
-        // Si está en formato DD/MM/YYYY, convertir a YYYY-MM-DD
-        if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateString)) {
-            const parts = dateString.split('/');
-            return `${parts[2]}-${String(parts[1]).padStart(2, '0')}-${String(parts[0]).padStart(2, '0')}`;
+
+    .empty-state-icon {
+        font-size: 3rem;
+        color: var(--text-muted);
+        margin-bottom: 1.5rem;
+    }
+
+    .empty-state h2 {
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+        color: var(--text-main);
+    }
+
+    .empty-state p {
+        font-size: 1rem;
+        color: var(--text-muted);
+    }
+
+    /* Scrollbar personalizado */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: #c1c1c1;
+        border-radius: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: #a8a8a8;
+    }
+
+    /* Ocultar el formulario */
+    #tableForm {
+        display: none;
+    }
+
+    /* Responsividad */
+    @media (max-width: 768px) {
+        .dashboard-container {
+            padding: 1rem;
         }
         
-        return dateString;
+        .page-title {
+            font-size: 1.5rem;
+        }
+        
+        .btn {
+            padding: 0.5rem 1rem;
+            font-size: 0.813rem;
+        }
+        
+        .search-input {
+            width: 180px;
+        }
+        
+        .search-input:focus {
+            width: 220px;
+        }
+        
+        .header-content, .table-card-header, .table-card-footer {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        
+        .header-right, .footer-right {
+            width: 100%;
+            margin-top: 0.5rem;
+        }
+        
+        .pagination-container {
+            justify-content: center;
+        }
+        
+        .summary-content {
+            flex-direction: column;
+        }
+        
+        /* Responsive datepicker */
+        .ui-datepicker {
+            width: 280px;
+            left: 50% !important;
+            transform: translateX(-50%);
+        }
     }
-    
-    // Inicializar datepicker con formato español
-    $(".datepicker").datepicker({
-        dateFormat: "dd/mm/yy", // Formato visual para el usuario
-        changeMonth: true,
-        changeYear: true,
-        yearRange: "1900:2100",
-        showOtherMonths: true,
-        selectOtherMonths: true,
-        onSelect: function(dateText) {
-            console.log("Fecha seleccionada:", dateText);
-            $(this).val(dateText);
-            filterTableInRealTime();
-        }
-    });
-    
-    // Convertir valores iniciales de fechas al formato de visualización
-    $(".datepicker").each(function() {
-        const val = $(this).val();
-        if (val) {
-            $(this).val(formatDateForDisplay(val));
-        }
-    });
-    
-    console.log("Datepickers inicializados:", $(".datepicker").length);
-    
-    // Mostrar el panel de filtros si hay filtros aplicados
-    if ($('.column-filter[value!=""]').length > 0 || $('#global-search').val() || $('.datepicker[value!=""]').length > 0) {
-        $('#filters-panel').show();
-    }
+    </style>
 
-    // Mostrar/ocultar el panel de filtros
-    $('#toggle-filters').on('click', function() {
-        $('#filters-panel').slideToggle(300);
-    });
-
-    // Filtrar en tiempo real al escribir en campos
-    $('.column-filter').on('input', function() {
-        filterTableInRealTime();
-    });
-
-    // Filtrar en tiempo real al escribir en búsqueda global
-    $('#global-search').on('input', function() {
-        filterTableInRealTime();
-    });
-
-    // Filtrado en tiempo real
-    function filterTableInRealTime() {
-        // Obtener el valor de búsqueda global
-        var globalSearchTerm = $('#global-search').val().toLowerCase();
+    <script>
+    // Esperamos a que el documento esté completamente cargado
+    $(document).ready(function() {
+        console.log("Documento cargado");
         
-        // Mostrar todas las filas primero
-        $('#detailTable tbody tr').show();
-        
-        // Aplicar búsqueda global
-        if (globalSearchTerm) {
-            $('#detailTable tbody tr').each(function() {
-                var rowText = $(this).text().toLowerCase();
-                if (rowText.indexOf(globalSearchTerm) === -1) {
-                    $(this).hide();
-                }
-            });
-        }
-        
-        // Aplicar filtros de columna
-        $('.column-filter').each(function() {
-            var columnIndex = $(this).data('column-index');
-            var filterValue = $(this).val().toLowerCase();
+        // Función para formatear fecha para mostrar
+        function formatDateForDisplay(dateString) {
+            if (!dateString) return '';
             
-            if (filterValue) {
-                $(this).addClass('active-filter');
-                $('#detailTable tbody tr:visible').each(function() {
-                    var cellText = $(this).find('td').eq(columnIndex).text().toLowerCase();
-                    if (cellText.indexOf(filterValue) === -1) {
+            // Crear un objeto Date a partir de la cadena
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return dateString; // Si no es una fecha válida, devolver original
+            
+            // Formatear como DD/MM/YYYY
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0'); // Mes es base 0
+            const year = date.getFullYear();
+            
+            return `${day}/${month}/${year}`;
+        }
+        
+        // Función para formatear fecha para el servidor
+        function formatDateForServer(dateString) {
+            if (!dateString) return '';
+            
+            // Si está en formato DD/MM/YYYY, convertir a YYYY-MM-DD
+            if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateString)) {
+                const parts = dateString.split('/');
+                return `${parts[2]}-${String(parts[1]).padStart(2, '0')}-${String(parts[0]).padStart(2, '0')}`;
+            }
+            
+            return dateString;
+        }
+        
+        // Inicializar datepicker con formato español
+        $(".datepicker").datepicker({
+            dateFormat: "dd/mm/yy", // Formato visual para el usuario
+            changeMonth: true,
+            changeYear: true,
+            yearRange: "1900:2100",
+            showOtherMonths: true,
+            selectOtherMonths: true,
+            onSelect: function(dateText) {
+                console.log("Fecha seleccionada:", dateText);
+                $(this).val(dateText);
+                filterTableInRealTime();
+            }
+        });
+        
+        // Convertir valores iniciales de fechas al formato de visualización
+        $(".datepicker").each(function() {
+            const val = $(this).val();
+            if (val) {
+                $(this).val(formatDateForDisplay(val));
+            }
+        });
+        
+        console.log("Datepickers inicializados:", $(".datepicker").length);
+        
+        // Mostrar el panel de filtros si hay filtros aplicados
+        if ($('.column-filter[value!=""]').length > 0 || $('#global-search').val() || $('.datepicker[value!=""]').length > 0) {
+            $('#filters-panel').show();
+        }
+
+        // Mostrar/ocultar el panel de filtros
+        $('#toggle-filters').on('click', function() {
+            $('#filters-panel').slideToggle(300);
+        });
+
+        // Filtrar en tiempo real al escribir en campos
+        $('.column-filter').on('input', function() {
+            filterTableInRealTime();
+        });
+
+        // Filtrar en tiempo real al escribir en búsqueda global
+        $('#global-search').on('input', function() {
+            filterTableInRealTime();
+        });
+
+        // Filtrado en tiempo real
+        function filterTableInRealTime() {
+            // Obtener el valor de búsqueda global
+            var globalSearchTerm = $('#global-search').val().toLowerCase();
+            
+            // Mostrar todas las filas primero
+            $('#detailTable tbody tr').show();
+            
+            // Aplicar búsqueda global
+            if (globalSearchTerm) {
+                $('#detailTable tbody tr').each(function() {
+                    var rowText = $(this).text().toLowerCase();
+                    if (rowText.indexOf(globalSearchTerm) === -1) {
                         $(this).hide();
                     }
                 });
-            } else {
-                $(this).removeClass('active-filter');
             }
-        });
-        
-        // Actualizar contador
-        $('#visible-count').text($('#detailTable tbody tr:visible').length);
-    }
-
-    // Limpiar filtros
-    $('#clear-filters').on('click', function(e) {
-        e.preventDefault();
-        
-        // Verificar si hay filtros aplicados a nivel de servidor
-        var hasServerFilters = $('.column-filter[value!=""]').length > 0 || 
-                               $('#global-search').val() || 
-                               $('.datepicker[value!=""]').length > 0;
-        
-        // Limpiar campos
-        $('.column-filter').val('').removeClass('active-filter');
-        $('.datepicker').val('').removeClass('active-filter');
-        $('#global-search').val('');
-        
-        if (hasServerFilters) {
-            // Si había filtros en servidor, redirigir sin filtros
-            window.location.href = '<?= $this->url('application', ['action' => 'detail', 'table' => $table]) ?>?limit=<?= $limit ?>';
-        } else {
-            // Solo filtrado local
-            $('#detailTable tbody tr').show();
-            $('#visible-count').text($('#detailTable tbody tr').length);
-        }
-        
-        return false;
-    });
-
-    // Buscar con botón global
-    $('#global-search-btn').on('click', function() {
-        var searchTerm = $('#global-search').val();
-        sendToServer({search: searchTerm});
-    });
-
-    // Búsqueda global con Enter
-    $('#global-search').on('keypress', function(e) {
-        if (e.which === 13) {
-            var searchTerm = $(this).val();
-            sendToServer({search: searchTerm});
-            return false;
-        }
-    });
-
-    // Buscar en toda la base de datos
-    $('#apply-all-filters').on('click', function() {
-        var filters = {};
-        var hasFilters = false;
-        
-        // Recolectar todos los filtros regulares
-        $('.column-filter').each(function() {
-            var value = $(this).val();
-            if (value) {
-                hasFilters = true;
-                var column = $(this).data('column');
-                filters['filter_' + column] = value;
-            }
-        });
-        
-        // Recolectar filtros de fecha
-        $('.datepicker').each(function() {
-            var value = $(this).val();
-            if (value) {
-                hasFilters = true;
-                var column = $(this).data('column');
-                // Convertir al formato que entiende el servidor
-                filters['filter_' + column] = formatDateForServer(value);
-            }
-        });
-        
-        // Agregar búsqueda global
-        var searchTerm = $('#global-search').val();
-        if (searchTerm) {
-            hasFilters = true;
-            filters.search = searchTerm;
-        }
-        
-        if (hasFilters) {
-            sendToServer(filters);
-        } else {
-            alert("No hay filtros aplicados para buscar.");
-        }
-    });
-
-    // Cambiar tamaño de página
-    $('#page-size-select').on('change', function() {
-        var filters = getCurrentFilters();
-        filters.limit = $(this).val();
-        filters.page = 1; // Volver a primera página
-        sendToServer(filters);
-    });
-
-    // Obtener filtros actuales
-    function getCurrentFilters() {
-        var filters = {};
-        
-        // Agregar filtros de campo normales
-        $('.column-filter').each(function() {
-            var value = $(this).val();
-            if (value) {
-                var column = $(this).data('column');
-                filters['filter_' + column] = value;
-            }
-        });
-        
-        // Agregar filtros de fechas
-        $('.datepicker').each(function() {
-            var value = $(this).val();
-            if (value) {
-                var column = $(this).data('column');
-                // Convertir al formato que entiende el servidor
-                filters['filter_' + column] = formatDateForServer(value);
-            }
-        });
-        
-        // Agregar búsqueda global
-        var searchTerm = $('#global-search').val();
-        if (searchTerm) {
-            filters.search = searchTerm;
-        }
-        
-        // Agregar paginación
-        filters.page = $('#page-input').val();
-        filters.limit = $('#limit-input').val();
-        
-        return filters;
-    }
-
-    // Enviar al servidor
-    function sendToServer(params) {
-        // Completar con parámetros actuales
-        var currentParams = getCurrentFilters();
-        // Sobrescribir con nuevos parámetros
-        for (var key in params) {
-            currentParams[key] = params[key];
-        }
-        
-        // Crear formulario y enviar
-        var form = $('<form>', {
-            'method': 'GET',
-            'action': window.location.pathname
-        });
-        
-        for (var key in currentParams) {
-            $('<input>').attr({
-                'type': 'hidden',
-                'name': key,
-                'value': currentParams[key]
-            }).appendTo(form);
-        }
-        
-        form.appendTo('body').submit();
-    }
-
-    // Exportar a CSV
-    $('#export-csv').on('click', function() {
-        var filters = getCurrentFilters();
-        filters.export = 'csv';
-        // Agregar parámetro para indicar qué columnas excluir
-        filters.hidden_columns = 'id_estado,url_pdf_boleta';
-        sendToServer(filters);
-    });
-
-    // Inicialmente filtramos para aplicar los filtros que puedan estar en la URL
-    filterTableInRealTime();
-});
-
-// Función para buscar en el servidor con un filtro específico
-function applyServerFilter(column) {
-    console.log("Aplicando filtro para columna:", column);
-    
-    var input = $('input[data-column="' + column + '"]');
-    var value = input.val();
-    
-    if (value) {
-        // Si es una fecha, convertir al formato del servidor
-        if (input.hasClass('datepicker')) {
-            // Convertir de DD/MM/YYYY a YYYY-MM-DD
-            if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(value)) {
-                const parts = value.split('/');
-                value = `${parts[2]}-${String(parts[1]).padStart(2, '0')}-${String(parts[0]).padStart(2, '0')}`;
-            }
-        }
-        
-        var filters = {};
-        filters['filter_' + column] = value;
-        
-        // Crear formulario y enviar
-        var form = $('<form>', {
-            'method': 'GET',
-            'action': window.location.pathname
-        });
-        
-        // Añadir filtro
-        $('<input>').attr({
-            'type': 'hidden',
-            'name': 'filter_' + column,
-            'value': value
-        }).appendTo(form);
-        
-        // Añadir parámetros de paginación
-        $('<input>').attr({
-            'type': 'hidden',
-            'name': 'limit',
-            'value': $('#limit-input').val()
-        }).appendTo(form);
-        
-        // Añadir otros filtros activos
-        $('.column-filter').not(input).each(function() {
-            var val = $(this).val();
-            if (val) {
-                var col = $(this).data('column');
-                $('<input>').attr({
-                    'type': 'hidden',
-                    'name': 'filter_' + col,
-                    'value': val
-                }).appendTo(form);
-            }
-        });
-        
-        // Añadir otros datepickers activos
-        $('.datepicker').not(input).each(function() {
-            var val = $(this).val();
-            if (val) {
-                var col = $(this).data('column');
-                // Convertir al formato que entiende el servidor
-                if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(val)) {
-                    const parts = val.split('/');
-                    val = `${parts[2]}-${String(parts[1]).padStart(2, '0')}-${String(parts[0]).padStart(2, '0')}`;
+            
+            // Aplicar filtros de columna
+            $('.column-filter').each(function() {
+                var columnIndex = $(this).data('column-index');
+                var filterValue = $(this).val().toLowerCase();
+                
+                if (filterValue) {
+                    $(this).addClass('active-filter');
+                    $('#detailTable tbody tr:visible').each(function() {
+                        var cellText = $(this).find('td').eq(columnIndex).text().toLowerCase();
+                        if (cellText.indexOf(filterValue) === -1) {
+                            $(this).hide();
+                        }
+                    });
+                } else {
+                    $(this).removeClass('active-filter');
                 }
-                $('<input>').attr({
-                    'type': 'hidden',
-                    'name': 'filter_' + col,
-                    'value': val
-                }).appendTo(form);
+            });
+            
+            // Actualizar contador
+            $('#visible-count').text($('#detailTable tbody tr:visible').length);
+        }
+
+        // Limpiar filtros
+        $('#clear-filters').on('click', function(e) {
+            e.preventDefault();
+            
+            // Verificar si hay filtros aplicados a nivel de servidor
+            var hasServerFilters = $('.column-filter[value!=""]').length > 0 || 
+                                $('#global-search').val() || 
+                                $('.datepicker[value!=""]').length > 0;
+            
+            // Limpiar campos
+            $('.column-filter').val('').removeClass('active-filter');
+            $('.datepicker').val('').removeClass('active-filter');
+            $('#global-search').val('');
+            
+            if (hasServerFilters) {
+                // Si había filtros en servidor, redirigir sin filtros
+                window.location.href = '<?= $this->url('application', ['action' => 'detail', 'table' => $table]) ?>?limit=<?= $limit ?>';
+            } else {
+                // Solo filtrado local
+                $('#detailTable tbody tr').show();
+                $('#visible-count').text($('#detailTable tbody tr').length);
+            }
+            
+            return false;
+        });
+
+        // Buscar con botón global
+        $('#global-search-btn').on('click', function() {
+            var searchTerm = $('#global-search').val();
+            sendToServer({search: searchTerm});
+        });
+
+        // Búsqueda global con Enter
+        $('#global-search').on('keypress', function(e) {
+            if (e.which === 13) {
+                var searchTerm = $(this).val();
+                sendToServer({search: searchTerm});
+                return false;
             }
         });
+
+        // Buscar en toda la base de datos
+        $('#apply-all-filters').on('click', function() {
+            var filters = {};
+            var hasFilters = false;
+            
+            // Recolectar todos los filtros regulares
+            $('.column-filter').each(function() {
+                var value = $(this).val();
+                if (value) {
+                    hasFilters = true;
+                    var column = $(this).data('column');
+                    filters['filter_' + column] = value;
+                }
+            });
+            
+            // Recolectar filtros de fecha
+            $('.datepicker').each(function() {
+                var value = $(this).val();
+                if (value) {
+                    hasFilters = true;
+                    var column = $(this).data('column');
+                    // Convertir al formato que entiende el servidor
+                    filters['filter_' + column] = formatDateForServer(value);
+                }
+            });
+            
+            // Agregar búsqueda global
+            var searchTerm = $('#global-search').val();
+            if (searchTerm) {
+                hasFilters = true;
+                filters.search = searchTerm;
+            }
+            
+            if (hasFilters) {
+                sendToServer(filters);
+            } else {
+                alert("No hay filtros aplicados para buscar.");
+            }
+        });
+
+        // Cambiar tamaño de página
+        $('#page-size-select').on('change', function() {
+            var filters = getCurrentFilters();
+            filters.limit = $(this).val();
+            filters.page = 1; // Volver a primera página
+            sendToServer(filters);
+        });
+
+        // Obtener filtros actuales
+        function getCurrentFilters() {
+            var filters = {};
+            
+            // Agregar filtros de campo normales
+            $('.column-filter').each(function() {
+                var value = $(this).val();
+                if (value) {
+                    var column = $(this).data('column');
+                    filters['filter_' + column] = value;
+                }
+            });
+            
+            // Agregar filtros de fechas
+            $('.datepicker').each(function() {
+                var value = $(this).val();
+                if (value) {
+                    var column = $(this).data('column');
+                    // Convertir al formato que entiende el servidor
+                    filters['filter_' + column] = formatDateForServer(value);
+                }
+            });
+            
+            // Agregar búsqueda global
+            var searchTerm = $('#global-search').val();
+            if (searchTerm) {
+                filters.search = searchTerm;
+            }
+            
+            // Agregar paginación
+            filters.page = $('#page-input').val();
+            filters.limit = $('#limit-input').val();
+            
+            return filters;
+        }
+
+        // Enviar al servidor
+        function sendToServer(params) {
+            // Completar con parámetros actuales
+            var currentParams = getCurrentFilters();
+            // Sobrescribir con nuevos parámetros
+            for (var key in params) {
+                currentParams[key] = params[key];
+            }
+            
+            // Crear formulario y enviar
+            var form = $('<form>', {
+                'method': 'GET',
+                'action': window.location.pathname
+            });
+            
+            for (var key in currentParams) {
+                $('<input>').attr({
+                    'type': 'hidden',
+                    'name': key,
+                    'value': currentParams[key]
+                }).appendTo(form);
+            }
+            
+            form.appendTo('body').submit();
+        }
+
+        // Exportar a CSV
+        $('#export-csv').on('click', function() {
+            var filters = getCurrentFilters();
+            filters.export = 'csv';
+            // Agregar parámetro para indicar qué columnas excluir
+            filters.hidden_columns = 'id_estado,url_pdf_boleta,link_factura';
+            sendToServer(filters);
+        });
+
+        // Inicialmente filtramos para aplicar los filtros que puedan estar en la URL
+        filterTableInRealTime();
+    });
+
+    // Función para buscar en el servidor con un filtro específico
+    function applyServerFilter(column) {
+        console.log("Aplicando filtro para columna:", column);
         
-        // Búsqueda global
-        var searchTerm = $('#global-search').val();
-        if (searchTerm) {
+        var input = $('input[data-column="' + column + '"]');
+        var value = input.val();
+        
+        if (value) {
+            // Si es una fecha, convertir al formato del servidor
+            if (input.hasClass('datepicker')) {
+                // Convertir de DD/MM/YYYY a YYYY-MM-DD
+                if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(value)) {
+                    const parts = value.split('/');
+                    value = `${parts[2]}-${String(parts[1]).padStart(2, '0')}-${String(parts[0]).padStart(2, '0')}`;
+                }
+            }
+            
+            var filters = {};
+            filters['filter_' + column] = value;
+            
+            // Crear formulario y enviar
+            var form = $('<form>', {
+                'method': 'GET',
+                'action': window.location.pathname
+            });
+            
+            // Añadir filtro
             $('<input>').attr({
                 'type': 'hidden',
-                'name': 'search',
-                'value': searchTerm
+                'name': 'filter_' + column,
+                'value': value
             }).appendTo(form);
+            
+            // Añadir parámetros de paginación
+            $('<input>').attr({
+                'type': 'hidden',
+                'name': 'limit',
+                'value': $('#limit-input').val()
+            }).appendTo(form);
+            
+            // Añadir otros filtros activos
+            $('.column-filter').not(input).each(function() {
+                var val = $(this).val();
+                if (val) {
+                    var col = $(this).data('column');
+                    $('<input>').attr({
+                        'type': 'hidden',
+                        'name': 'filter_' + col,
+                        'value': val
+                    }).appendTo(form);
+                }
+            });
+            
+            // Añadir otros datepickers activos
+            $('.datepicker').not(input).each(function() {
+                var val = $(this).val();
+                if (val) {
+                    var col = $(this).data('column');
+                    // Convertir al formato que entiende el servidor
+                    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(val)) {
+                        const parts = val.split('/');
+                        val = `${parts[2]}-${String(parts[1]).padStart(2, '0')}-${String(parts[0]).padStart(2, '0')}`;
+                    }
+                    $('<input>').attr({
+                        'type': 'hidden',
+                        'name': 'filter_' + col,
+                        'value': val
+                    }).appendTo(form);
+                }
+            });
+            
+            // Búsqueda global
+            var searchTerm = $('#global-search').val();
+            if (searchTerm) {
+                $('<input>').attr({
+                    'type': 'hidden',
+                    'name': 'search',
+                    'value': searchTerm
+                }).appendTo(form);
+            }
+            
+            // Enviar formulario
+            form.appendTo('body').submit();
         }
-        
-        // Enviar formulario
-        form.appendTo('body').submit();
     }
-}
-</script>
+    </script>
 
-</body>
-</html>
+    </body>
+    </html>
