@@ -298,4 +298,94 @@ class IndexController extends AbstractActionController
             'messageType' => $messageType
         ]);
     }
+
+    /**
+ * Método para probar la conexión con un marketplace
+ */
+public function testConnectionAction()
+{
+    $id = $this->params()->fromQuery('id');
+    if (!$id) {
+        return $this->jsonResponse(['success' => false, 'message' => 'ID de configuración no proporcionado']);
+    }
+    
+    // Obtener la configuración de la API
+    $sql = "SELECT * FROM api_config WHERE id = ?";
+    $statement = $this->dbAdapter->createStatement($sql);
+    $result = $statement->execute([$id]);
+    $config = $result->current();
+    
+    if (!$config) {
+        return $this->jsonResponse(['success' => false, 'message' => 'Configuración no encontrada']);
+    }
+    
+    try {
+        // Crear cliente HTTP
+        $client = new \Laminas\Http\Client();
+        $client->setOptions([
+            'timeout' => 30,
+            'sslverifypeer' => false // Para desarrollo - en producción debería ser true
+        ]);
+        
+        // Configurar la solicitud
+        $apiUrl = $config['api_url'];
+        // Añadir una ruta de prueba si el endpoint solo es la base
+        if (substr($apiUrl, -1) === '/') {
+            $apiUrl .= 'status'; // O algún endpoint común para verificar estado
+        }
+        
+        $client->setUri($apiUrl);
+        $client->setMethod('GET');
+        
+        // Agregar headers de autenticación según la configuración
+        $client->setHeaders([
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json'
+        ]);
+        
+        if (!empty($config['api_key'])) {
+            $client->setHeaders(['X-API-Key' => $config['api_key']]);
+        }
+        
+        if (!empty($config['accesstoken'])) {
+            $client->setHeaders(['Authorization' => 'Bearer ' . $config['accesstoken']]);
+        }
+        
+        // Realizar la solicitud
+        $response = $client->send();
+        
+        // Verificar la respuesta
+        if ($response->isSuccess()) {
+            return $this->jsonResponse([
+                'success' => true, 
+                'message' => 'Conexión exitosa',
+                'statusCode' => $response->getStatusCode(),
+                'responseBody' => substr($response->getBody(), 0, 500) // Limitar longitud
+            ]);
+        } else {
+            return $this->jsonResponse([
+                'success' => false, 
+                'message' => 'Error en la conexión',
+                'statusCode' => $response->getStatusCode(),
+                'responseBody' => substr($response->getBody(), 0, 500) // Limitar longitud
+            ]);
+        }
+    } catch (\Exception $e) {
+        return $this->jsonResponse([
+            'success' => false, 
+            'message' => 'Error: ' . $e->getMessage()
+        ]);
+    }
+}
+
+/**
+ * Método para devolver respuestas JSON
+ */
+private function jsonResponse($data)
+{
+    $response = $this->getResponse();
+    $response->getHeaders()->addHeaderLine('Content-Type', 'application/json');
+    $response->setContent(json_encode($data));
+    return $response;
+}
 }

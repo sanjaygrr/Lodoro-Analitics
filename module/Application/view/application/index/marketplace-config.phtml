@@ -113,22 +113,27 @@
                 </div>
                 
                 <!-- Footer con acciones -->
-                <div class="card-footer bg-light border-0 d-flex justify-content-end gap-2">
-                    <button type="button" class="btn btn-warning btn-sm edit-config" 
-                            data-id="<?= $this->escapeHtml($config['id']) ?>"
-                            data-marketplace="<?= $this->escapeHtml($config['marketplace']) ?>"
-                            data-api-url="<?= $this->escapeHtml($config['api_url']) ?>"
-                            data-api-key="<?= $this->escapeHtml($config['api_key']) ?>"
-                            data-accesstoken="<?= $this->escapeHtml($config['accesstoken'] ?? '') ?>"
-                            data-offset="<?= $this->escapeHtml($config['offset']) ?>"
-                            data-bs-toggle="modal" data-bs-target="#editConfigModal">
-                        <i class="fas fa-edit me-1"></i>Editar
+                <div class="card-footer bg-light border-0 d-flex justify-content-between">
+                    <button type="button" class="btn btn-info btn-sm test-connection" data-id="<?= $this->escapeHtml($config['id']) ?>">
+                        <i class="fas fa-network-wired me-1"></i>Probar Conexión
                     </button>
-                    <a href="?delete=<?= $this->escapeHtml($config['id']) ?>" 
-                        class="btn btn-danger btn-sm" 
-                        onclick="return confirm('¿Está seguro de que desea eliminar la configuración para <?= $this->escapeHtml($config['marketplace']) ?>?')">
-                        <i class="fas fa-trash me-1"></i>Eliminar
-                    </a>
+                    <div>
+                        <button type="button" class="btn btn-warning btn-sm edit-config" 
+                                data-id="<?= $this->escapeHtml($config['id']) ?>"
+                                data-marketplace="<?= $this->escapeHtml($config['marketplace']) ?>"
+                                data-api-url="<?= $this->escapeHtml($config['api_url']) ?>"
+                                data-api-key="<?= $this->escapeHtml($config['api_key']) ?>"
+                                data-accesstoken="<?= $this->escapeHtml($config['accesstoken'] ?? '') ?>"
+                                data-offset="<?= $this->escapeHtml($config['offset']) ?>"
+                                data-bs-toggle="modal" data-bs-target="#editConfigModal">
+                            <i class="fas fa-edit me-1"></i>Editar
+                        </button>
+                        <a href="?delete=<?= $this->escapeHtml($config['id']) ?>" 
+                            class="btn btn-danger btn-sm" 
+                            onclick="return confirm('¿Está seguro de que desea eliminar la configuración para <?= $this->escapeHtml($config['marketplace']) ?>?')">
+                            <i class="fas fa-trash me-1"></i>Eliminar
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -199,6 +204,9 @@
                             <td><?= $this->escapeHtml($config['update_at']) ?></td>
                             <td>
                                 <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-info btn-sm test-connection" data-id="<?= $this->escapeHtml($config['id']) ?>">
+                                        <i class="fas fa-network-wired"></i>
+                                    </button>
                                     <button type="button" class="btn btn-warning btn-sm edit-config" 
                                             data-id="<?= $this->escapeHtml($config['id']) ?>"
                                             data-marketplace="<?= $this->escapeHtml($config['marketplace']) ?>"
@@ -343,6 +351,46 @@
     </div>
 </div>
 
+<!-- Modal para Resultado de Prueba de Conexión -->
+<div class="modal fade" id="connectionTestModal" tabindex="-1" aria-labelledby="connectionTestModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="connectionTestModalLabel">Resultado de Prueba de Conexión</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="connectionTestLoading" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                    <p class="mt-3">Probando conexión, por favor espere...</p>
+                </div>
+                
+                <div id="connectionTestResult" class="d-none">
+                    <div class="alert d-flex align-items-center" id="connectionTestAlert" role="alert">
+                        <div id="connectionTestIcon" class="me-3"></div>
+                        <div id="connectionTestMessage"></div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Código de Respuesta</label>
+                        <input type="text" class="form-control" id="connectionTestStatusCode" readonly>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Detalles de la Respuesta</label>
+                        <textarea class="form-control font-monospace" id="connectionTestResponseBody" rows="8" readonly></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Estilos personalizados -->
 <style>
 .bg-gradient-primary {
@@ -439,5 +487,72 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     });
+    
+    // Configurar botones de prueba de conexión
+    document.querySelectorAll('.test-connection').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const id = this.getAttribute('data-id');
+            testConnection(id);
+        });
+    });
+    
+    function testConnection(id) {
+        // Mostrar modal con loader
+        const connectionTestModal = new bootstrap.Modal(document.getElementById('connectionTestModal'));
+        connectionTestModal.show();
+        
+        // Mostrar cargando y ocultar resultados
+        document.getElementById('connectionTestLoading').classList.remove('d-none');
+        document.getElementById('connectionTestResult').classList.add('d-none');
+        
+        // Realizar solicitud AJAX
+        fetch(`<?= $this->url('application', ['action' => 'test-connection']) ?>?id=${id}`)
+            .then(response => response.json())
+            .then(data => {
+                // Ocultar cargando y mostrar resultados
+                document.getElementById('connectionTestLoading').classList.add('d-none');
+                document.getElementById('connectionTestResult').classList.remove('d-none');
+                
+                // Mostrar resultados
+                const alertElement = document.getElementById('connectionTestAlert');
+                const iconElement = document.getElementById('connectionTestIcon');
+                const messageElement = document.getElementById('connectionTestMessage');
+                const statusCodeElement = document.getElementById('connectionTestStatusCode');
+                const responseBodyElement = document.getElementById('connectionTestResponseBody');
+                
+                // Configurar el tipo de alerta y el ícono
+                if (data.success) {
+                    alertElement.classList.add('alert-success');
+                    alertElement.classList.remove('alert-danger');
+                    iconElement.innerHTML = '<i class="fas fa-check-circle fa-2x"></i>';
+                } else {
+                    alertElement.classList.add('alert-danger');
+                    alertElement.classList.remove('alert-success');
+                    iconElement.innerHTML = '<i class="fas fa-exclamation-circle fa-2x"></i>';
+                }
+                
+                // Mostrar mensaje y detalles
+                messageElement.textContent = data.message;
+                statusCodeElement.value = data.statusCode || 'N/A';
+                responseBodyElement.value = data.responseBody || 'No hay datos de respuesta disponibles';
+            })
+            .catch(error => {
+                // Ocultar cargando y mostrar resultados con error
+                document.getElementById('connectionTestLoading').classList.add('d-none');
+                document.getElementById('connectionTestResult').classList.remove('d-none');
+                
+                const alertElement = document.getElementById('connectionTestAlert');
+                const iconElement = document.getElementById('connectionTestIcon');
+                const messageElement = document.getElementById('connectionTestMessage');
+                
+                alertElement.classList.add('alert-danger');
+                alertElement.classList.remove('alert-success');
+                iconElement.innerHTML = '<i class="fas fa-exclamation-triangle fa-2x"></i>';
+                messageElement.textContent = 'Error al realizar la prueba: ' + error.message;
+                
+                document.getElementById('connectionTestStatusCode').value = 'Error';
+                document.getElementById('connectionTestResponseBody').value = 'No se pudo completar la solicitud.';
+            });
+    }
 });
 </script>
