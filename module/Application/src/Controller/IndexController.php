@@ -200,4 +200,102 @@ class IndexController extends AbstractActionController
         
         return $response;
     }
+
+    /**
+     * Acción para gestionar la configuración de integración de marketplaces
+     */
+    public function marketplaceConfigAction()
+    {
+        // Obtener todas las configuraciones existentes
+        $sql = "SELECT * FROM api_config ORDER BY marketplace";
+        $statement = $this->dbAdapter->createStatement($sql);
+        $configs = $statement->execute();
+        
+        $configsArray = [];
+        foreach ($configs as $row) {
+            $configsArray[] = $row;
+        }
+        
+        // Procesar formulario si se ha enviado
+        $message = '';
+        $messageType = '';
+        
+        if ($this->getRequest()->isPost()) {
+            $postData = $this->params()->fromPost();
+            
+            if (isset($postData['id']) && $postData['id'] > 0) {
+                // Actualizar registro existente
+                $sql = "UPDATE api_config SET 
+                        api_url = ?, 
+                        api_key = ?, 
+                        accesstoken = ?, 
+                        offset = ?, 
+                        marketplace = ?, 
+                        update_at = NOW() 
+                        WHERE id = ?";
+                
+                $params = [
+                    $postData['api_url'],
+                    $postData['api_key'],
+                    $postData['accesstoken'] ?? null,
+                    (int)($postData['offset'] ?? 0),
+                    $postData['marketplace'],
+                    $postData['id']
+                ];
+                
+                $statement = $this->dbAdapter->createStatement($sql);
+                $result = $statement->execute($params);
+                
+                $message = 'Configuración actualizada correctamente';
+                $messageType = 'success';
+            } else {
+                // Insertar nuevo registro
+                $sql = "INSERT INTO api_config 
+                        (api_url, api_key, accesstoken, offset, marketplace, created_at, update_at) 
+                        VALUES (?, ?, ?, ?, ?, NOW(), NOW())";
+                
+                $params = [
+                    $postData['api_url'],
+                    $postData['api_key'],
+                    $postData['accesstoken'] ?? null,
+                    (int)($postData['offset'] ?? 0),
+                    $postData['marketplace']
+                ];
+                
+                $statement = $this->dbAdapter->createStatement($sql);
+                $result = $statement->execute($params);
+                
+                $message = 'Nueva configuración creada correctamente';
+                $messageType = 'success';
+            }
+            
+            // Recargar datos
+            $statement = $this->dbAdapter->createStatement("SELECT * FROM api_config ORDER BY marketplace");
+            $configs = $statement->execute();
+            $configsArray = [];
+            foreach ($configs as $row) {
+                $configsArray[] = $row;
+            }
+        }
+        
+        // Procesar eliminación si se solicita
+        $deleteId = $this->params()->fromQuery('delete', null);
+        if ($deleteId) {
+            $sql = "DELETE FROM api_config WHERE id = ?";
+            $statement = $this->dbAdapter->createStatement($sql);
+            $result = $statement->execute([$deleteId]);
+            
+            $message = 'Configuración eliminada correctamente';
+            $messageType = 'success';
+            
+            // Redireccionar para evitar problemas con F5
+            return $this->redirect()->toRoute('application', ['action' => 'marketplace-config']);
+        }
+        
+        return new ViewModel([
+            'configs' => $configsArray,
+            'message' => $message,
+            'messageType' => $messageType
+        ]);
+    }
 }

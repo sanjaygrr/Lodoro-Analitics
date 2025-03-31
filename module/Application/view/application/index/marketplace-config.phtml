@@ -1,0 +1,220 @@
+<?php
+/**
+ * @var Laminas\View\Renderer\PhpRenderer $this
+ */
+?>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Configuración de Integraciones de Marketplaces</h5>
+                    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newConfigModal">
+                        <i class="fas fa-plus"></i> Nueva Configuración
+                    </button>
+                </div>
+                
+                <?php if (!empty($message)): ?>
+                <div class="alert alert-<?= $messageType ?> alert-dismissible fade show m-3" role="alert">
+                    <?= $this->escapeHtml($message) ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                <?php endif; ?>
+                
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Marketplace</th>
+                                    <th>URL API</th>
+                                    <th>API Key</th>
+                                    <th>Access Token</th>
+                                    <th>Offset</th>
+                                    <th>Creado</th>
+                                    <th>Actualizado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if (empty($configs)): ?>
+                                <tr>
+                                    <td colspan="9" class="text-center">No hay configuraciones disponibles</td>
+                                </tr>
+                                <?php else: ?>
+                                <?php foreach ($configs as $config): ?>
+                                <tr>
+                                    <td><?= $this->escapeHtml($config['id']) ?></td>
+                                    <td><?= $this->escapeHtml($config['marketplace']) ?></td>
+                                    <td><?= $this->escapeHtml($config['api_url']) ?></td>
+                                    <td>
+                                        <div class="input-group">
+                                            <input type="password" readonly class="form-control form-control-sm" value="<?= $this->escapeHtml($config['api_key']) ?>">
+                                            <button class="btn btn-outline-secondary btn-sm toggle-password" type="button">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <?php if (!empty($config['accesstoken'])): ?>
+                                        <div class="input-group">
+                                            <input type="password" readonly class="form-control form-control-sm" value="<?= $this->escapeHtml($config['accesstoken']) ?>">
+                                            <button class="btn btn-outline-secondary btn-sm toggle-password" type="button">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        </div>
+                                        <?php else: ?>
+                                        <span class="text-muted">No definido</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><?= $this->escapeHtml($config['offset']) ?></td>
+                                    <td><?= $this->escapeHtml($config['created_at']) ?></td>
+                                    <td><?= $this->escapeHtml($config['update_at']) ?></td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <button type="button" class="btn btn-warning btn-sm edit-config" 
+                                                    data-id="<?= $this->escapeHtml($config['id']) ?>"
+                                                    data-marketplace="<?= $this->escapeHtml($config['marketplace']) ?>"
+                                                    data-api-url="<?= $this->escapeHtml($config['api_url']) ?>"
+                                                    data-api-key="<?= $this->escapeHtml($config['api_key']) ?>"
+                                                    data-accesstoken="<?= $this->escapeHtml($config['accesstoken'] ?? '') ?>"
+                                                    data-offset="<?= $this->escapeHtml($config['offset']) ?>"
+                                                    data-bs-toggle="modal" data-bs-target="#editConfigModal">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <a href="<?= $this->url('application', ['action' => 'marketplace-config'], ['query' => ['delete' => $config['id']]]) ?>" 
+                                               class="btn btn-danger btn-sm delete-config" 
+                                               data-marketplace="<?= $this->escapeHtml($config['marketplace']) ?>"
+                                               onclick="return confirm('¿Está seguro de que desea eliminar esta configuración?')">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Nueva Configuración -->
+<div class="modal fade" id="newConfigModal" tabindex="-1" aria-labelledby="newConfigModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="newConfigModalLabel">Nueva Configuración de Marketplace</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="marketplace" class="form-label">Marketplace</label>
+                        <input type="text" class="form-control" id="marketplace" name="marketplace" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="api_url" class="form-label">URL de API</label>
+                        <input type="url" class="form-control" id="api_url" name="api_url" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="api_key" class="form-label">API Key</label>
+                        <input type="text" class="form-control" id="api_key" name="api_key" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="accesstoken" class="form-label">Access Token (opcional)</label>
+                        <input type="text" class="form-control" id="accesstoken" name="accesstoken">
+                    </div>
+                    <div class="mb-3">
+                        <label for="offset" class="form-label">Offset</label>
+                        <input type="number" class="form-control" id="offset" name="offset" value="0">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Editar Configuración -->
+<div class="modal fade" id="editConfigModal" tabindex="-1" aria-labelledby="editConfigModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post">
+                <input type="hidden" id="edit_id" name="id">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editConfigModalLabel">Editar Configuración de Marketplace</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="edit_marketplace" class="form-label">Marketplace</label>
+                        <input type="text" class="form-control" id="edit_marketplace" name="marketplace" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_api_url" class="form-label">URL de API</label>
+                        <input type="url" class="form-control" id="edit_api_url" name="api_url" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_api_key" class="form-label">API Key</label>
+                        <input type="text" class="form-control" id="edit_api_key" name="api_key" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_accesstoken" class="form-label">Access Token (opcional)</label>
+                        <input type="text" class="form-control" id="edit_accesstoken" name="accesstoken">
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_offset" class="form-label">Offset</label>
+                        <input type="number" class="form-control" id="edit_offset" name="offset" value="0">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Actualizar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript para la página -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Función para alternar visibilidad de contraseñas/tokens
+    document.querySelectorAll('.toggle-password').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const input = this.previousElementSibling;
+            const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
+            input.setAttribute('type', type);
+            this.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
+        });
+    });
+    
+    // Configurar modal de edición
+    document.querySelectorAll('.edit-config').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const id = this.getAttribute('data-id');
+            const marketplace = this.getAttribute('data-marketplace');
+            const apiUrl = this.getAttribute('data-api-url');
+            const apiKey = this.getAttribute('data-api-key');
+            const accessToken = this.getAttribute('data-accesstoken');
+            const offset = this.getAttribute('data-offset');
+            
+            document.getElementById('edit_id').value = id;
+            document.getElementById('edit_marketplace').value = marketplace;
+            document.getElementById('edit_api_url').value = apiUrl;
+            document.getElementById('edit_api_key').value = apiKey;
+            document.getElementById('edit_accesstoken').value = accessToken;
+            document.getElementById('edit_offset').value = offset;
+        });
+    });
+});
+</script>
