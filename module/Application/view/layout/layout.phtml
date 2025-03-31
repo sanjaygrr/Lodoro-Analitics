@@ -67,41 +67,28 @@
                 min-height: 100vh;
             }
 
-            /* Sidebar */
+            /* Sidebar - CORREGIDO */
             #sidebar {
                 background: linear-gradient(180deg, var(--dark) 0%, var(--darker) 100%);
                 color: var(--white);
                 min-height: 100vh;
-                transition: width var(--transition-speed) ease;
+                transition: all var(--transition-speed) ease; /* Cambiado de width a all para mejor transición */
                 position: fixed;
                 top: 0;
                 left: 0;
                 z-index: 1000;
                 box-shadow: var(--shadow);
                 overflow-y: auto;
-                scrollbar-width: thin;
+                width: 70px; /* Estado inicial colapsado */
             }
 
-            #sidebar::-webkit-scrollbar {
-                width: 4px;
-            }
-            
-            #sidebar::-webkit-scrollbar-track {
-                background: rgba(255,255,255,0.05);
-            }
-            
-            #sidebar::-webkit-scrollbar-thumb {
-                background-color: rgba(255,255,255,0.2);
-                border-radius: 4px;
-            }
-
-            /* Control de anchos */
+            /* Control de anchos - CORREGIDO */
             .sidebar-collapsed {
-                width: 70px;
+                width: 70px !important;
             }
 
             .sidebar-expanded {
-                width: 240px;
+                width: 240px !important;
             }
 
             /* Cabecera del sidebar */
@@ -219,10 +206,22 @@
                 white-space: nowrap;
                 opacity: 0;
                 transition: opacity var(--transition-speed) ease;
+                display: inline-block; /* AÑADIDO para asegurar que el texto sea visible */
+                font-weight: 500; /* Mejorar legibilidad */
             }
 
             .sidebar-expanded .nav-text {
                 opacity: 1;
+                visibility: visible;
+            }
+            
+            /* Estado expandido para mostrar todos los títulos */
+            .sidebar-expanded .menu-header,
+            .sidebar-expanded .nav-text,
+            .sidebar-expanded .badge-new {
+                opacity: 1;
+                visibility: visible;
+                display: inline-block;
             }
 
             /* Tooltip estilizado - CORREGIDO para asegurar visibilidad */
@@ -280,8 +279,8 @@
             /* Insignia de notificación - CORREGIDA */
             .notification-badge {
                 position: absolute;
-                top: 5px;
-                right: 5px;
+                top: 0;
+                right: 0;
                 background-color: var(--danger);
                 color: white;
                 font-size: 0.65rem;
@@ -299,7 +298,6 @@
             .menu-divider {
                 height: 1px;
                 background-color: rgba(255, 255, 255, 0.1);
-                margin: 1rem 1rem;
             }
 
             /* Panel de notificaciones */
@@ -490,15 +488,59 @@
                 visibility: visible;
             }
 
+            /* Botón de expansión inferior */
+            .sidebar-bottom-toggle {
+                padding: 0.5rem 1rem;
+                display: flex;
+                justify-content: center;
+                flex-shrink: 0; /* No permitir que se encoja */
+                margin-top: auto; /* Empujar al fondo */
+            }
+            
+            .toggle-btn-bottom {
+                background: transparent;
+                border: none;
+                color: var(--text-light);
+                cursor: pointer;
+                width: 100%;
+                padding: 0.5rem;
+                border-radius: 0.25rem;
+                display: flex;
+                align-items: center;
+                justify-content: flex-start;
+                transition: all var(--transition-speed) ease;
+            }
+            
+            .toggle-btn-bottom:hover {
+                background-color: rgba(255, 255, 255, 0.1);
+                color: var(--white);
+            }
+            
+            .toggle-btn-bottom i {
+                margin-right: 0.75rem;
+                min-width: 16px;
+                text-align: center;
+            }
+            
+            .toggle-text {
+                font-size: 0.875rem;
+                white-space: nowrap;
+                opacity: 0;
+                transition: opacity var(--transition-speed) ease;
+            }
+            
+            .sidebar-expanded .toggle-text {
+                opacity: 1;
+            }
+            
             /* Panel de usuario */
             .user-panel {
-                padding: 1rem;
+                padding: 0.75rem 1rem; /* Reducido de 1rem */
                 border-top: 1px solid rgba(255, 255, 255, 0.1);
-                position: sticky;
-                bottom: 0;
                 background-color: var(--darker);
                 display: flex;
                 align-items: center;
+                flex-shrink: 0; /* No permitir que se encoja */
             }
 
             .user-avatar {
@@ -538,19 +580,23 @@
                 white-space: nowrap;
             }
 
-            /* Contenido principal */
+            /* Contenido principal - CORREGIDO para mejorar transición */
             .main-content {
                 flex: 1;
                 margin-left: 70px;
                 padding: 1.5rem;
                 transition: margin-left var(--transition-speed) ease;
+                overflow-x: hidden; /* Evitar desplazamiento horizontal */
+                max-width: calc(100% - 70px); /* Asegurar que no exceda el espacio disponible */
+                box-sizing: border-box; /* Incluir padding en el cálculo del ancho */
             }
 
             .sidebar-expanded ~ .main-content {
                 margin-left: 240px;
+                max-width: calc(100% - 240px); /* Ajustar cuando el sidebar está expandido */
             }
 
-            /* Navbar superior */
+            /* Navbar superior - CORREGIDO */
             .top-navbar {
                 background-color: var(--white);
                 padding: 0.75rem 1.5rem;
@@ -560,6 +606,9 @@
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
+                width: 100%; /* Asegurar que ocupe el ancho completo */
+                box-sizing: border-box; /* Incluir padding en el cálculo del ancho */
+                overflow: visible; /* Evitar que los elementos se recorten */
             }
 
             .page-title {
@@ -573,6 +622,8 @@
                 display: flex;
                 align-items: center;
                 gap: 1rem;
+                flex-wrap: nowrap; /* Evitar que los elementos se envuelvan */
+                min-width: fit-content; /* Garantizar espacio mínimo necesario */
             }
 
             .navbar-icon {
@@ -586,6 +637,7 @@
                 position: relative;
                 color: var(--text-muted);
                 transition: all var(--transition-speed) ease;
+                flex-shrink: 0; /* Evitar que estos íconos se encojan */
             }
 
             .navbar-icon:hover {
@@ -593,7 +645,7 @@
                 color: var(--primary);
             }
 
-            /* Responsividad */
+            /* Responsividad - CORREGIDA */
             @media (max-width: 992px) {
                 #sidebar {
                     position: fixed;
@@ -602,7 +654,8 @@
                     height: 100%;
                     z-index: 1000;
                     transform: translateX(-100%);
-                    transition: transform var(--transition-speed) ease;
+                    transition: transform var(--transition-speed) ease, width var(--transition-speed) ease;
+                    width: 240px !important; /* Ancho constante en móvil para evitar problemas */
                 }
                 
                 #sidebar.sidebar-collapsed,
@@ -612,6 +665,7 @@
                 
                 .main-content {
                     margin-left: 0 !important;
+                    max-width: 100%;
                 }
                 
                 .overlay {
@@ -633,6 +687,14 @@
                     width: 100%;
                     max-width: 320px;
                 }
+                
+                .top-navbar {
+                    padding: 0.75rem 1rem; /* Reducir el padding en pantallas más pequeñas */
+                }
+                
+                .page-title {
+                    font-size: 1.1rem; /* Reducir tamaño del título en pantallas pequeñas */
+                }
             }
         </style>
 
@@ -640,16 +702,14 @@
     </head>
     <body>
         <div class="app-container">
-            <!-- Sidebar / Navbar lateral -->
+            <!-- Sidebar / Navbar lateral - CORREGIDO -->
             <div id="sidebar" class="sidebar-collapsed">
                 <div class="sidebar-header">
                     <div class="logo-icon">
                         <i class="fas fa-chart-pie"></i>
                     </div>
                     <div class="logo-text">Lodoro Analytics</div>
-                    <button class="toggle-btn" id="toggleBtn" title="Expandir/Colapsar">
-                        <i class="fas fa-chevron-right"></i>
-                    </button>
+                    <!-- Se ha quitado el botón de toggle superior -->
                 </div>
                 
                 <ul class="nav-menu">
@@ -660,9 +720,9 @@
                             <div class="nav-icon">
                                 <i class="fas fa-tachometer-alt"></i>
                             </div>
-                            <span class="nav-text">Dashboard</span>
+                            <span class="nav-text">Resumen de ventas</span>
                         </a>
-                        <div class="tooltip-nav">Dashboard</div>
+                        <div class="tooltip-nav">Resumen de ventas</div>
                     </li>
                     
                     <li class="nav-item">
@@ -714,15 +774,15 @@
                     <li class="menu-header">Sistema</li>
                     
                     <li class="nav-item">
-                        <a href="#" class="nav-link">
+                        <a href="<?= $this->url('application', ['action' => 'marketplace-config']) ?>" class="nav-link">
                             <div class="nav-icon">
-                                <i class="fas fa-cog"></i>
+                                <i class="fas fa-plug"></i>
                             </div>
-                            <span class="nav-text">Configuración</span>
+                            <span class="nav-text">Integraciones</span>
                         </a>
-                        <div class="tooltip-nav">Configuración</div>
+                        <div class="tooltip-nav">Integraciones</div>
                     </li>
-                    
+                                        
                     <li class="nav-item">
                         <a href="#" class="nav-link">
                             <div class="nav-icon">
@@ -744,6 +804,15 @@
                         <div class="tooltip-nav">Notificaciones</div>
                     </li>
                 </ul>
+                
+                <!-- Botón de expansión inferior -->
+                <div class="menu-divider"></div>
+                <div class="sidebar-bottom-toggle">
+                    <button class="toggle-btn-bottom" id="toggleBtnBottom" title="Expandir/Colapsar">
+                        <i class="fas fa-chevron-right"></i>
+                        <span class="toggle-text">Expandir menú</span>
+                    </button>
+                </div>
                 
                 <!-- Panel de usuario -->
                 <div class="user-panel">
@@ -840,7 +909,7 @@
             <div class="main-content">
                 <!-- Navbar superior -->
                 <div class="top-navbar">
-                    <h1 class="page-title">Dashboard</h1>
+                    <h1 class="page-title"></h1>
                     <div class="navbar-actions">
                         <div class="navbar-icon" id="navNotificationsBtn" title="Notificaciones">
                             <i class="fas fa-bell"></i>
@@ -877,26 +946,61 @@
                 
                 // Verificación de elementos
                 if (!sidebar) console.error("Elemento sidebar no encontrado");
-                if (!toggleBtn) console.error("Botón de toggle no encontrado");
                 
-                // Toggle del sidebar - CORREGIDO
-                toggleBtn.addEventListener('click', function() {
+                // YA NO EXPANDIMOS AUTOMÁTICAMENTE - Eliminada la función expandSidebarOnLoad()
+                
+                // Función para alternar el estado del sidebar
+                function toggleSidebar() {
                     console.log("Toggle sidebar clicked");
                     
                     if (sidebar.classList.contains('sidebar-collapsed')) {
                         console.log("Expandiendo sidebar");
                         sidebar.classList.remove('sidebar-collapsed');
                         sidebar.classList.add('sidebar-expanded');
-                        toggleBtn.querySelector('i').classList.remove('fa-chevron-right');
-                        toggleBtn.querySelector('i').classList.add('fa-chevron-left');
+                        
+                        // Actualizar el ícono del botón inferior
+                        const toggleBtnIcon = document.querySelector('#toggleBtnBottom i');
+                        if (toggleBtnIcon) {
+                            toggleBtnIcon.classList.remove('fa-chevron-right');
+                            toggleBtnIcon.classList.add('fa-chevron-left');
+                        }
+                        
+                        // Actualizar el texto del botón inferior
+                        const toggleText = document.querySelector('.toggle-text');
+                        if (toggleText) {
+                            toggleText.textContent = 'Colapsar';
+                        }
+                        
+                        // Registrar el ancho después de expandir para debugging
+                        console.log("Ancho del sidebar expandido:", getComputedStyle(sidebar).width);
                     } else {
                         console.log("Colapsando sidebar");
                         sidebar.classList.remove('sidebar-expanded');
                         sidebar.classList.add('sidebar-collapsed');
-                        toggleBtn.querySelector('i').classList.remove('fa-chevron-left');
-                        toggleBtn.querySelector('i').classList.add('fa-chevron-right');
+                        
+                        // Actualizar el ícono del botón inferior
+                        const toggleBtnIcon = document.querySelector('#toggleBtnBottom i');
+                        if (toggleBtnIcon) {
+                            toggleBtnIcon.classList.remove('fa-chevron-left');
+                            toggleBtnIcon.classList.add('fa-chevron-right');
+                        }
+                        
+                        // Actualizar el texto del botón inferior
+                        const toggleText = document.querySelector('.toggle-text');
+                        if (toggleText) {
+                            toggleText.textContent = 'Expandir';
+                        }
+                        
+                        // Registrar el ancho después de colapsar para debugging
+                        console.log("Ancho del sidebar colapsado:", getComputedStyle(sidebar).width);
                     }
-                });
+                }
+                
+                // Asignar la función al botón inferior
+                const toggleBtnBottom = document.getElementById('toggleBtnBottom');
+                if (toggleBtnBottom) {
+                    toggleBtnBottom.addEventListener('click', toggleSidebar);
+                }
                 
                 // Cerrar sidebar con overlay en dispositivos móviles
                 if (overlay) {
@@ -960,6 +1064,14 @@
                         this.classList.add('active');
                     });
                 });
+                
+                // Iniciar debug para confirmar ancho correcto
+                console.log("Ancho inicial del sidebar:", getComputedStyle(sidebar).width);
+                console.log("Clases del sidebar:", sidebar.className);
+                
+                // Comprobar si estamos en móvil
+                const isMobile = window.innerWidth <= 992;
+                console.log("Vista móvil:", isMobile);
                 
                 console.log("Inicialización de sidebar completada");
             });
