@@ -1,6 +1,6 @@
 <?php
 /**
- * Dashboard view.
+ * Dashboard view con datos reales.
  *
  * Se espera que $data sea un arreglo indexado, donde cada elemento es un arreglo asociativo con las siguientes claves:
  * - table_name o TABLE_NAME
@@ -20,7 +20,146 @@ foreach ($data as $row) {
 }
 // Reemplazar $data con los datos filtrados
 $data = $filtered_data;
+
+// IMPORTANTE: CONSULTAS SQL ADICIONALES PARA DATOS AVANZADOS
+// Debes implementar estas consultas para obtener datos reales en lugar de ejemplos
+
+// 1. CONSULTA PARA OBTENER ESTADOS DE CUMPLIMIENTO (por marketplace)
+// $fulfillmentData = [];
+// Ejemplo de SQL:
+// SELECT COUNT(*) as count, Estado, SUBSTRING_INDEX(FROM_TABLE, '_', 2) as marketplace 
+// FROM (
+//   SELECT 'MKP_FALABELLA' as FROM_TABLE, Estado FROM MKP_FALABELLA
+//   UNION ALL SELECT 'MKP_MERCADO_LIBRE' as FROM_TABLE, Estado FROM MKP_MERCADO_LIBRE
+//   UNION ALL SELECT 'MKP_PARIS' as FROM_TABLE, Estado FROM MKP_PARIS
+//   UNION ALL SELECT 'MKP_RIPLEY' as FROM_TABLE, Estado FROM MKP_RIPLEY
+//   UNION ALL SELECT 'MKP_WALLMART' as FROM_TABLE, Estado FROM MKP_WALLMART
+// ) combined
+// GROUP BY Estado, marketplace
+// ORDER BY marketplace, count DESC;
+
+// 2. CONSULTA PARA OBTENER DATOS DE VENTAS POR FECHA
+// $salesTrendData = [];
+// Ejemplo de SQL:
+// SELECT COUNT(*) as count, DATE(`Fecha de Creación`) as date, SUBSTRING_INDEX(FROM_TABLE, '_', 2) as marketplace 
+// FROM (
+//   SELECT 'MKP_FALABELLA' as FROM_TABLE, `Fecha de Creación` FROM MKP_FALABELLA
+//   UNION ALL SELECT 'MKP_MERCADO_LIBRE' as FROM_TABLE, `Fecha de Creación` FROM MKP_MERCADO_LIBRE
+//   UNION ALL SELECT 'MKP_PARIS' as FROM_TABLE, `Fecha de Creación` FROM MKP_PARIS
+//   UNION ALL SELECT 'MKP_RIPLEY' as FROM_TABLE, `Fecha de Creación` FROM MKP_RIPLEY
+//   UNION ALL SELECT 'MKP_WALLMART' as FROM_TABLE, `Fecha de Creación` FROM MKP_WALLMART
+// ) combined
+// WHERE `Fecha de Creación` >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+// GROUP BY date, marketplace
+// ORDER BY date, marketplace;
+
+// 3. CONSULTA PARA OBTENER TICKET PROMEDIO
+// $avgTicketData = [];
+// Ejemplo de SQL:
+// SELECT AVG(`Precio con Descuento`) as avg_price, SUBSTRING_INDEX(FROM_TABLE, '_', 2) as marketplace 
+// FROM (
+//   SELECT 'MKP_FALABELLA' as FROM_TABLE, `Precio con Descuento` FROM MKP_FALABELLA
+//   UNION ALL SELECT 'MKP_MERCADO_LIBRE' as FROM_TABLE, `Precio con Descuento` FROM MKP_MERCADO_LIBRE
+//   UNION ALL SELECT 'MKP_PARIS' as FROM_TABLE, `Precio con Descuento` FROM MKP_PARIS
+//   UNION ALL SELECT 'MKP_RIPLEY' as FROM_TABLE, `Precio con Descuento` FROM MKP_RIPLEY
+//   UNION ALL SELECT 'MKP_WALLMART' as FROM_TABLE, `Precio con Descuento` FROM MKP_WALLMART
+// ) combined
+// GROUP BY marketplace
+// ORDER BY avg_price DESC;
+
+// 4. CONSULTA PARA OBTENER TOP PRODUCTOS
+// $topProductsData = [];
+// Ejemplo de SQL:
+// SELECT COUNT(*) as count, `SKU`, `Nombre Producto`, SUBSTRING_INDEX(FROM_TABLE, '_', 2) as marketplace 
+// FROM (
+//   SELECT 'MKP_FALABELLA' as FROM_TABLE, `SKU`, `Nombre Producto` FROM MKP_FALABELLA
+//   UNION ALL SELECT 'MKP_MERCADO_LIBRE' as FROM_TABLE, `SKU`, `Nombre Producto` FROM MKP_MERCADO_LIBRE
+//   UNION ALL SELECT 'MKP_PARIS' as FROM_TABLE, `SKU`, `Nombre Producto` FROM MKP_PARIS
+//   UNION ALL SELECT 'MKP_RIPLEY' as FROM_TABLE, `SKU`, `Nombre Producto` FROM MKP_RIPLEY
+//   UNION ALL SELECT 'MKP_WALLMART' as FROM_TABLE, `SKU`, `Nombre Producto` FROM MKP_WALLMART
+// ) combined
+// GROUP BY `SKU`
+// ORDER BY count DESC
+// LIMIT 10;
+
+// 5. CONSULTA PARA OBTENER DATOS DE TRANSPORTISTAS
+// $carriersData = [];
+// Ejemplo de SQL:
+// SELECT COUNT(*) as count, `Transportista` 
+// FROM (
+//   SELECT `Transportista` FROM MKP_FALABELLA
+//   UNION ALL SELECT `Transportista` FROM MKP_MERCADO_LIBRE
+//   UNION ALL SELECT `Transportista` FROM MKP_PARIS
+//   UNION ALL SELECT `Transportista` FROM MKP_RIPLEY
+//   UNION ALL SELECT `Transportista` FROM MKP_WALLMART
+// ) combined
+// GROUP BY `Transportista`
+// ORDER BY count DESC;
+
+// 6. CONSULTA PARA OBTENER MÉTRICAS FINANCIERAS
+// $financialMetrics = [];
+// Ejemplo de SQL para total de ventas:
+// SELECT SUM(`Monto Total Factura`) as total_sales, 
+//        SUBSTRING_INDEX(FROM_TABLE, '_', 2) as marketplace,
+//        COUNT(CASE WHEN `Estado Del Pago` = 'Pendiente' THEN 1 END) as pending_count,
+//        SUM(CASE WHEN `Estado Del Pago` = 'Pendiente' THEN `Monto Total Factura` ELSE 0 END) as pending_amount,
+//        AVG(`Impuesto`/`Base Imponible`*100) as tax_rate
+// FROM (
+//   SELECT 'MKP_FALABELLA' as FROM_TABLE, `Monto Total Factura`, `Estado Del Pago`, `Impuesto`, `Base Imponible` FROM MKP_FALABELLA
+//   UNION ALL SELECT 'MKP_MERCADO_LIBRE' as FROM_TABLE, `Monto Total Factura`, `Estado Del Pago`, `Impuesto`, `Base Imponible` FROM MKP_MERCADO_LIBRE
+//   UNION ALL SELECT 'MKP_PARIS' as FROM_TABLE, `Monto Total Factura`, `Estado Del Pago`, `Impuesto`, `Base Imponible` FROM MKP_PARIS
+//   UNION ALL SELECT 'MKP_RIPLEY' as FROM_TABLE, `Monto Total Factura`, `Estado Del Pago`, `Impuesto`, `Base Imponible` FROM MKP_RIPLEY
+//   UNION ALL SELECT 'MKP_WALLMART' as FROM_TABLE, `Monto Total Factura`, `Estado Del Pago`, `Impuesto`, `Base Imponible` FROM MKP_WALLMART
+// ) combined
+// GROUP BY marketplace WITH ROLLUP;
+
+// 7. CONSULTA PARA OBTENER MAPA DE CALOR POR HORA/DÍA
+// $heatmapData = [];
+// Ejemplo de SQL:
+// SELECT COUNT(*) as count, 
+//        DAYOFWEEK(`Fecha de Creación`) as day_of_week,
+//        HOUR(`Fecha de Creación`) as hour_of_day,
+//        SUBSTRING_INDEX(FROM_TABLE, '_', 2) as marketplace
+// FROM (
+//   SELECT 'MKP_FALABELLA' as FROM_TABLE, `Fecha de Creación` FROM MKP_FALABELLA
+//   UNION ALL SELECT 'MKP_MERCADO_LIBRE' as FROM_TABLE, `Fecha de Creación` FROM MKP_MERCADO_LIBRE
+//   UNION ALL SELECT 'MKP_PARIS' as FROM_TABLE, `Fecha de Creación` FROM MKP_PARIS
+//   UNION ALL SELECT 'MKP_RIPLEY' as FROM_TABLE, `Fecha de Creación` FROM MKP_RIPLEY
+//   UNION ALL SELECT 'MKP_WALLMART' as FROM_TABLE, `Fecha de Creación` FROM MKP_WALLMART
+// ) combined
+// GROUP BY day_of_week, hour_of_day, marketplace
+// ORDER BY day_of_week, hour_of_day, marketplace;
+
+// Preparar la estructura de datos para los gráficos
+$marketplaceData = [];
+foreach ($data as $row) {
+    $tableName = $row['TABLE_NAME'] ?? $row['table_name'] ?? 'N/A';
+    $displayName = str_replace('MKP_', '', $tableName);
+    $displayName = ucfirst(strtolower($displayName)); // Convertir a formato de título
+    
+    $marketplaceData[] = [
+        'name' => $tableName,
+        'displayName' => $displayName,
+        'records' => intval($row['TABLE_ROWS'] ?? $row['table_rows'] ?? 0),
+        'updated' => ($row['UPDATE_TIME'] ?? $row['update_time'] ?? 'N/A') !== 'N/A' 
+            ? date('d/m/Y', strtotime($row['UPDATE_TIME'] ?? $row['update_time'])) 
+            : 'N/A'
+    ];
+}
+
+// Codificar los datos para usar en JavaScript
+$marketplaceDataJson = json_encode($marketplaceData);
+
+// Estos JSON estarían disponibles si implementas las consultas mencionadas arriba
+// $fulfillmentDataJson = json_encode($fulfillmentData ?? []);
+// $salesTrendDataJson = json_encode($salesTrendData ?? []);
+// $avgTicketDataJson = json_encode($avgTicketData ?? []);
+// $topProductsDataJson = json_encode($topProductsData ?? []);
+// $carriersDataJson = json_encode($carriersData ?? []);
+// $financialMetricsJson = json_encode($financialMetrics ?? []);
+// $heatmapDataJson = json_encode($heatmapData ?? []);
 ?>
+
 <div class="dashboard-container">
     <div class="dashboard-header">
         <div class="header-content">
@@ -160,17 +299,283 @@ $data = $filtered_data;
             <?php endforeach; ?>
         </div>
         
-        <!-- Gráfico de distribución -->
-        <div class="chart-container">
-            <div class="chart-card">
-                <div class="chart-header">
-                    <h2>
-                        <i class="fas fa-chart-column"></i>
-                        Distribución de Registros en Tablas MKP
-                    </h2>
+        <!-- Sección de gráficos avanzados específicos para los marketplaces -->
+        <div class="advanced-charts-section">
+            <h2 class="section-title">
+                <i class="fas fa-chart-pie"></i>
+                Análisis de Marketplaces
+            </h2>
+            
+            <div class="charts-grid">
+                <!-- Gráfico 1: Comparativa de volumen de ventas por marketplace -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3>
+                            <i class="fas fa-store"></i>
+                            Volumen de registros por Marketplace
+                        </h3>
+                        <div class="chart-actions">
+                            <button class="chart-action-btn" id="mkpComparisonFullscreen">
+                                <i class="fas fa-expand"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="chart-body">
+                        <canvas id="mkpComparisonChart"></canvas>
+                    </div>
+                    <div class="chart-footer">
+                        <p class="chart-description">Comparativa de volumen de registros por marketplace</p>
+                    </div>
                 </div>
-                <div class="chart-body">
-                    <canvas id="tableChart"></canvas>
+                
+                <!-- Gráfico 2: Estado de cumplimiento por marketplace -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3>
+                            <i class="fas fa-truck"></i>
+                            Estado de cumplimiento
+                        </h3>
+                        <div class="chart-actions">
+                            <button class="chart-action-btn" id="fulfillmentChartFullscreen">
+                                <i class="fas fa-expand"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="chart-body">
+                        <div class="data-placeholder">
+                            <i class="fas fa-database"></i>
+                            <p>Implementa la consulta SQL de estados en el servidor para ver este gráfico</p>
+                        </div>
+                    </div>
+                    <div class="chart-footer">
+                        <p class="chart-description">Distribución de estados de cumplimiento (Requiere consulta SQL adicional)</p>
+                    </div>
+                </div>
+                
+                <!-- Gráfico 3: Tendencia de ventas en el tiempo -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3>
+                            <i class="fas fa-chart-line"></i>
+                            Tendencia de ventas
+                        </h3>
+                        <div class="chart-actions">
+                            <button class="chart-action-btn" id="salesTrendFullscreen">
+                                <i class="fas fa-expand"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="chart-body">
+                        <div class="data-placeholder">
+                            <i class="fas fa-calendar-alt"></i>
+                            <p>Implementa la consulta SQL de tendencias en el servidor para ver este gráfico</p>
+                        </div>
+                    </div>
+                    <div class="chart-footer">
+                        <p class="chart-description">Evolución de ventas (Requiere consulta SQL adicional)</p>
+                    </div>
+                </div>
+                
+                <!-- Gráfico 4: Precios promedio por marketplace -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3>
+                            <i class="fas fa-tag"></i>
+                            Ticket promedio
+                        </h3>
+                        <div class="chart-actions">
+                            <button class="chart-action-btn" id="avgPriceFullscreen">
+                                <i class="fas fa-expand"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="chart-body">
+                        <div class="data-placeholder">
+                            <i class="fas fa-dollar-sign"></i>
+                            <p>Implementa la consulta SQL de precios en el servidor para ver este gráfico</p>
+                        </div>
+                    </div>
+                    <div class="chart-footer">
+                        <p class="chart-description">Comparación de ticket promedio (Requiere consulta SQL adicional)</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sección de métricas financieras clave -->
+            <div class="metrics-section">
+                <h2 class="section-title">
+                    <i class="fas fa-dollar-sign"></i>
+                    Métricas financieras
+                </h2>
+                
+                <div class="metrics-grid">
+                    <!-- Métrica 1: Venta total -->
+                    <div class="metric-card success">
+                        <div class="metric-icon">
+                            <i class="fas fa-shopping-cart"></i>
+                        </div>
+                        <div class="metric-content">
+                            <h3 class="metric-title">Venta total</h3>
+                            <div class="metric-value" id="totalSalesValue">
+                                <span class="placeholder-text">Requiere SQL</span>
+                            </div>
+                            <div class="metric-description">Facturación total de todos los marketplaces</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Métrica 2: Marketplace más rentable -->
+                    <div class="metric-card primary">
+                        <div class="metric-icon">
+                            <i class="fas fa-trophy"></i>
+                        </div>
+                        <div class="metric-content">
+                            <h3 class="metric-title">Marketplace más rentable</h3>
+                            <div class="metric-value" id="bestMarketplace">
+                                <span class="placeholder-text">Requiere SQL</span>
+                            </div>
+                            <div class="metric-description">Marketplace con mayor venta promedio</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Métrica 3: Tasa de impuestos -->
+                    <div class="metric-card info">
+                        <div class="metric-icon">
+                            <i class="fas fa-percent"></i>
+                        </div>
+                        <div class="metric-content">
+                            <h3 class="metric-title">Tasa de impuestos</h3>
+                            <div class="metric-value" id="taxRate">
+                                <span class="placeholder-text">Requiere SQL</span>
+                            </div>
+                            <div class="metric-description">Porcentaje promedio de impuestos</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Métrica 4: Pendientes de pago -->
+                    <div class="metric-card warning">
+                        <div class="metric-icon">
+                            <i class="fas fa-hourglass-half"></i>
+                        </div>
+                        <div class="metric-content">
+                            <h3 class="metric-title">Pendientes de pago</h3>
+                            <div class="metric-value" id="pendingPayments">
+                                <span class="placeholder-text">Requiere SQL</span>
+                            </div>
+                            <div class="metric-description">Monto en órdenes pendientes de pago</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sección de mapas de calor para análisis temporal -->
+            <div class="heatmap-section">
+                <h2 class="section-title">
+                    <i class="fas fa-calendar-alt"></i>
+                    Análisis temporal
+                </h2>
+                
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3>
+                            <i class="fas fa-fire"></i>
+                            Mapa de calor de ventas
+                        </h3>
+                        <div class="chart-actions">
+                            <div class="chart-filter">
+                                <select id="heatmapMarketplaceFilter" class="chart-select">
+                                    <option value="all">Todos los marketplaces</option>
+                                    <?php foreach ($marketplaceData as $mkp): ?>
+                                    <option value="<?= $mkp['name'] ?>"><?= $mkp['displayName'] ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <button class="chart-action-btn" id="salesHeatmapFullscreen">
+                                <i class="fas fa-expand"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="chart-body">
+                        <div class="data-placeholder">
+                            <i class="fas fa-fire"></i>
+                            <p>Implementa la consulta SQL de distribución por hora/día para ver este gráfico</p>
+                        </div>
+                    </div>
+                    <div class="chart-footer">
+                        <p class="chart-description">Distribución de ventas por día y hora (Requiere consulta SQL adicional)</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Top productos y transportistas -->
+            <div class="top-entities-section">
+                <h2 class="section-title">
+                    <i class="fas fa-award"></i>
+                    Top productos y transportistas
+                </h2>
+                
+                <div class="charts-grid">
+                    <!-- Top productos -->
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3>
+                                <i class="fas fa-box"></i>
+                                Top productos
+                            </h3>
+                            <div class="chart-actions">
+                                <button class="chart-action-btn" id="topProductsFullscreen">
+                                    <i class="fas fa-expand"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="chart-body">
+                            <div class="data-placeholder">
+                                <i class="fas fa-box-open"></i>
+                                <p>Implementa la consulta SQL de productos en el servidor para ver este gráfico</p>
+                            </div>
+                        </div>
+                        <div class="chart-footer">
+                            <p class="chart-description">Productos más vendidos (Requiere consulta SQL adicional)</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Top transportistas -->
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3>
+                                <i class="fas fa-shipping-fast"></i>
+                                Transportistas
+                            </h3>
+                            <div class="chart-actions">
+                                <button class="chart-action-btn" id="carriersFullscreen">
+                                    <i class="fas fa-expand"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="chart-body">
+                            <div class="data-placeholder">
+                                <i class="fas fa-truck"></i>
+                                <p>Implementa la consulta SQL de transportistas en el servidor para ver este gráfico</p>
+                            </div>
+                        </div>
+                        <div class="chart-footer">
+                            <p class="chart-description">Distribución de envíos por transportista (Requiere consulta SQL adicional)</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Modal para vista de gráfico a pantalla completa -->
+        <div class="chart-modal" id="chartModal">
+            <div class="chart-modal-content">
+                <div class="chart-modal-header">
+                    <h3 id="modalChartTitle">Título del gráfico</h3>
+                    <button class="close-modal" id="closeChartModal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="chart-modal-body">
+                    <canvas id="modalChart"></canvas>
                 </div>
             </div>
         </div>
@@ -191,8 +596,10 @@ $data = $filtered_data;
 
 <!-- Incluir Chart.js desde CDN -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Extensión para gráficos de matriz (heatmap) -->
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@1.2.0/dist/chartjs-chart-matrix.min.js"></script>
 
-<!-- Estilos para el dashboard - se mantienen exactamente igual -->
+<!-- Estilos para el dashboard -->
 <style>
 :root {
     /* Colores */
@@ -222,7 +629,7 @@ $data = $filtered_data;
     --transition-speed: 0.3s;
 }
 
-/* Resto de estilos CSS sin cambios */
+/* Estilos base */
 * {
     box-sizing: border-box;
     margin: 0;
@@ -487,36 +894,359 @@ body {
     box-shadow: var(--shadow-sm);
 }
 
-/* Contenedor del gráfico */
-.chart-container {
-    margin-bottom: 2rem;
+/* Sección de gráficos avanzados */
+.advanced-charts-section {
+    margin-top: 3rem;
+}
+
+.section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+    color: var(--dark);
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 0.75rem;
+}
+
+.section-title i {
+    color: var(--primary);
+}
+
+.charts-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 3rem;
 }
 
 .chart-card {
     background-color: var(--card-bg);
     border-radius: var(--border-radius);
-    box-shadow: var(--shadow);
+    box-shadow: var(--shadow-sm);
     overflow: hidden;
+    transition: transform var(--transition-speed), box-shadow var(--transition-speed);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.chart-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow);
 }
 
 .chart-header {
-    padding: 1.25rem;
-    background-color: var(--success);
+    background-color: var(--primary);
     color: white;
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
-.chart-header h2 {
-    font-size: 1.25rem;
-    font-weight: 600;
+.chart-header h3 {
     margin: 0;
+    font-size: 1.1rem;
+    font-weight: 500;
     display: flex;
     align-items: center;
     gap: 0.5rem;
 }
 
+.chart-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.chart-action-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    border-radius: 4px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color var(--transition-speed);
+}
+
+.chart-action-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
 .chart-body {
+    padding: 1.25rem;
+    flex-grow: 1;
+    min-height: 300px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.chart-footer {
+    padding: 1rem;
+    border-top: 1px solid var(--border-color);
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+.chart-description {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+/* Placeholder para datos pendientes */
+.data-placeholder {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    background-color: rgba(0, 0, 0, 0.02);
+    border-radius: var(--border-radius);
+    border: 1px dashed var(--border-color);
+    width: 100%;
+    height: 100%;
+}
+
+.data-placeholder i {
+    font-size: 2.5rem;
+    opacity: 0.5;
+}
+
+.data-placeholder p {
+    font-size: 0.9rem;
+    max-width: 250px;
+}
+
+.placeholder-text {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    font-style: italic;
+}
+
+/* Modal de gráfico a pantalla completa */
+.chart-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.75);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+}
+
+.chart-modal.open {
+    display: flex;
+}
+
+.chart-modal-content {
+    background-color: var(--card-bg);
+    border-radius: var(--border-radius);
+    width: 90%;
+    max-width: 1200px;
+    height: 90%;
+    max-height: 800px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-lg);
+}
+
+.chart-modal-header {
+    padding: 1.25rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chart-modal-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    color: var(--dark);
+}
+
+.close-modal {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.25rem;
+    cursor: pointer;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-speed);
+}
+
+.close-modal:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+    color: var(--dark);
+}
+
+.chart-modal-body {
+    flex-grow: 1;
     padding: 1.5rem;
-    height: 400px;
+    overflow: hidden;
+}
+
+/* Sección de métricas */
+.metrics-section {
+    margin-bottom: 3rem;
+}
+
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+}
+
+.metric-card {
+    background-color: var(--card-bg);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-sm);
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    transition: transform var(--transition-speed), box-shadow var(--transition-speed);
+    position: relative;
+    overflow: hidden;
+}
+
+.metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+}
+
+.metric-card.primary::before {
+    background-color: var(--primary);
+}
+
+.metric-card.success::before {
+    background-color: var(--success);
+}
+
+.metric-card.warning::before {
+    background-color: var(--warning);
+}
+
+.metric-card.info::before {
+    background-color: var(--info);
+}
+
+.metric-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow);
+}
+
+.metric-icon {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.metric-card.primary .metric-icon {
+    background-color: rgba(67, 97, 238, 0.1);
+    color: var(--primary);
+}
+
+.metric-card.success .metric-icon {
+    background-color: rgba(76, 175, 80, 0.1);
+    color: var(--success);
+}
+
+.metric-card.warning .metric-icon {
+    background-color: rgba(255, 152, 0, 0.1);
+    color: var(--warning);
+}
+
+.metric-card.info .metric-icon {
+    background-color: rgba(33, 150, 243, 0.1);
+    color: var(--info);
+}
+
+.metric-content {
+    flex-grow: 1;
+}
+
+.metric-title {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin: 0 0 0.5rem 0;
+}
+
+.metric-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--dark);
+    margin-bottom: 0.25rem;
+}
+
+.metric-description {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* Selectores para filtros */
+.chart-filter {
+    margin-right: 0.5rem;
+}
+
+.chart-select {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='4' viewBox='0 0 8 4'%3E%3Cpath fill='%23ffffff' d='M0 0l4 4 4-4z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    padding-right: 1.5rem;
+    cursor: pointer;
+}
+
+.chart-select:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
+}
+
+/* Sección de mapas de calor */
+.heatmap-section {
+    margin-top: 2rem;
+    margin-bottom: 2.5rem;
+}
+
+/* Sección de entidades principales */
+.top-entities-section {
+    margin-top: 2rem;
+    margin-bottom: 3rem;
 }
 
 /* Estado vacío */
@@ -548,6 +1278,12 @@ body {
 }
 
 /* Responsividad */
+@media (max-width: 1200px) {
+    .charts-grid, .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
 @media (max-width: 768px) {
     .dashboard-title {
         font-size: 1.5rem;
@@ -567,12 +1303,29 @@ body {
         font-size: 1.25rem;
     }
     
-    .tables-grid {
+    .tables-grid, .charts-grid, .metrics-grid {
         grid-template-columns: 1fr;
     }
     
     .chart-body {
         height: 300px;
+    }
+    
+    .section-title {
+        font-size: 1.25rem;
+    }
+    
+    .metric-card {
+        padding: 1.25rem;
+    }
+    
+    .metric-icon {
+        width: 2.5rem;
+        height: 2.5rem;
+    }
+    
+    .metric-value {
+        font-size: 1.25rem;
     }
 }
 </style>
@@ -580,7 +1333,7 @@ body {
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     // Animación de entrada
-    const cards = document.querySelectorAll('.table-card, .stats-card');
+    const cards = document.querySelectorAll('.table-card, .stats-card, .metric-card');
     cards.forEach((card, index) => {
         card.style.opacity = '0';
         card.style.transform = 'translateY(20px)';
@@ -595,68 +1348,82 @@ document.addEventListener("DOMContentLoaded", function() {
     // Búsqueda de tablas
     const searchInput = document.getElementById('table-search');
     const tablesContainer = document.getElementById('tables-container');
-    const tableCards = tablesContainer.querySelectorAll('.table-card');
     
-    searchInput.addEventListener('keyup', function() {
-        const searchTerm = this.value.toLowerCase();
+    if (searchInput && tablesContainer) {
+        const tableCards = tablesContainer.querySelectorAll('.table-card');
         
-        tableCards.forEach(card => {
-            const tableName = card.getAttribute('data-table-name');
+        searchInput.addEventListener('keyup', function() {
+            const searchTerm = this.value.toLowerCase();
             
-            if (tableName.includes(searchTerm)) {
-                card.style.display = 'flex';
-            } else {
-                card.style.display = 'none';
+            tableCards.forEach(card => {
+                const tableName = card.getAttribute('data-table-name');
+                
+                if (tableName.includes(searchTerm)) {
+                    card.style.display = 'flex';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        });
+    }
+    
+    // ============ GRÁFICOS AVANZADOS ============
+    
+    // Obtener los datos reales del PHP
+    const marketplaceData = <?= $marketplaceDataJson ?>;
+    
+    // Renderizar el gráfico que podemos con los datos disponibles
+    renderMarketplaceComparisonChart();
+    
+    // Configurar eventos
+    setupModalEvents();
+    setupFilterEvents();
+    
+    /**
+     * Renderiza el gráfico de comparación de volumen por marketplace
+     */
+    function renderMarketplaceComparisonChart() {
+        const ctx = document.getElementById('mkpComparisonChart');
+        if (!ctx) return;
+        
+        // Preparar datos
+        const labels = marketplaceData.map(mkp => mkp.displayName);
+        const values = marketplaceData.map(mkp => mkp.records);
+        
+        // Colores personalizados por marketplace
+        const marketplaceColors = {
+            "Falabella": "rgba(10, 74, 144, 0.7)",   // Azul Falabella
+            "Mercado_libre": "rgba(255, 233, 0, 0.7)", // Amarillo ML
+            "Paris": "rgba(231, 23, 133, 0.7)",      // Rosa Paris
+            "Ripley": "rgba(237, 28, 36, 0.7)",      // Rojo Ripley
+            "Wallmart": "rgba(0, 125, 198, 0.7)"     // Azul Walmart
+        };
+        
+        const backgroundColor = labels.map(label => {
+            // Buscar el color apropiado
+            for (const [key, value] of Object.entries(marketplaceColors)) {
+                if (label.toLowerCase().includes(key.toLowerCase())) {
+                    return value;
+                }
             }
+            return "rgba(67, 97, 238, 0.7)"; // Color por defecto
         });
-    });
-    
-    // Configuración del gráfico
-    const chartCanvas = document.getElementById('tableChart');
-    
-    if (chartCanvas) {
-        // Obtener datos para el gráfico desde PHP (ya filtrados)
-        const dashboardData = <?= json_encode($data) ?>;
-        const labels = [];
-        const rowCounts = [];
-
-        dashboardData.forEach(function(row) {
-            const tableName = row.TABLE_NAME || row.table_name || 'N/A';
-            labels.push(tableName);
-            const count = row.TABLE_ROWS || row.table_rows || 0;
-            rowCounts.push(parseInt(count));
-        });
-
-        // Ordenar los datos para el gráfico (de mayor a menor)
-        const sortedData = labels.map((label, index) => ({
-            label,
-            value: rowCounts[index]
-        })).sort((a, b) => b.value - a.value);
-
-        // Limitar a las 15 tablas con más registros para mejor visualización
-        const topLabels = sortedData.slice(0, 15).map(item => item.label);
-        const topValues = sortedData.slice(0, 15).map(item => item.value);
-
-        // Colores para las barras
-        const colors = [];
-        for (let i = 0; i < topLabels.length; i++) {
-            const opacity = 0.7 + (0.3 * (i / topLabels.length));
-            colors.push(`rgba(67, 97, 238, ${opacity})`);
-        }
-
+        
+        const borderColor = backgroundColor.map(color => color.replace("0.7", "1"));
+        
         // Crear el gráfico
-        new Chart(chartCanvas, {
+        window.mkpComparisonChart = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: topLabels,
+                labels: labels,
                 datasets: [{
-                    label: 'Número de Registros',
-                    data: topValues,
-                    backgroundColor: colors,
-                    borderColor: 'rgba(67, 97, 238, 1)',
+                    label: 'Número de registros',
+                    data: values,
+                    backgroundColor: backgroundColor,
+                    borderColor: borderColor,
                     borderWidth: 1,
                     borderRadius: 4,
-                    maxBarThickness: 60
+                    maxBarThickness: 50
                 }]
             },
             options: {
@@ -667,46 +1434,17 @@ document.addEventListener("DOMContentLoaded", function() {
                         display: false
                     },
                     tooltip: {
-                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                        titleFont: {
-                            family: 'Inter',
-                            size: 14
-                        },
-                        bodyFont: {
-                            family: 'Inter',
-                            size: 13
-                        },
-                        padding: 12,
-                        displayColors: false,
                         callbacks: {
                             label: function(context) {
-                                return `Registros: ${context.parsed.y.toLocaleString()}`;
+                                return `Registros: ${context.raw.toLocaleString()}`;
                             }
                         }
                     }
                 },
                 scales: {
-                    x: {
-                        ticks: {
-                            autoSkip: false,
-                            maxRotation: 45,
-                            minRotation: 45,
-                            font: {
-                                family: 'Inter',
-                                size: 11
-                            }
-                        },
-                        grid: {
-                            display: false
-                        }
-                    },
                     y: {
                         beginAtZero: true,
                         ticks: {
-                            font: {
-                                family: 'Inter',
-                                size: 12
-                            },
                             callback: function(value) {
                                 return value.toLocaleString();
                             }
@@ -714,11 +1452,77 @@ document.addEventListener("DOMContentLoaded", function() {
                     }
                 },
                 animation: {
-                    duration: 2000,
-                    easing: 'easeOutQuart'
+                    duration: 2000
                 }
             }
         });
+    }
+    
+    /**
+     * Configura eventos para modales
+     */
+    function setupModalEvents() {
+        const chartModal = document.getElementById('chartModal');
+        const modalChart = document.getElementById('modalChart');
+        const modalTitle = document.getElementById('modalChartTitle');
+        const closeBtn = document.getElementById('closeChartModal');
+        
+        if (!chartModal || !modalChart || !modalTitle || !closeBtn) return;
+        
+        // Configurar botones de pantalla completa
+        const fullscreenButtons = [
+            { id: 'mkpComparisonFullscreen', chartId: 'mkpComparisonChart', title: 'Volumen de registros por Marketplace' }
+        ];
+        
+        fullscreenButtons.forEach(button => {
+            const btnElement = document.getElementById(button.id);
+            if (btnElement) {
+                btnElement.addEventListener('click', function() {
+                    openChartInModal(button.chartId, button.title);
+                });
+            }
+        });
+        
+        // Cerrar modal
+        closeBtn.addEventListener('click', function() {
+            chartModal.classList.remove('open');
+        });
+        
+        // Función para abrir un gráfico en el modal
+        function openChartInModal(chartId, title) {
+            modalTitle.textContent = title;
+            chartModal.classList.add('open');
+            
+            // Obtener la configuración del gráfico original
+            const sourceChart = window[chartId];
+            if (!sourceChart) return;
+            
+            // Si ya hay un gráfico en el modal, destruirlo
+            if (window.modalChartInstance) {
+                window.modalChartInstance.destroy();
+            }
+            
+            // Crear una nueva instancia del gráfico en el modal
+            window.modalChartInstance = new Chart(modalChart, {
+                type: sourceChart.config.type,
+                data: JSON.parse(JSON.stringify(sourceChart.data)),
+                options: JSON.parse(JSON.stringify(sourceChart.options))
+            });
+        }
+    }
+    
+    /**
+     * Configura eventos para filtros
+     */
+    function setupFilterEvents() {
+        const heatmapFilter = document.getElementById('heatmapMarketplaceFilter');
+        
+        if (heatmapFilter) {
+            heatmapFilter.addEventListener('change', function() {
+                const selectedMarketplace = this.value;
+                console.log(`Filtro cambiado a: ${selectedMarketplace}`);
+            });
+        }
     }
 });
 </script>
