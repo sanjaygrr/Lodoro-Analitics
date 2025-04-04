@@ -30,7 +30,7 @@
         <!-- Google Fonts - Inter -->
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
 
-        <!-- Estilos personalizados corregidos -->
+        <!-- Estilos personalizados -->
         <style>
             :root {
                 --primary: #4361ee;
@@ -67,12 +67,12 @@
                 min-height: 100vh;
             }
 
-            /* Sidebar - CORREGIDO */
+            /* Sidebar */
             #sidebar {
                 background: linear-gradient(180deg, var(--dark) 0%, var(--darker) 100%);
                 color: var(--white);
                 min-height: 100vh;
-                transition: all var(--transition-speed) ease; /* Cambiado de width a all para mejor transición */
+                transition: all var(--transition-speed) ease;
                 position: fixed;
                 top: 0;
                 left: 0;
@@ -82,9 +82,10 @@
                 width: 70px; /* Estado inicial colapsado */
             }
 
-            /* Control de anchos - CORREGIDO */
+            /* Control de anchos */
             .sidebar-collapsed {
                 width: 70px !important;
+                overflow: visible;
             }
 
             .sidebar-expanded {
@@ -99,12 +100,23 @@
                 height: 70px;
                 border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             }
+            
+            .logo-link {
+                display: flex;
+                align-items: center;
+                text-decoration: none;
+                color: var(--white);
+                width: 100%;
+            }
 
             .logo-icon {
                 font-size: 1.5rem;
                 color: var(--primary);
                 width: 30px;
                 text-align: center;
+                display: inline-block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
             }
 
             .logo-text {
@@ -170,13 +182,15 @@
             .nav-link {
                 display: flex;
                 align-items: center;
-                padding: 0.75rem 1rem;
+                padding: 10px;
                 color: var(--text-light);
                 text-decoration: none;
                 position: relative;
                 transition: all var(--transition-speed) ease;
                 border-radius: 0.25rem;
                 margin: 0 0.5rem;
+                overflow: hidden;
+                padding-left: 50px;
             }
 
             .nav-link:hover, .nav-link.active {
@@ -199,6 +213,9 @@
                 font-size: 1.25rem;
                 min-width: 30px;
                 text-align: center;
+                display: inline-block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
             }
 
             .nav-text {
@@ -206,8 +223,9 @@
                 white-space: nowrap;
                 opacity: 0;
                 transition: opacity var(--transition-speed) ease;
-                display: inline-block; /* AÑADIDO para asegurar que el texto sea visible */
-                font-weight: 500; /* Mejorar legibilidad */
+                display: inline-block;
+                font-weight: 500;
+                margin-right: 30px;
             }
 
             .sidebar-expanded .nav-text {
@@ -224,10 +242,10 @@
                 display: inline-block;
             }
 
-            /* Tooltip estilizado - CORREGIDO para asegurar visibilidad */
+            /* Tooltip estilizado */
             .tooltip-nav {
                 position: absolute;
-                left: 70px; /* Coincide con el ancho del sidebar colapsado */
+                left: 70px;
                 top: 50%;
                 transform: translateY(-50%);
                 background-color: rgba(0, 0, 0, 0.9);
@@ -239,7 +257,7 @@
                 pointer-events: none;
                 opacity: 0;
                 visibility: hidden;
-                z-index: 9999; /* Z-index alto para asegurar que esté por encima de todo */
+                z-index: 9999;
                 box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
             }
 
@@ -254,11 +272,10 @@
                 border-color: transparent rgba(0, 0, 0, 0.9) transparent transparent;
             }
 
-            /* CORREGIDO: Regla específica para mostrar tooltips en sidebar colapsado */
             .sidebar-collapsed .nav-item:hover .tooltip-nav {
                 opacity: 1;
                 visibility: visible;
-                display: block;
+                left: 75px;
             }
 
             .badge-new {
@@ -276,7 +293,7 @@
                 opacity: 1;
             }
 
-            /* Insignia de notificación - CORREGIDA */
+            /* Insignia de notificación */
             .notification-badge {
                 position: absolute;
                 top: 0;
@@ -298,6 +315,7 @@
             .menu-divider {
                 height: 1px;
                 background-color: rgba(255, 255, 255, 0.1);
+                margin: 10px auto;
             }
 
             /* Panel de notificaciones */
@@ -493,14 +511,14 @@
                 padding: 0.5rem 1rem;
                 display: flex;
                 justify-content: center;
-                flex-shrink: 0; /* No permitir que se encoja */
-                margin-top: auto; /* Empujar al fondo */
+                flex-shrink: 0;
+                margin-top: auto;
             }
             
             .toggle-btn-bottom {
                 background: transparent;
                 border: none;
-                color: var(--text-light);
+                color: var(--white);
                 cursor: pointer;
                 width: 100%;
                 padding: 0.5rem;
@@ -512,7 +530,7 @@
             }
             
             .toggle-btn-bottom:hover {
-                background-color: rgba(255, 255, 255, 0.1);
+                background-color: rgba(255, 255, 255, 0.2);
                 color: var(--white);
             }
             
@@ -520,6 +538,9 @@
                 margin-right: 0.75rem;
                 min-width: 16px;
                 text-align: center;
+                display: inline-block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
             }
             
             .toggle-text {
@@ -535,12 +556,12 @@
             
             /* Panel de usuario */
             .user-panel {
-                padding: 0.75rem 1rem; /* Reducido de 1rem */
+                padding: 0.75rem 1rem;
                 border-top: 1px solid rgba(255, 255, 255, 0.1);
                 background-color: var(--darker);
                 display: flex;
                 align-items: center;
-                flex-shrink: 0; /* No permitir que se encoja */
+                flex-shrink: 0;
             }
 
             .user-avatar {
@@ -548,12 +569,20 @@
                 height: 36px;
                 border-radius: 50%;
                 background-color: var(--primary);
-                display: flex;
+                display: flex !important;
                 align-items: center;
                 justify-content: center;
                 color: white;
                 font-weight: 600;
                 flex-shrink: 0;
+                visibility: visible !important;
+                opacity: 1 !important;
+            }
+
+            .user-avatar i {
+                display: inline-block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
             }
 
             .user-info {
@@ -580,23 +609,23 @@
                 white-space: nowrap;
             }
 
-            /* Contenido principal - CORREGIDO para mejorar transición */
+            /* Contenido principal */
             .main-content {
                 flex: 1;
                 margin-left: 70px;
                 padding: 1.5rem;
                 transition: margin-left var(--transition-speed) ease;
-                overflow-x: hidden; /* Evitar desplazamiento horizontal */
-                max-width: calc(100% - 70px); /* Asegurar que no exceda el espacio disponible */
-                box-sizing: border-box; /* Incluir padding en el cálculo del ancho */
+                overflow-x: hidden;
+                max-width: calc(100% - 70px);
+                box-sizing: border-box;
             }
 
             .sidebar-expanded ~ .main-content {
                 margin-left: 240px;
-                max-width: calc(100% - 240px); /* Ajustar cuando el sidebar está expandido */
+                max-width: calc(100% - 240px);
             }
 
-            /* Navbar superior - CORREGIDO */
+            /* Navbar superior */
             .top-navbar {
                 background-color: var(--white);
                 padding: 0.75rem 1.5rem;
@@ -606,9 +635,9 @@
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
-                width: 100%; /* Asegurar que ocupe el ancho completo */
-                box-sizing: border-box; /* Incluir padding en el cálculo del ancho */
-                overflow: visible; /* Evitar que los elementos se recorten */
+                width: 100%;
+                box-sizing: border-box;
+                overflow: visible;
             }
 
             .page-title {
@@ -622,8 +651,8 @@
                 display: flex;
                 align-items: center;
                 gap: 1rem;
-                flex-wrap: nowrap; /* Evitar que los elementos se envuelvan */
-                min-width: fit-content; /* Garantizar espacio mínimo necesario */
+                flex-wrap: nowrap;
+                min-width: fit-content;
             }
 
             .navbar-icon {
@@ -637,7 +666,7 @@
                 position: relative;
                 color: var(--text-muted);
                 transition: all var(--transition-speed) ease;
-                flex-shrink: 0; /* Evitar que estos íconos se encojan */
+                flex-shrink: 0;
             }
 
             .navbar-icon:hover {
@@ -645,7 +674,143 @@
                 color: var(--primary);
             }
 
-            /* Responsividad - CORREGIDA */
+            /* Submenús */
+            .has-submenu {
+                position: relative;
+            }
+
+            .nav-menu .nav-item.has-submenu .nav-link {
+                padding-right: 45px !important;
+            }
+
+            .nav-menu .nav-item.has-submenu .nav-text {
+                margin-right: 40px !important;
+            }
+
+            .submenu-arrow {
+                position: absolute;
+                right: 2px !important;
+                top: 50%;
+                transform: translateY(-50%);
+                transition: transform var(--transition-speed) ease;
+                z-index: 2;
+                font-size: 0.8rem;
+                display: inline-block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+            }
+
+            .has-submenu.open .submenu-arrow {
+                transform: translateY(-50%) rotate(90deg);
+            }
+
+            .submenu {
+                list-style: none;
+                padding: 0;
+                max-height: 0;
+                overflow: hidden;
+                transition: max-height var(--transition-speed) ease;
+                background-color: rgba(0, 0, 0, 0.2);
+            }
+
+            .has-submenu.open .submenu {
+                max-height: 500px;
+            }
+
+            .submenu-item {
+                margin: 0;
+            }
+
+            .submenu-link {
+                display: flex;
+                align-items: center;
+                padding: 0.5rem 1rem 0.5rem 3rem;
+                color: var(--text-light);
+                text-decoration: none;
+                transition: all var(--transition-speed) ease;
+                border-radius: 0.25rem;
+                margin: 0 0.5rem;
+            }
+
+            .submenu-link:hover, .submenu-link.active {
+                color: var(--white);
+                background-color: rgba(255, 255, 255, 0.1);
+            }
+
+            .submenu-text {
+                font-size: 0.85rem;
+                white-space: nowrap;
+            }
+
+            .sidebar-collapsed .submenu {
+                display: none;
+            }
+
+            .has-submenu .tooltip-nav {
+                width: auto;
+                max-width: 200px;
+            }
+
+            /* Mejoras para el sidebar colapsado */
+            #sidebar.sidebar-collapsed .nav-item {
+                margin: 5px 0;
+                display: flex;
+                justify-content: center;
+                position: relative;
+            }
+
+            #sidebar.sidebar-collapsed .nav-link {
+                padding: 10px 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 100%;
+                height: auto;
+                margin: 5px 0;
+                border-radius: 0;
+            }
+
+            #sidebar.sidebar-collapsed .nav-icon {
+                display: inline-block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                font-size: 18px;
+                margin: 0 auto;
+            }
+
+            #sidebar.sidebar-collapsed .toggle-btn-bottom {
+                background-color: rgba(255, 255, 255, 0.15);
+                width: 100%;
+                padding: 10px 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0 auto;
+            }
+
+            #sidebar.sidebar-collapsed .toggle-btn-bottom i {
+                display: inline-block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                margin: 0;
+                font-size: 16px;
+                color: white;
+            }
+
+            #sidebar.sidebar-collapsed .user-avatar {
+                display: flex !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+            }
+
+            /* Eliminar efectos que puedan estar causando problemas */
+            #sidebar.sidebar-collapsed .nav-link:hover {
+                transform: none;
+                box-shadow: none;
+                background-color: rgba(255, 255, 255, 0.1);
+            }
+
+            /* Responsividad */
             @media (max-width: 992px) {
                 #sidebar {
                     position: fixed;
@@ -655,7 +820,7 @@
                     z-index: 1000;
                     transform: translateX(-100%);
                     transition: transform var(--transition-speed) ease, width var(--transition-speed) ease;
-                    width: 240px !important; /* Ancho constante en móvil para evitar problemas */
+                    width: 240px !important;
                 }
                 
                 #sidebar.sidebar-collapsed,
@@ -689,12 +854,115 @@
                 }
                 
                 .top-navbar {
-                    padding: 0.75rem 1rem; /* Reducir el padding en pantallas más pequeñas */
+                    padding: 0.75rem 1rem;
                 }
                 
                 .page-title {
-                    font-size: 1.1rem; /* Reducir tamaño del título en pantallas pequeñas */
+                    font-size: 1.1rem;
                 }
+
+                .submenu {
+                    background-color: rgba(0, 0, 0, 0.3);
+                }
+                
+                .submenu-link {
+                    padding-left: 2.5rem;
+                }
+                
+                #sidebar.sidebar-collapsed .nav-link {
+                    width: 100%;
+                }
+            }
+
+            /* CORRECCIÓN CRÍTICA PARA NAVBAR - AÑADIR AL FINAL DE LOS ESTILOS */
+
+            /* Eliminar límites de ancho que pueden estar causando problemas */
+            #sidebar {
+                width: 70px !important;
+                min-width: 70px !important;
+                max-width: 70px !important;
+                overflow-x: hidden !important;
+                overflow-y: auto !important;
+            }
+
+            #sidebar.sidebar-expanded {
+                width: 240px !important;
+                min-width: 240px !important;
+                max-width: 240px !important;
+            }
+
+            /* Forzar que los iconos sean visibles en el navbar colapsado */
+            #sidebar .fas,
+            #sidebar i.fa,
+            #sidebar i.fas,
+            #sidebar i.fa-chart-line,
+            #sidebar i.fa-chart-bar,
+            #sidebar i.fa-shopping-cart,
+            #sidebar i.fa-plug,
+            #sidebar i.fa-cog,
+            #sidebar i.fa-chevron-right,
+            #sidebar i.fa-chevron-left,
+            #sidebar i.fa-angle-right,
+            #sidebar i.fa-user {
+                display: inline-block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                color: white !important;
+                font-size: 1.2rem !important;
+            }
+
+            /* Eliminar cualquier padding o margen que pueda estar afectando el posicionamiento */
+            #sidebar .nav-link {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                padding: 10px 5px !important;
+                margin: 5px 5px !important;
+            }
+
+            /* Mejorar la visibilidad del toggle button */
+            #sidebar .toggle-btn-bottom {
+                background-color: rgba(255, 255, 255, 0.2) !important;
+                border-radius: 4px !important;
+                padding: 10px !important;
+                margin: 10px 5px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+            }
+
+            /* Asegurar que el avatar del usuario sea visible */
+            #sidebar .user-avatar {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                width: 40px !important;
+                height: 40px !important;
+                margin: 0 auto !important;
+            }
+
+            /* Evitar que los textos ocupen espacio en modo colapsado */
+            #sidebar.sidebar-collapsed .nav-text,
+            #sidebar.sidebar-collapsed .logo-text,
+            #sidebar.sidebar-collapsed .toggle-text,
+            #sidebar.sidebar-collapsed .user-info,
+            #sidebar.sidebar-collapsed .menu-header {
+                display: none !important;
+            }
+
+            /* Asegurar que la estructura básica del menú funcione */
+            #sidebar .nav-menu {
+                padding: 10px 0 !important;
+            }
+
+            #sidebar .nav-item {
+                margin: 8px 0 !important;
+                text-align: center !important;
+            }
+
+            /* Eliminar toda posibilidad de scroll horizontal */
+            body, html, #sidebar, .app-container, .main-content {
+                overflow-x: hidden !important;
             }
         </style>
 
@@ -702,106 +970,135 @@
     </head>
     <body>
         <div class="app-container">
-            <!-- Sidebar / Navbar lateral - CORREGIDO -->
+            <!-- Sidebar / Navbar lateral -->
             <div id="sidebar" class="sidebar-collapsed">
                 <div class="sidebar-header">
-                <div class="logo-icon">
-                    <img src="<?= $this->basePath() . '/img/favicon.ico' ?>" alt="Logo Lodoro">
-                </div>
-                    <div class="logo-text">Lodoro Analytics</div>
-                    <!-- Se ha quitado el botón de toggle superior -->
+                    <a href="<?= $this->url('application', ['action' => 'index']) ?>" class="logo-link">
+                        <i class="fas fa-chart-line logo-icon"></i>
+                        <div class="logo-text">Lodoro Analytics</div>
+                    </a>
                 </div>
                 
                 <ul class="nav-menu">
-                    <li class="menu-header">Principal</li>
+                    <!-- SECCIÓN 1: ANÁLISIS DE VENTAS -->
+                    <li class="menu-header">Análisis</li>
                     
-                    <li class="nav-item">
-                        <a href="<?= $this->url('home') ?>" class="nav-link active">
-                            <div class="nav-icon">
-                                <i class="fas fa-tachometer-alt"></i>
-                            </div>
-                            <span class="nav-text">Resumen de ventas</span>
+                    <li class="nav-item has-submenu">
+                        <a href="<?= $this->url('application', ['action' => 'dashboard']) ?>" class="nav-link">
+                            <i class="fas fa-chart-bar nav-icon"></i>
+                            <span class="nav-text">Análisis de Ventas</span>
+                            <i class="submenu-arrow fas fa-angle-right"></i>
                         </a>
-                        <div class="tooltip-nav">Resumen de ventas</div>
-                    </li>
-                    
-                    <li class="nav-item">
-                        <a href="#" class="nav-link">
-                            <div class="nav-icon">
-                                <i class="fas fa-table"></i>
-                            </div>
-                            <span class="nav-text">Tablas</span>
-                        </a>
-                        <div class="tooltip-nav">Tablas</div>
-                    </li>
-                    
-                    <li class="nav-item">
-                        <a href="#" class="nav-link">
-                            <div class="nav-icon">
-                                <i class="fas fa-chart-bar"></i>
-                            </div>
-                            <span class="nav-text">Estadísticas</span>
-                            <span class="badge-new">Nuevo</span>
-                        </a>
-                        <div class="tooltip-nav">Estadísticas</div>
-                    </li>
-                    
-                    <div class="menu-divider"></div>
-                    <li class="menu-header">Reportes</li>
-                    
-                    <li class="nav-item">
-                        <a href="#" class="nav-link">
-                            <div class="nav-icon">
-                                <i class="fas fa-file-alt"></i>
-                            </div>
-                            <span class="nav-text">Reportería</span>
-                            <span class="notification-badge">3</span>
-                        </a>
-                        <div class="tooltip-nav">Reportería</div>
-                    </li>
-                    
-                    <li class="nav-item">
-                        <a href="#" class="nav-link">
-                            <div class="nav-icon">
-                                <i class="fas fa-download"></i>
-                            </div>
-                            <span class="nav-text">Exportar</span>
-                        </a>
-                        <div class="tooltip-nav">Exportar</div>
+                        <div class="tooltip-nav">Análisis de Ventas</div>
+                        <ul class="submenu">
+                            <li>
+                            <a href="<?= $this->url('application', ['action' => 'dashboard']) ?>" class="submenu-link">
+                                    <span class="submenu-text">Resumen de ventas</span>
+                                </a>
+                            </li>
+                            <li class="submenu-item">
+                                <a href="<?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_WALLMART']) ?>" class="submenu-link">
+                                    <span class="submenu-text">Walmart</span>
+                                </a>
+                            </li>
+                            <li class="submenu-item">
+                                <a href="<?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_RIPLEY']) ?>" class="submenu-link">
+                                    <span class="submenu-text">Ripley</span>
+                                </a>
+                            </li>
+                            <li class="submenu-item">
+                                <a href="<?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_FALABELLA']) ?>" class="submenu-link">
+                                    <span class="submenu-text">Falabella</span>
+                                </a>
+                            </li>
+                            <li class="submenu-item">
+                                <a href="<?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_MERCADO_LIBRE']) ?>" class="submenu-link">
+                                    <span class="submenu-text">Mercado Libre</span>
+                                </a>
+                            </li>
+                            <li class="submenu-item">
+                                <a href="<?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_PARIS']) ?>" class="submenu-link">
+                                    <span class="submenu-text">Paris</span>
+                                </a>
+                            </li>
+                            <li class="submenu-item">
+                                <a href="<?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_WOOCOMMERCE']) ?>" class="submenu-link">
+                                    <span class="submenu-text">WooCommerce</span>
+                                </a>
+                            </li>
+                        </ul>
                     </li>
                     
                     <div class="menu-divider"></div>
+                    
+                    <!-- SECCIÓN 2: ÓRDENES Y PEDIDOS -->
+                    <li class="menu-header">Operaciones</li>
+                    
+                    <li class="nav-item has-submenu">
+                        <a href="#" class="nav-link">
+                            <i class="fas fa-shopping-cart nav-icon"></i>
+                            <span class="nav-text">Órdenes y Pedidos</span>
+                            <i class="submenu-arrow fas fa-angle-right"></i>
+                        </a>
+                        <div class="tooltip-nav">Órdenes y Pedidos</div>
+                        <ul class="submenu">
+                            <li class="submenu-item">
+                                <a href="<?= $this->url('application', ['action' => 'orders']) ?>" class="submenu-link">
+                                    <span class="submenu-text">Todas las órdenes</span>
+                                </a>
+                            </li>
+                            <li class="submenu-item">
+                                <a href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_WALLMART']) ?>" class="submenu-link">
+                                    <span class="submenu-text">Walmart</span>
+                                </a>
+                            </li>
+                            <li class="submenu-item">
+                                <a href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_RIPLEY']) ?>" class="submenu-link">
+                                    <span class="submenu-text">Ripley</span>
+                                </a>
+                            </li>
+                            <li class="submenu-item">
+                                <a href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_FALABELLA']) ?>" class="submenu-link">
+                                    <span class="submenu-text">Falabella</span>
+                                </a>
+                            </li>
+                            <li class="submenu-item">
+                                <a href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_MERCADO_LIBRE']) ?>" class="submenu-link">
+                                    <span class="submenu-text">Mercado Libre</span>
+                                </a>
+                            </li>
+                            <li class="submenu-item">
+                                <a href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_PARIS']) ?>" class="submenu-link">
+                                    <span class="submenu-text">Paris</span>
+                                </a>
+                            </li>
+                            <li class="submenu-item">
+                                <a href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_WOOCOMMERCE']) ?>" class="submenu-link">
+                                    <span class="submenu-text">WooCommerce</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                    
+                    <div class="menu-divider"></div>
+                    
+                    <!-- SECCIÓN 3: CONFIGURACIÓN E INTEGRACIONES -->
                     <li class="menu-header">Sistema</li>
                     
                     <li class="nav-item">
                         <a href="<?= $this->url('application', ['action' => 'marketplace-config']) ?>" class="nav-link">
-                            <div class="nav-icon">
-                                <i class="fas fa-plug"></i>
-                            </div>
+                            <i class="fas fa-plug nav-icon"></i>
                             <span class="nav-text">Integraciones</span>
                         </a>
                         <div class="tooltip-nav">Integraciones</div>
                     </li>
-                                        
-                    <li class="nav-item">
-                        <a href="#" class="nav-link">
-                            <div class="nav-icon">
-                                <i class="fas fa-question-circle"></i>
-                            </div>
-                            <span class="nav-text">Ayuda</span>
-                        </a>
-                        <div class="tooltip-nav">Ayuda</div>
-                    </li>
                     
                     <li class="nav-item">
-                        <a href="#" class="nav-link" id="notificationsBtn">
-                            <div class="nav-icon">
-                                <i class="fas fa-bell"></i>
-                            </div>
-                            <span class="nav-text">Notificaciones</span>
-                            <span class="notification-badge">5</span>
+                        <a href="<?= $this->url('application', ['action' => 'system-config']) ?>" class="nav-link">
+                            <i class="fas fa-cog nav-icon"></i>
+                            <span class="nav-text">Configuración</span>
                         </a>
-                        <div class="tooltip-nav">Notificaciones</div>
+                        <div class="tooltip-nav">Configuración</div>
                     </li>
                 </ul>
                 
@@ -909,7 +1206,9 @@
             <div class="main-content">
                 <!-- Navbar superior -->
                 <div class="top-navbar">
-                    <h1 class="page-title"></h1>
+                    <h1 class="page-title">
+                        <?= isset($this->title) ? $this->escapeHtml($this->title) : 'Dashboard' ?>
+                    </h1>
                     <div class="navbar-actions">
                         <div class="navbar-icon" id="navNotificationsBtn" title="Notificaciones">
                             <i class="fas fa-bell"></i>
@@ -929,111 +1228,163 @@
         <?= $this->inlineScript()->prependFile($this->basePath('js/bootstrap.min.js')) ?>
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
 
-        <!-- Script corregido para toggle y tooltips -->
+        <!-- Script para la funcionalidad del navbar -->
         <script>
             document.addEventListener('DOMContentLoaded', function() {
-                console.log("DOM cargado, inicializando sidebar...");
-                
                 // Referencias a elementos del DOM
                 const sidebar = document.getElementById('sidebar');
-                const toggleBtn = document.getElementById('toggleBtn');
+                const toggleBtnBottom = document.getElementById('toggleBtnBottom');
                 const overlay = document.querySelector('.overlay');
-                const notificationsBtn = document.getElementById('notificationsBtn');
                 const navNotificationsBtn = document.getElementById('navNotificationsBtn');
                 const notificationsPanel = document.getElementById('notificationsPanel');
                 const closeNotifications = document.getElementById('closeNotifications');
                 const overlayNotifications = document.getElementById('overlayNotifications');
                 
-                // Verificación de elementos
-                if (!sidebar) console.error("Elemento sidebar no encontrado");
-                
-                // YA NO EXPANDIMOS AUTOMÁTICAMENTE - Eliminada la función expandSidebarOnLoad()
+                // Verificar existencia de elementos
+                if (!sidebar || !toggleBtnBottom) {
+                    console.error("Elementos críticos del sidebar no encontrados");
+                    return;
+                }
                 
                 // Función para alternar el estado del sidebar
                 function toggleSidebar() {
-                    console.log("Toggle sidebar clicked");
-                    
                     if (sidebar.classList.contains('sidebar-collapsed')) {
-                        console.log("Expandiendo sidebar");
                         sidebar.classList.remove('sidebar-collapsed');
                         sidebar.classList.add('sidebar-expanded');
                         
-                        // Actualizar el ícono del botón inferior
-                        const toggleBtnIcon = document.querySelector('#toggleBtnBottom i');
-                        if (toggleBtnIcon) {
-                            toggleBtnIcon.classList.remove('fa-chevron-right');
-                            toggleBtnIcon.classList.add('fa-chevron-left');
-                        }
+                        // Actualizar ícono
+                        const icon = toggleBtnBottom.querySelector('i');
+                        if (icon) icon.className = 'fas fa-chevron-left';
                         
-                        // Actualizar el texto del botón inferior
+                        // Actualizar texto
                         const toggleText = document.querySelector('.toggle-text');
-                        if (toggleText) {
-                            toggleText.textContent = 'Colapsar';
-                        }
-                        
-                        // Registrar el ancho después de expandir para debugging
-                        console.log("Ancho del sidebar expandido:", getComputedStyle(sidebar).width);
+                        if (toggleText) toggleText.textContent = 'Colapsar menú';
                     } else {
-                        console.log("Colapsando sidebar");
                         sidebar.classList.remove('sidebar-expanded');
                         sidebar.classList.add('sidebar-collapsed');
                         
-                        // Actualizar el ícono del botón inferior
-                        const toggleBtnIcon = document.querySelector('#toggleBtnBottom i');
-                        if (toggleBtnIcon) {
-                            toggleBtnIcon.classList.remove('fa-chevron-left');
-                            toggleBtnIcon.classList.add('fa-chevron-right');
-                        }
+                        // Actualizar ícono
+                        const icon = toggleBtnBottom.querySelector('i');
+                        if (icon) icon.className = 'fas fa-chevron-right';
                         
-                        // Actualizar el texto del botón inferior
+                        // Actualizar texto
                         const toggleText = document.querySelector('.toggle-text');
-                        if (toggleText) {
-                            toggleText.textContent = 'Expandir';
-                        }
+                        if (toggleText) toggleText.textContent = 'Expandir menú';
                         
-                        // Registrar el ancho después de colapsar para debugging
-                        console.log("Ancho del sidebar colapsado:", getComputedStyle(sidebar).width);
+                        // Cerrar todos los submenús abiertos
+                        document.querySelectorAll('.has-submenu.open').forEach(item => {
+                            item.classList.remove('open');
+                        });
                     }
                 }
                 
-                // Asignar la función al botón inferior
-                const toggleBtnBottom = document.getElementById('toggleBtnBottom');
-                if (toggleBtnBottom) {
-                    toggleBtnBottom.addEventListener('click', toggleSidebar);
-                }
+                // Asignar evento
+                toggleBtnBottom.addEventListener('click', toggleSidebar);
                 
                 // Cerrar sidebar con overlay en dispositivos móviles
                 if (overlay) {
                     overlay.addEventListener('click', function() {
                         sidebar.classList.remove('sidebar-expanded');
                         sidebar.classList.add('sidebar-collapsed');
-                        toggleBtn.querySelector('i').classList.remove('fa-chevron-left');
-                        toggleBtn.querySelector('i').classList.add('fa-chevron-right');
+                        
+                        // También actualizar el ícono
+                        const icon = toggleBtnBottom.querySelector('i');
+                        if (icon) icon.className = 'fas fa-chevron-right';
+                        
+                        // Y el texto
+                        const toggleText = document.querySelector('.toggle-text');
+                        if (toggleText) toggleText.textContent = 'Expandir menú';
                     });
                 }
                 
-                // Marcar menú activo según la ruta actual
-                const currentPath = window.location.pathname;
-                const navLinks = document.querySelectorAll('.nav-link');
+                // Manejo de submenús
+                const submenuItems = document.querySelectorAll('.has-submenu');
                 
-                navLinks.forEach(link => {
-                    const href = link.getAttribute('href');
-                    if (href && currentPath.includes(href) && href !== '#') {
-                        link.classList.add('active');
+                submenuItems.forEach(item => {
+                    const link = item.querySelector('.nav-link');
+                    
+                    if (link) {
+                        link.addEventListener('click', function(e) {
+                            // Si es un elemento con submenú, prevenir navegación al hacer clic en el enlace principal
+                            if (e.currentTarget.parentElement.classList.contains('has-submenu')) {
+                                e.preventDefault();
+                            }
+                            
+                            // Verificar si el sidebar está expandido
+                            const isExpanded = sidebar.classList.contains('sidebar-expanded');
+                            
+                            // Solo permitir expandir submenús si el sidebar está expandido
+                            if (isExpanded) {
+                                // Cerrar otros submenús abiertos
+                                submenuItems.forEach(otherItem => {
+                                    if (otherItem !== item && otherItem.classList.contains('open')) {
+                                        otherItem.classList.remove('open');
+                                    }
+                                });
+                                
+                                // Alternar estado del submenú actual
+                                item.classList.toggle('open');
+                            } else {
+                                // Si el sidebar está colapsado, primero expandirlo
+                                toggleSidebar();
+                                
+                                // Esperar a que termine la animación del sidebar y luego abrir el submenú
+                                setTimeout(() => {
+                                    item.classList.add('open');
+                                }, 300);
+                            }
+                        });
                     }
                 });
                 
-                // Toggle del panel de notificaciones
+                // Marcar activo según URL actual
+                function setActiveMenuBasedOnUrl() {
+                    const currentPath = window.location.pathname;
+                    
+                    // Primero intentamos encontrar una coincidencia exacta en los submenús
+                    let found = false;
+                    
+                    document.querySelectorAll('.submenu-link').forEach(link => {
+                        const href = link.getAttribute('href');
+                        if (href && href !== '#' && currentPath.includes(href)) {
+                            // Marcar este subenlace como activo
+                            link.classList.add('active');
+                            
+                            // Abrir el submenú padre
+                            const parentMenu = link.closest('.has-submenu');
+                            if (parentMenu) {
+                                parentMenu.classList.add('open');
+                                parentMenu.querySelector('.nav-link').classList.add('active');
+                            }
+                            
+                            found = true;
+                        }
+                    });
+                    
+                    // Si no encontramos coincidencia en los submenús, buscamos en los menús principales
+                    if (!found) {
+                        document.querySelectorAll('.nav-link').forEach(link => {
+                            const href = link.getAttribute('href');
+                            if (href && href !== '#' && currentPath.includes(href)) {
+                                link.classList.add('active');
+                                
+                                // Si tiene submenú, lo expandimos
+                                const parentItem = link.closest('.has-submenu');
+                                if (parentItem) {
+                                    parentItem.classList.add('open');
+                                }
+                            }
+                        });
+                    }
+                }
+                
+                // Ejecutar al cargar
+                setActiveMenuBasedOnUrl();
+                
+                // Panel de notificaciones
                 function toggleNotifications() {
                     notificationsPanel.classList.toggle('open');
                     overlayNotifications.classList.toggle('open');
-                }
-                
-                if (notificationsBtn) {
-                    notificationsBtn.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        toggleNotifications();
-                    });
                 }
                 
                 if (navNotificationsBtn) {
@@ -1064,16 +1415,6 @@
                         this.classList.add('active');
                     });
                 });
-                
-                // Iniciar debug para confirmar ancho correcto
-                console.log("Ancho inicial del sidebar:", getComputedStyle(sidebar).width);
-                console.log("Clases del sidebar:", sidebar.className);
-                
-                // Comprobar si estamos en móvil
-                const isMobile = window.innerWidth <= 992;
-                console.log("Vista móvil:", isMobile);
-                
-                console.log("Inicialización de sidebar completada");
             });
         </script>
     </body>
