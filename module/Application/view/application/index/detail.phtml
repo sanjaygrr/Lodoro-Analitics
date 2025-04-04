@@ -1091,10 +1091,9 @@
                             <div class="page-size">
                                 <span>Mostrar</span>
                                 <select id="page-size-select">
-                                    <option value="10" <?= $limit == 10 ? 'selected' : '' ?>>10</option>
-                                    <option value="20" <?= $limit == 20 ? 'selected' : '' ?>>20</option>
-                                    <option value="30" <?= $limit == 30 ? 'selected' : '' ?>>30</option>
                                     <option value="50" <?= $limit == 50 ? 'selected' : '' ?>>50</option>
+                                    <option value="100" <?= $limit == 100 ? 'selected' : '' ?>>100</option>
+                                    <option value="150" <?= $limit == 150 ? 'selected' : '' ?>>150</option>
                                 </select>
                                 <span>registros</span>
                             </div>
@@ -1105,7 +1104,7 @@
                                 <?php if ($totalPages > 1): 
                                     // Construir base de URL de paginación
                                     $paginationParams = [];
-                                    if ($limit != 20) {
+                                    if ($limit != 50) {
                                         $paginationParams['limit'] = $limit;
                                     }
                                     if (!empty($search)) {
@@ -2117,7 +2116,7 @@
             
             if (hasServerFilters) {
                 // Si había filtros en servidor, redirigir sin filtros
-                window.location.href = '<?= $this->url('application', ['action' => 'detail', 'table' => $table]) ?>?limit=<?= $limit ?>';
+                window.location.href = '<?= $this->url('application', ['action' => 'detail', 'table' => $table]) ?>?limit=50';
             } else {
                 // Solo filtrado local
                 $('#detailTable tbody tr').show();

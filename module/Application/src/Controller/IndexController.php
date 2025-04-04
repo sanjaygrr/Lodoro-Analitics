@@ -65,7 +65,7 @@ class IndexController extends AbstractActionController
 
         // Parámetros de paginación
         $page  = (int) $this->params()->fromQuery('page', 1);
-        $limit = (int) $this->params()->fromQuery('limit', 20);
+        $limit = (int) $this->params()->fromQuery('limit', 150);
         // Limitar a máximo 50 registros
         $limit = min($limit, 50);
         $offset = ($page - 1) * $limit;
