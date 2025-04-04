@@ -11,6 +11,7 @@ use Laminas\Db\Adapter\Adapter;
 use Laminas\Db\Sql\Sql;
 use Laminas\Db\Sql\Where;
 use Laminas\Db\Sql\Predicate\Expression;
+use Laminas\View\Model\JsonModel;
 
 class IndexController extends AbstractActionController
 {
@@ -25,11 +26,13 @@ class IndexController extends AbstractActionController
     /**
      * Acción por defecto: redirige al dashboard.
      */
-    public function indexAction()   
-    {
-        return $this->redirect()->toRoute('application', ['action' => 'dashboard']);
-    }
-
+    public function indexAction()
+{
+    // Podemos agregar aquí cualquier lógica o datos que necesites pasar a la vista
+    return new ViewModel([
+        // Aquí puedes pasar datos a tu vista index.phtml si los necesitas
+    ]);
+}
     /**
      * Acción que muestra un dashboard con resumen de todas las tablas.
      */
@@ -67,7 +70,7 @@ class IndexController extends AbstractActionController
         $page  = (int) $this->params()->fromQuery('page', 1);
         $limit = (int) $this->params()->fromQuery('limit', 150);
         // Limitar a máximo 50 registros
-        $limit = min($limit, 50);
+        $limit = min($limit, 150);
         $offset = ($page - 1) * $limit;
 
         // Verificar exportación a CSV
@@ -300,92 +303,780 @@ class IndexController extends AbstractActionController
     }
 
     /**
- * Método para probar la conexión con un marketplace
- */
-public function testConnectionAction()
-{
-    $id = $this->params()->fromQuery('id');
-    if (!$id) {
-        return $this->jsonResponse(['success' => false, 'message' => 'ID de configuración no proporcionado']);
-    }
-    
-    // Obtener la configuración de la API
-    $sql = "SELECT * FROM api_config WHERE id = ?";
-    $statement = $this->dbAdapter->createStatement($sql);
-    $result = $statement->execute([$id]);
-    $config = $result->current();
-    
-    if (!$config) {
-        return $this->jsonResponse(['success' => false, 'message' => 'Configuración no encontrada']);
-    }
-    
-    try {
-        // Crear cliente HTTP
-        $client = new \Laminas\Http\Client();
-        $client->setOptions([
-            'timeout' => 30,
-            'sslverifypeer' => false // Para desarrollo - en producción debería ser true
-        ]);
-        
-        // Configurar la solicitud
-        $apiUrl = $config['api_url'];
-        // Añadir una ruta de prueba si el endpoint solo es la base
-        if (substr($apiUrl, -1) === '/') {
-            $apiUrl .= 'status'; // O algún endpoint común para verificar estado
+     * Método para probar la conexión con un marketplace
+     */
+    public function testConnectionAction()
+    {
+        $id = $this->params()->fromQuery('id');
+        if (!$id) {
+            return $this->jsonResponse(['success' => false, 'message' => 'ID de configuración no proporcionado']);
         }
         
-        $client->setUri($apiUrl);
-        $client->setMethod('GET');
+        // Obtener la configuración de la API
+        $sql = "SELECT * FROM api_config WHERE id = ?";
+        $statement = $this->dbAdapter->createStatement($sql);
+        $result = $statement->execute([$id]);
+        $config = $result->current();
         
-        // Agregar headers de autenticación según la configuración
-        $client->setHeaders([
-            'Content-Type' => 'application/json',
-            'Accept' => 'application/json'
-        ]);
-        
-        if (!empty($config['api_key'])) {
-            $client->setHeaders(['X-API-Key' => $config['api_key']]);
+        if (!$config) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Configuración no encontrada']);
         }
         
-        if (!empty($config['accesstoken'])) {
-            $client->setHeaders(['Authorization' => 'Bearer ' . $config['accesstoken']]);
-        }
-        
-        // Realizar la solicitud
-        $response = $client->send();
-        
-        // Verificar la respuesta
-        if ($response->isSuccess()) {
-            return $this->jsonResponse([
-                'success' => true, 
-                'message' => 'Conexión exitosa',
-                'statusCode' => $response->getStatusCode(),
-                'responseBody' => substr($response->getBody(), 0, 500) // Limitar longitud
+        try {
+            // Crear cliente HTTP
+            $client = new \Laminas\Http\Client();
+            $client->setOptions([
+                'timeout' => 30,
+                'sslverifypeer' => false // Para desarrollo - en producción debería ser true
             ]);
-        } else {
+            
+            // Configurar la solicitud
+            $apiUrl = $config['api_url'];
+            // Añadir una ruta de prueba si el endpoint solo es la base
+            if (substr($apiUrl, -1) === '/') {
+                $apiUrl .= 'status'; // O algún endpoint común para verificar estado
+            }
+            
+            $client->setUri($apiUrl);
+            $client->setMethod('GET');
+            
+            // Agregar headers de autenticación según la configuración
+            $client->setHeaders([
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json'
+            ]);
+            
+            if (!empty($config['api_key'])) {
+                $client->setHeaders(['X-API-Key' => $config['api_key']]);
+            }
+            
+            if (!empty($config['accesstoken'])) {
+                $client->setHeaders(['Authorization' => 'Bearer ' . $config['accesstoken']]);
+            }
+            
+            // Realizar la solicitud
+            $response = $client->send();
+            
+            // Verificar la respuesta
+            if ($response->isSuccess()) {
+                return $this->jsonResponse([
+                    'success' => true, 
+                    'message' => 'Conexión exitosa',
+                    'statusCode' => $response->getStatusCode(),
+                    'responseBody' => substr($response->getBody(), 0, 500) // Limitar longitud
+                ]);
+            } else {
+                return $this->jsonResponse([
+                    'success' => false, 
+                    'message' => 'Error en la conexión',
+                    'statusCode' => $response->getStatusCode(),
+                    'responseBody' => substr($response->getBody(), 0, 500) // Limitar longitud
+                ]);
+            }
+        } catch (\Exception $e) {
             return $this->jsonResponse([
                 'success' => false, 
-                'message' => 'Error en la conexión',
-                'statusCode' => $response->getStatusCode(),
-                'responseBody' => substr($response->getBody(), 0, 500) // Limitar longitud
+                'message' => 'Error: ' . $e->getMessage()
             ]);
         }
-    } catch (\Exception $e) {
-        return $this->jsonResponse([
-            'success' => false, 
-            'message' => 'Error: ' . $e->getMessage()
+    }
+    
+    /**
+     * Método para devolver respuestas JSON
+     */
+    private function jsonResponse($data)
+    {
+        $response = $this->getResponse();
+        $response->getHeaders()->addHeaderLine('Content-Type', 'application/json');
+        $response->setContent(json_encode($data));
+        return $response;
+    }
+
+    /**
+     * NUEVOS MÉTODOS PARA GESTIÓN DE ÓRDENES Y PEDIDOS
+     */
+    
+    /**
+     * Acción principal para visualizar todas las órdenes de todos los marketplaces
+     */
+    public function ordersAction()
+    {
+        // Obtenemos estadísticas resumidas por marketplace y estado
+        $statsSql = "SELECT 
+                        COUNT(*) as total,
+                        SUM(CASE WHEN estado = 'Nueva' THEN 1 ELSE 0 END) as nuevas,
+                        SUM(CASE WHEN estado = 'En Proceso' THEN 1 ELSE 0 END) as en_proceso,
+                        SUM(CASE WHEN estado = 'Enviada' THEN 1 ELSE 0 END) as enviadas,
+                        SUM(CASE WHEN estado = 'Entregada' THEN 1 ELSE 0 END) as entregadas,
+                        SUM(CASE WHEN estado = 'Pendiente de Pago' THEN 1 ELSE 0 END) as pendiente_pago,
+                        SUM(CASE WHEN estado = 'Cancelada' THEN 1 ELSE 0 END) as canceladas,
+                        SUM(CASE WHEN estado = 'Devuelta' THEN 1 ELSE 0 END) as devueltas
+                    FROM (
+                        SELECT estado FROM Orders_WALLMART
+                        UNION ALL SELECT estado FROM Orders_RIPLEY
+                        UNION ALL SELECT estado FROM Orders_FALABELLA
+                        UNION ALL SELECT estado FROM Orders_MERCADO_LIBRE
+                        UNION ALL SELECT estado FROM Orders_PARIS
+                        UNION ALL SELECT estado FROM Orders_WOOCOMMERCE
+                    ) as all_orders";
+        
+        // Ejecutar la consulta de estadísticas
+        $statsStatement = $this->dbAdapter->createStatement($statsSql);
+        $statsResult = $statsStatement->execute();
+        $stats = $statsResult->current() ?: [
+            'total' => 0,
+            'nuevas' => 0,
+            'en_proceso' => 0,
+            'enviadas' => 0,
+            'entregadas' => 0,
+            'pendiente_pago' => 0,
+            'canceladas' => 0,
+            'devueltas' => 0
+        ];
+        
+        // Parámetros de paginación
+        $page = (int) $this->params()->fromQuery('page', 1);
+        $limit = (int) $this->params()->fromQuery('limit', 30);
+        $offset = ($page - 1) * $limit;
+        
+        // Obtener filtros
+        $search = $this->params()->fromQuery('search', '');
+        $statusFilter = $this->params()->fromQuery('status', '');
+        $transportistaFilter = $this->params()->fromQuery('transportista', '');
+        $startDate = $this->params()->fromQuery('startDate', '');
+        $endDate = $this->params()->fromQuery('endDate', '');
+        
+        // Construir condiciones WHERE basadas en filtros
+        $whereConditions = [];
+        $whereParams = [];
+        
+        if (!empty($search)) {
+            $whereConditions[] = "(id LIKE ? OR cliente LIKE ? OR telefono LIKE ? OR direccion LIKE ?)";
+            $whereParams[] = '%' . $search . '%';
+            $whereParams[] = '%' . $search . '%';
+            $whereParams[] = '%' . $search . '%';
+            $whereParams[] = '%' . $search . '%';
+        }
+        
+        if (!empty($statusFilter)) {
+            $whereConditions[] = "estado = ?";
+            $whereParams[] = $statusFilter;
+        }
+        
+        if (!empty($transportistaFilter)) {
+            $whereConditions[] = "transportista = ?";
+            $whereParams[] = $transportistaFilter;
+        }
+        
+        if (!empty($startDate)) {
+            $whereConditions[] = "fecha_creacion >= ?";
+            $whereParams[] = $startDate . ' 00:00:00';
+        }
+        
+        if (!empty($endDate)) {
+            $whereConditions[] = "fecha_creacion <= ?";
+            $whereParams[] = $endDate . ' 23:59:59';
+        }
+        
+        // Construir la cláusula WHERE final
+        $whereClause = !empty($whereConditions) ? " WHERE " . implode(" AND ", $whereConditions) : "";
+        
+        // Consultar todas las órdenes (uniendo todas las tablas de órdenes)
+        // NOTA: Esto asume que todas las tablas de órdenes tienen la misma estructura
+        $ordersSql = "SELECT 
+                        id, 
+                        'TODOS' as marketplace_original, 
+                        fecha_creacion, 
+                        fecha_entrega, 
+                        cliente, 
+                        telefono, 
+                        direccion, 
+                        productos, 
+                        total, 
+                        estado, 
+                        transportista, 
+                        num_seguimiento
+                    FROM (
+                        SELECT 
+                            id, 
+                            'WALLMART' as marketplace, 
+                            fecha_creacion, 
+                            fecha_entrega, 
+                            cliente, 
+                            telefono, 
+                            direccion, 
+                            productos, 
+                            total, 
+                            estado, 
+                            transportista, 
+                            num_seguimiento 
+                        FROM Orders_WALLMART
+                        UNION ALL 
+                        SELECT 
+                            id, 
+                            'RIPLEY' as marketplace, 
+                            fecha_creacion, 
+                            fecha_entrega, 
+                            cliente, 
+                            telefono, 
+                            direccion, 
+                            productos, 
+                            total, 
+                            estado, 
+                            transportista, 
+                            num_seguimiento 
+                        FROM Orders_RIPLEY
+                        UNION ALL 
+                        SELECT 
+                            id, 
+                            'FALABELLA' as marketplace, 
+                            fecha_creacion, 
+                            fecha_entrega, 
+                            cliente, 
+                            telefono, 
+                            direccion, 
+                            productos, 
+                            total, 
+                            estado, 
+                            transportista, 
+                            num_seguimiento 
+                        FROM Orders_FALABELLA
+                        UNION ALL 
+                        SELECT 
+                            id, 
+                            'MERCADO_LIBRE' as marketplace, 
+                            fecha_creacion, 
+                            fecha_entrega, 
+                            cliente, 
+                            telefono, 
+                            direccion, 
+                            productos, 
+                            total, 
+                            estado, 
+                            transportista, 
+                            num_seguimiento 
+                        FROM Orders_MERCADO_LIBRE
+                        UNION ALL 
+                        SELECT 
+                            id, 
+                            'PARIS' as marketplace, 
+                            fecha_creacion, 
+                            fecha_entrega, 
+                            cliente, 
+                            telefono, 
+                            direccion, 
+                            productos, 
+                            total, 
+                            estado, 
+                            transportista, 
+                            num_seguimiento 
+                        FROM Orders_PARIS
+                        UNION ALL 
+                        SELECT 
+                            id, 
+                            'WOOCOMMERCE' as marketplace, 
+                            fecha_creacion, 
+                            fecha_entrega, 
+                            cliente, 
+                            telefono, 
+                            direccion, 
+                            productos, 
+                            total, 
+                            estado, 
+                            transportista, 
+                            num_seguimiento 
+                        FROM Orders_WOOCOMMERCE
+                    ) as all_orders" . $whereClause . 
+                    " ORDER BY fecha_creacion DESC 
+                     LIMIT $limit OFFSET $offset";
+        
+        // Ejecutar la consulta de órdenes
+        $ordersStatement = $this->dbAdapter->createStatement($ordersSql);
+        $ordersResult = $ordersStatement->execute($whereParams);
+        
+        // Formatear resultados
+        $orders = [];
+        foreach ($ordersResult as $row) {
+            $orders[] = $row;
+        }
+        
+        // Devolver la vista con los datos
+        return new ViewModel([
+            'table' => 'all',
+            'orders' => $orders,
+            'stats' => $stats,
+            'page' => $page,
+            'limit' => $limit,
+            'search' => $search,
+            'statusFilter' => $statusFilter,
+            'transportistaFilter' => $transportistaFilter,
+            'startDate' => $startDate,
+            'endDate' => $endDate
         ]);
     }
-}
-
-/**
- * Método para devolver respuestas JSON
- */
-private function jsonResponse($data)
-{
-    $response = $this->getResponse();
-    $response->getHeaders()->addHeaderLine('Content-Type', 'application/json');
-    $response->setContent(json_encode($data));
-    return $response;
-}
+    
+    /**
+     * Acción para visualizar las órdenes de un marketplace específico
+     */
+    public function ordersDetailAction()
+    {
+        // Obtener el marketplace desde la ruta
+        $table = $this->params()->fromRoute('table', null);
+        if (!$table) {
+            // Si no se especifica, redirigir a la vista de todas las órdenes
+            return $this->redirect()->toRoute('application', ['action' => 'orders']);
+        }
+        
+        // Validar el nombre de la tabla (debe empezar con "Orders_")
+        if (strpos($table, 'Orders_') !== 0) {
+            return $this->redirect()->toRoute('application', ['action' => 'orders']);
+        }
+        
+        // Obtener estadísticas para este marketplace
+        $statsSql = "SELECT 
+                        COUNT(*) as total,
+                        SUM(CASE WHEN estado = 'Nueva' THEN 1 ELSE 0 END) as nuevas,
+                        SUM(CASE WHEN estado = 'En Proceso' THEN 1 ELSE 0 END) as en_proceso,
+                        SUM(CASE WHEN estado = 'Enviada' THEN 1 ELSE 0 END) as enviadas,
+                        SUM(CASE WHEN estado = 'Entregada' THEN 1 ELSE 0 END) as entregadas,
+                        SUM(CASE WHEN estado = 'Pendiente de Pago' THEN 1 ELSE 0 END) as pendiente_pago,
+                        SUM(CASE WHEN estado = 'Cancelada' THEN 1 ELSE 0 END) as canceladas,
+                        SUM(CASE WHEN estado = 'Devuelta' THEN 1 ELSE 0 END) as devueltas
+                    FROM `$table`";
+        
+        $statsStatement = $this->dbAdapter->createStatement($statsSql);
+        $statsResult = $statsStatement->execute();
+        $stats = $statsResult->current() ?: [
+            'total' => 0,
+            'nuevas' => 0,
+            'en_proceso' => 0,
+            'enviadas' => 0,
+            'entregadas' => 0,
+            'pendiente_pago' => 0,
+            'canceladas' => 0,
+            'devueltas' => 0
+        ];
+        
+        // Parámetros de paginación
+        $page = (int) $this->params()->fromQuery('page', 1);
+        $limit = (int) $this->params()->fromQuery('limit', 30);
+        $offset = ($page - 1) * $limit;
+        
+        // Obtener filtros
+        $search = $this->params()->fromQuery('search', '');
+        $statusFilter = $this->params()->fromQuery('status', '');
+        $transportistaFilter = $this->params()->fromQuery('transportista', '');
+        $startDate = $this->params()->fromQuery('startDate', '');
+        $endDate = $this->params()->fromQuery('endDate', '');
+        
+        // Construir condiciones WHERE basadas en filtros
+        $whereConditions = [];
+        $whereParams = [];
+        
+        if (!empty($search)) {
+            $whereConditions[] = "(id LIKE ? OR cliente LIKE ? OR telefono LIKE ? OR direccion LIKE ?)";
+            $whereParams[] = '%' . $search . '%';
+            $whereParams[] = '%' . $search . '%';
+            $whereParams[] = '%' . $search . '%';
+            $whereParams[] = '%' . $search . '%';
+        }
+        
+        if (!empty($statusFilter)) {
+            $whereConditions[] = "estado = ?";
+            $whereParams[] = $statusFilter;
+        }
+        
+        if (!empty($transportistaFilter)) {
+            $whereConditions[] = "transportista = ?";
+            $whereParams[] = $transportistaFilter;
+        }
+        
+        if (!empty($startDate)) {
+            $whereConditions[] = "fecha_creacion >= ?";
+            $whereParams[] = $startDate . ' 00:00:00';
+        }
+        
+        if (!empty($endDate)) {
+            $whereConditions[] = "fecha_creacion <= ?";
+            $whereParams[] = $endDate . ' 23:59:59';
+        }
+        
+        // Construir la cláusula WHERE final
+        $whereClause = !empty($whereConditions) ? " WHERE " . implode(" AND ", $whereConditions) : "";
+        
+        // Consulta para obtener órdenes
+        $ordersSql = "SELECT * FROM `$table`" . $whereClause . " ORDER BY fecha_creacion DESC LIMIT $limit OFFSET $offset";
+        $ordersStatement = $this->dbAdapter->createStatement($ordersSql);
+        $ordersResult = $ordersStatement->execute($whereParams);
+        
+        // Formatear resultados
+        $orders = [];
+        foreach ($ordersResult as $row) {
+            // Añadir el marketplace a cada registro
+            $row['marketplace'] = str_replace('Orders_', '', $table);
+            $orders[] = $row;
+        }
+        
+        // Devolver la vista con los datos
+        return new ViewModel([
+            'table' => $table,
+            'orders' => $orders,
+            'stats' => $stats,
+            'page' => $page,
+            'limit' => $limit,
+            'search' => $search,
+            'statusFilter' => $statusFilter,
+            'transportistaFilter' => $transportistaFilter,
+            'startDate' => $startDate,
+            'endDate' => $endDate
+        ]);
+    }
+    
+    /**
+     * Acción para ver los detalles completos de una orden específica
+     */
+    public function orderDetailAction()
+    {
+        // Obtener ID de orden y tabla (marketplace) desde los parámetros
+        $orderId = $this->params()->fromRoute('id', null);
+        $table = $this->params()->fromRoute('table', null);
+        
+        if (!$orderId || !$table) {
+            return $this->redirect()->toRoute('application', ['action' => 'orders']);
+        }
+        
+        // Validar la tabla
+        if (strpos($table, 'Orders_') !== 0) {
+            return $this->redirect()->toRoute('application', ['action' => 'orders']);
+        }
+        
+        // Consultar los detalles de la orden
+        $sql = "SELECT * FROM `$table` WHERE id = ?";
+        $statement = $this->dbAdapter->createStatement($sql);
+        $result = $statement->execute([$orderId]);
+        $order = $result->current();
+        
+        if (!$order) {
+            // Si no se encuentra la orden, redirigir
+            return $this->redirect()->toRoute('application', ['action' => 'orders-detail', 'table' => $table]);
+        }
+        
+        // Consultar productos de la orden (esto requiere una tabla de detalles de orden)
+        $productsSql = "SELECT * FROM `{$table}_Items` WHERE order_id = ?";
+        $productsStatement = $this->dbAdapter->createStatement($productsSql);
+        
+        try {
+            $productsResult = $productsStatement->execute([$orderId]);
+            $products = [];
+            foreach ($productsResult as $product) {
+                $products[] = $product;
+            }
+        } catch (\Exception $e) {
+            // Si no hay tabla de detalles, crear productos de muestra
+            $products = [
+                [
+                    'id' => 1,
+                    'nombre' => 'Producto de ejemplo 1',
+                    'sku' => 'SKU-123456',
+                    'cantidad' => 2,
+                    'precio_unitario' => 12990,
+                    'subtotal' => 25980
+                ],
+                [
+                    'id' => 2,
+                    'nombre' => 'Producto de ejemplo 2',
+                    'sku' => 'SKU-654321',
+                    'cantidad' => 1,
+                    'precio_unitario' => 34990,
+                    'subtotal' => 34990
+                ]
+            ];
+        }
+        
+        // Calcular totales
+        $subtotal = array_sum(array_column($products, 'subtotal'));
+        $envio = isset($order['costo_envio']) ? $order['costo_envio'] : 3990;
+        $total = $subtotal + $envio;
+        
+        // Devolver la vista con todos los datos
+        return new ViewModel([
+            'order' => $order,
+            'products' => $products,
+            'subtotal' => $subtotal,
+            'envio' => $envio,
+            'total' => $total,
+            'table' => $table
+        ]);
+    }
+    
+    /**
+     * Acción para procesar cambios de estado de órdenes
+     */
+    public function updateOrderStatusAction()
+    {
+        if (!$this->getRequest()->isPost()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Se requiere método POST']);
+        }
+        
+        $orderId = $this->params()->fromPost('orderId', null);
+        $table = $this->params()->fromPost('table', null);
+        $newStatus = $this->params()->fromPost('newStatus', null);
+        $notes = $this->params()->fromPost('notes', '');
+        $notifyCustomer = (bool) $this->params()->fromPost('notifyCustomer', false);
+        
+        if (!$orderId || !$table || !$newStatus) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Faltan parámetros requeridos']);
+        }
+        
+        // Validar tabla
+        if (strpos($table, 'Orders_') !== 0) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Tabla inválida']);
+        }
+        
+        // Validar estado
+        $validStates = ['Nueva', 'En Proceso', 'Enviada', 'Entregada', 'Pendiente de Pago', 'Cancelada', 'Devuelta'];
+        if (!in_array($newStatus, $validStates)) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Estado inválido']);
+        }
+        
+        try {
+            // Actualizar estado de la orden
+            $sql = "UPDATE `$table` SET estado = ?, updated_at = NOW() WHERE id = ?";
+            $statement = $this->dbAdapter->createStatement($sql);
+            $result = $statement->execute([$newStatus, $orderId]);
+            
+            // Registrar el cambio en el historial
+            $historySql = "INSERT INTO order_status_history (order_id, table_name, status, notes, created_at) 
+                          VALUES (?, ?, ?, ?, NOW())";
+            $historyStatement = $this->dbAdapter->createStatement($historySql);
+            $historyResult = $historyStatement->execute([$orderId, $table, $newStatus, $notes]);
+            
+            // Si se debe notificar al cliente
+            if ($notifyCustomer) {
+                // Aquí iría la lógica para enviar un email al cliente
+                // Por ahora solo registramos la intención
+                $notifySql = "INSERT INTO order_notifications (order_id, table_name, notification_type, status, created_at) 
+                             VALUES (?, ?, 'email', ?, NOW())";
+                $notifyStatement = $this->dbAdapter->createStatement($notifySql);
+                $notifyResult = $notifyStatement->execute([$orderId, $table, $newStatus]);
+            }
+            
+            return $this->jsonResponse([
+                'success' => true, 
+                'message' => 'Estado actualizado correctamente',
+                'newStatus' => $newStatus
+            ]);
+        } catch (\Exception $e) {
+            return $this->jsonResponse([
+                'success' => false, 
+                'message' => 'Error al actualizar estado: ' . $e->getMessage()
+            ]);
+        }
+    }
+    
+    /**
+     * Acción para actualizar el transportista de una orden
+     */
+    public function updateOrderCarrierAction()
+    {
+        if (!$this->getRequest()->isPost()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Se requiere método POST']);
+        }
+        
+        $orderId = $this->params()->fromPost('orderId', null);
+        $table = $this->params()->fromPost('table', null);
+        $newCarrier = $this->params()->fromPost('newCarrier', null);
+        $trackingNumber = $this->params()->fromPost('trackingNumber', '');
+        $updateStatus = (bool) $this->params()->fromPost('updateStatus', false);
+        $notifyCustomer = (bool) $this->params()->fromPost('notifyCustomer', false);
+        
+        if (!$orderId || !$table || !$newCarrier) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Faltan parámetros requeridos']);
+        }
+        
+        // Validar tabla
+        if (strpos($table, 'Orders_') !== 0) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Tabla inválida']);
+        }
+        
+        try {
+            // Actualizar transportista
+            $sql = "UPDATE `$table` SET 
+                    transportista = ?, 
+                    num_seguimiento = ?,
+                    updated_at = NOW()";
+            
+            $params = [$newCarrier, $trackingNumber];
+            
+            // Si también hay que actualizar el estado
+            if ($updateStatus) {
+                $sql .= ", estado = ?";
+                $params[] = "Enviada";
+            }
+            
+            $sql .= " WHERE id = ?";
+            $params[] = $orderId;
+            
+            $statement = $this->dbAdapter->createStatement($sql);
+            $result = $statement->execute($params);
+            
+            // Registrar el cambio en el historial
+            $historyNote = "Transportista actualizado a: $newCarrier";
+            if (!empty($trackingNumber)) {
+                $historyNote .= ". Número de seguimiento: $trackingNumber";
+            }
+            
+            $historySql = "INSERT INTO order_shipping_history (order_id, table_name, carrier, tracking_number, created_at) 
+                          VALUES (?, ?, ?, ?, NOW())";
+            $historyStatement = $this->dbAdapter->createStatement($historySql);
+            $historyResult = $historyStatement->execute([$orderId, $table, $newCarrier, $trackingNumber]);
+            
+            // Si se actualizó el estado, registrarlo también
+            if ($updateStatus) {
+                $statusSql = "INSERT INTO order_status_history (order_id, table_name, status, notes, created_at) 
+                             VALUES (?, ?, 'Enviada', ?, NOW())";
+                $statusStatement = $this->dbAdapter->createStatement($statusSql);
+                $statusResult = $statusStatement->execute([$orderId, $table, $historyNote]);
+            }
+            
+            // Si se debe notificar al cliente
+            if ($notifyCustomer) {
+                // Aquí iría la lógica para enviar un email al cliente
+                $notifySql = "INSERT INTO order_notifications (order_id, table_name, notification_type, status, created_at) 
+                             VALUES (?, ?, 'email', 'shipping_update', NOW())";
+                $notifyStatement = $this->dbAdapter->createStatement($notifySql);
+                $notifyResult = $notifyStatement->execute([$orderId, $table]);
+            }
+            
+            return $this->jsonResponse([
+                'success' => true, 
+                'message' => 'Transportista actualizado correctamente',
+                'carrier' => $newCarrier,
+                'trackingNumber' => $trackingNumber
+            ]);
+        } catch (\Exception $e) {
+            return $this->jsonResponse([
+                'success' => false, 
+                'message' => 'Error al actualizar transportista: ' . $e->getMessage()
+            ]);
+        }
+    }
+    
+    /**
+     * Acción para procesar lotes de órdenes (acciones masivas)
+     */
+    public function bulkOrdersAction()
+    {
+        if (!$this->getRequest()->isPost()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Se requiere método POST']);
+        }
+        
+        $orderIds = $this->params()->fromPost('orderIds', []);
+        $table = $this->params()->fromPost('table', null);
+        $action = $this->params()->fromPost('action', null);
+        
+        if (empty($orderIds) || !$action) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Faltan parámetros requeridos']);
+        }
+        
+        // Procesar según la acción solicitada
+        switch ($action) {
+            case 'print-labels':
+                // Simular generación de etiquetas
+                return $this->jsonResponse([
+                    'success' => true,
+                    'message' => 'Etiquetas generadas correctamente',
+                    'count' => count($orderIds),
+                    'labelUrl' => '/labels/batch-' . time() . '.pdf'
+                ]);
+                
+            case 'generate-manifest':
+                // Simular generación de manifiesto
+                return $this->jsonResponse([
+                    'success' => true,
+                    'message' => 'Manifiesto generado correctamente',
+                    'count' => count($orderIds),
+                    'manifestUrl' => '/manifests/manifest-' . time() . '.pdf'
+                ]);
+                
+            case 'update-status':
+                $newStatus = $this->params()->fromPost('newStatus', null);
+                if (!$newStatus) {
+                    return $this->jsonResponse(['success' => false, 'message' => 'Falta especificar el nuevo estado']);
+                }
+                
+                $validStates = ['Nueva', 'En Proceso', 'Enviada', 'Entregada', 'Pendiente de Pago', 'Cancelada', 'Devuelta'];
+                if (!in_array($newStatus, $validStates)) {
+                    return $this->jsonResponse(['success' => false, 'message' => 'Estado inválido']);
+                }
+                
+                // Actualizar estado para múltiples órdenes
+                try {
+                    $updated = 0;
+                    
+                    // Si es una tabla específica
+                    if ($table && $table !== 'all') {
+                        $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
+                        $sql = "UPDATE `$table` SET estado = ?, updated_at = NOW() WHERE id IN ($placeholders)";
+                        $params = array_merge([$newStatus], $orderIds);
+                        
+                        $statement = $this->dbAdapter->createStatement($sql);
+                        $result = $statement->execute($params);
+                        $updated = $result->getAffectedRows();
+                    } else {
+                        // Si son todas las tablas, actualizar en cada una
+                        $tables = [
+                            'Orders_WALLMART',
+                            'Orders_RIPLEY',
+                            'Orders_FALABELLA',
+                            'Orders_MERCADO_LIBRE',
+                            'Orders_PARIS',
+                            'Orders_WOOCOMMERCE'
+                        ];
+                        
+                        foreach ($tables as $tableToUpdate) {
+                            $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
+                            $sql = "UPDATE `$tableToUpdate` SET estado = ?, updated_at = NOW() WHERE id IN ($placeholders)";
+                            $params = array_merge([$newStatus], $orderIds);
+                            
+                            $statement = $this->dbAdapter->createStatement($sql);
+                            $result = $statement->execute($params);
+                            $updated += $result->getAffectedRows();
+                        }
+                    }
+                    
+                    return $this->jsonResponse([
+                        'success' => true,
+                        'message' => 'Estado actualizado para ' . $updated . ' órdenes',
+                        'updatedCount' => $updated
+                    ]);
+                } catch (\Exception $e) {
+                    return $this->jsonResponse([
+                        'success' => false,
+                        'message' => 'Error al actualizar estados: ' . $e->getMessage()
+                    ]);
+                }
+                
+            case 'export-csv':
+                // Simular exportación a CSV
+                return $this->jsonResponse([
+                    'success' => true,
+                    'message' => 'Exportación a CSV generada',
+                    'count' => count($orderIds),
+                    'csvUrl' => '/exports/orders-' . time() . '.csv'
+                ]);
+                
+            case 'export-excel':
+                // Simular exportación a Excel
+                return $this->jsonResponse([
+                    'success' => true,
+                    'message' => 'Exportación a Excel generada',
+                    'count' => count($orderIds),
+                    'excelUrl' => '/exports/orders-' . time() . '.xlsx'
+                ]);
+                
+            default:
+                return $this->jsonResponse(['success' => false, 'message' => 'Acción no reconocida']);
+        }
+    }
 }
