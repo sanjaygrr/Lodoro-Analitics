@@ -1,0 +1,728 @@
+<?php
+/**
+ * Vista detallada de órdenes por marketplace
+ * Esta vista se utiliza tanto para órdenes individuales como para órdenes consolidadas
+ */
+
+// Configuración de marketplaces
+$marketplaceDetails = [
+    'WALLMART' => ['name' => 'Walmart', 'color' => '#0071ce'],
+    'RIPLEY' => ['name' => 'Ripley', 'color' => '#e60000'],
+    'FALABELLA' => ['name' => 'Falabella', 'color' => '#0a4a90'],
+    'MERCADO_LIBRE' => ['name' => 'Mercado Libre', 'color' => '#ffe600'],
+    'PARIS' => ['name' => 'Paris', 'color' => '#e71785'],
+    'WOOCOMMERCE' => ['name' => 'WooCommerce', 'color' => '#7f54b3']
+];
+
+// Obtener marketplace actual
+$marketplace = isset($table) && $table !== 'all' ? str_replace('Orders_', '', $table) : 'TODOS';
+$marketplace = strtoupper($marketplace);
+
+// Configurar nombre y color del marketplace
+$displayName = $marketplaceDetails[$marketplace]['name'] ?? 'Todos los Marketplaces';
+$marketColor = $marketplaceDetails[$marketplace]['color'] ?? '#4361ee';
+
+// Valores predeterminados para estadísticas y órdenes
+$stats = $stats ?? [
+    'total' => 0,
+    'nuevas' => 0,
+    'en_proceso' => 0,
+    'enviadas' => 0,
+    'entregadas' => 0,
+    'pendiente_pago' => 0,
+    'canceladas' => 0,
+    'devueltas' => 0
+];
+
+$orders = $orders ?? [];
+
+// Configuración de paginación
+$page = $page ?? 1;
+$limit = $limit ?? 10;
+$totalPages = $totalPages ?? 1;
+$total = $total ?? count($orders);
+
+// Parámetros de filtro
+$search = $search ?? '';
+$startDate = $startDate ?? '';
+$endDate = $endDate ?? '';
+$statusFilter = $statusFilter ?? '';
+$transportistaFilter = $transportistaFilter ?? '';
+?>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Órdenes de <?= $this->escapeHtml($displayName) ?></title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- FontAwesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        /* Estilos generales */
+        body {
+            background-color: #f4f6f9;
+        }
+        .orders-container {
+            background-color: #fff;
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+            margin: 2rem auto;
+            max-width: 1400px;
+        }
+        
+        /* Cabecera de órdenes */
+        .orders-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+        
+        .orders-title {
+            color: #333;
+            font-size: 1.75rem;
+            margin-bottom: 0.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .orders-title i {
+            color: <?= $marketColor ?>;
+        }
+        
+        .orders-subtitle {
+            color: #6c757d;
+            margin-bottom: 0;
+        }
+        
+        .marketplace-selector {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .marketplace-selector label {
+            margin-bottom: 0;
+            font-weight: 500;
+        }
+        
+        .marketplace-selector select {
+            min-width: 220px;
+        }
+        
+        /* Tarjetas de estadísticas */
+        .stats-cards {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+        
+        .stat-card {
+            flex: 1;
+            min-width: 200px;
+            background-color: #fff;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+            border-left: 4px solid #ddd;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .stat-card.total { border-left-color: <?= $marketColor ?>; }
+        .stat-card.nuevas { border-left-color: #17a2b8; }
+        .stat-card.en-proceso { border-left-color: #007bff; }
+        .stat-card.enviadas { border-left-color: #ffc107; }
+        .stat-card.entregadas { border-left-color: #28a745; }
+        
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background-color: #f8f9fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+        
+        .stat-card.total .stat-icon { color: <?= $marketColor ?>; }
+        .stat-card.nuevas .stat-icon { color: #17a2b8; }
+        .stat-card.en-proceso .stat-icon { color: #007bff; }
+        .stat-card.enviadas .stat-icon { color: #ffc107; }
+        .stat-card.entregadas .stat-icon { color: #28a745; }
+        
+        .stat-content {
+            flex: 1;
+        }
+        
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #333;
+            line-height: 1.2;
+        }
+        
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.875rem;
+        }
+        
+        /* Barra de herramientas y filtros */
+        .orders-toolbar {
+            margin-bottom: 1.5rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: flex-start;
+            justify-content: space-between;
+            padding: 1rem;
+            background-color: #f8f9fa;
+            border-radius: 0.5rem;
+        }
+        
+        .bulk-actions {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        
+        .filters {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            align-items: center;
+            flex: 1;
+        }
+        
+        .filters form {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            width: 100%;
+        }
+        
+        .filters .input-group {
+            width: auto;
+            flex-wrap: nowrap;
+        }
+        
+        .date-filter {
+            min-width: 360px;
+        }
+        
+        /* Tabla de órdenes */
+        .orders-table-container {
+            overflow-x: auto;
+            margin-bottom: 1.5rem;
+            border: 1px solid #e9ecef;
+            border-radius: 0.5rem;
+        }
+        
+        #ordersTable {
+            margin-bottom: 0;
+        }
+        
+        #ordersTable th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            padding: 0.75rem;
+            border-bottom-width: 1px;
+        }
+        
+        .sortable {
+            cursor: pointer;
+        }
+        
+        .sortable i {
+            margin-left: 0.25rem;
+            color: #ccc;
+        }
+        
+        .sortable.asc i:before {
+            content: "\f0de";
+            color: #666;
+        }
+        
+        .sortable.desc i:before {
+            content: "\f0dd";
+            color: #666;
+        }
+        
+        /* Responsive ajustes */
+        @media (max-width: 768px) {
+            .orders-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .marketplace-selector {
+                width: 100%;
+                margin-top: 1rem;
+            }
+            
+            .orders-toolbar {
+                flex-direction: column;
+            }
+            
+            .filters form {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="orders-container">
+            <!-- Cabecera con título y selector de marketplace -->
+            <div class="orders-header">
+                <div class="orders-title-section">
+                    <h1 class="orders-title">
+                        <i class="fas fa-shopping-cart"></i>
+                        Órdenes: <?= $this->escapeHtml($displayName) ?>
+                    </h1>
+                    <p class="orders-subtitle">Gestión y seguimiento de pedidos</p>
+                </div>
+                
+                <div class="marketplace-selector">
+                    <label for="marketplace-select">Marketplace:</label>
+                    <select id="marketplace-select" class="form-select">
+                        <option value="all" <?= $marketplace === 'TODOS' ? 'selected' : '' ?>>Todos los Marketplaces</option>
+                        <?php foreach ($marketplaceDetails as $key => $details): ?>
+                        <option value="Orders_<?= $key ?>" <?= $marketplace === $key ? 'selected' : '' ?>>
+                            <?= $details['name'] ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- Tarjetas de estadísticas -->
+            <div class="stats-cards">
+                <div class="stat-card total">
+                    <div class="stat-icon">
+                        <i class="fas fa-shopping-bag"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value"><?= number_format((int)$stats['total']) ?></div>
+                        <div class="stat-label">Total de Órdenes</div>
+                    </div>
+                </div>
+                
+                <div class="stat-card nuevas">
+                    <div class="stat-icon">
+                        <i class="fas fa-star"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value"><?= number_format((int)$stats['nuevas']) ?></div>
+                        <div class="stat-label">Nuevas</div>
+                    </div>
+                </div>
+                
+                <div class="stat-card en-proceso">
+                    <div class="stat-icon">
+                        <i class="fas fa-hourglass-half"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value"><?= number_format((int)$stats['en_proceso']) ?></div>
+                        <div class="stat-label">En Proceso</div>
+                    </div>
+                </div>
+                
+                <div class="stat-card enviadas">
+                    <div class="stat-icon">
+                        <i class="fas fa-truck"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value"><?= number_format((int)$stats['enviadas']) ?></div>
+                        <div class="stat-label">Enviadas</div>
+                    </div>
+                </div>
+                
+                <div class="stat-card entregadas">
+                    <div class="stat-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value"><?= number_format((int)$stats['entregadas']) ?></div>
+                        <div class="stat-label">Entregadas</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Barra de herramientas y filtros -->
+            <div class="orders-toolbar">
+                <div class="bulk-actions">
+                    <button id="selectAllOrders" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-check-square"></i> Seleccionar Todo
+                    </button>
+                    
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-primary dropdown-toggle" type="button" id="bulkActionsDropdown" data-bs-toggle="dropdown" aria-expanded="false" disabled>
+                            Acciones en Grupo
+                        </button>
+                        <ul class="dropdown-menu" aria-labelledby="bulkActionsDropdown">
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-print"></i> Imprimir Etiquetas</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-file-alt"></i> Generar Manifiesto</a></li>
+                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#bulkStatusModal"><i class="fas fa-sync"></i> Actualizar Estado</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-file-csv"></i> Exportar CSV</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-file-excel"></i> Exportar Excel</a></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="filters">
+                    <form id="filterForm" method="GET">
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                            <input type="text" class="form-control" placeholder="Buscar..." name="search" value="<?= $this->escapeHtml($search) ?>">
+                        </div>
+                        
+                        <div class="input-group date-filter">
+                            <span class="input-group-text"><i class="fas fa-calendar"></i></span>
+                            <input type="date" class="form-control" name="startDate" value="<?= $this->escapeHtml($startDate) ?>" placeholder="Fecha inicio">
+                            <input type="date" class="form-control" name="endDate" value="<?= $this->escapeHtml($endDate) ?>" placeholder="Fecha fin">
+                        </div>
+                        
+                        <div class="input-group">
+                            <select class="form-select" name="status">
+                                <option value="">Todos los estados</option>
+                                <option value="Nueva" <?= $statusFilter === 'Nueva' ? 'selected' : '' ?>>Nuevas</option>
+                                <option value="En Proceso" <?= $statusFilter === 'En Proceso' ? 'selected' : '' ?>>En Proceso</option>
+                                <option value="Enviada" <?= $statusFilter === 'Enviada' ? 'selected' : '' ?>>Enviadas</option>
+                                <option value="Entregada" <?= $statusFilter === 'Entregada' ? 'selected' : '' ?>>Entregadas</option>
+                                <option value="Pendiente de Pago" <?= $statusFilter === 'Pendiente de Pago' ? 'selected' : '' ?>>Pendiente de Pago</option>
+                                <option value="Cancelada" <?= $statusFilter === 'Cancelada' ? 'selected' : '' ?>>Canceladas</option>
+                                <option value="Devuelta" <?= $statusFilter === 'Devuelta' ? 'selected' : '' ?>>Devueltas</option>
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-filter"></i> Aplicar Filtros
+                        </button>
+                        <button type="button" id="clearFilters" class="btn btn-outline-secondary">
+                            <i class="fas fa-times"></i> Limpiar
+                        </button>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Tabla de órdenes -->
+            <div class="orders-table-container">
+                <?php if (empty($orders)): ?>
+                    <div class="alert alert-info text-center">
+                        <i class="fas fa-info-circle me-2"></i>
+                        No se encontraron órdenes con los criterios seleccionados.
+                    </div>
+                <?php else: ?>
+                    <table id="ordersTable" class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th class="check-column">
+                                    <div class="form-check">
+                                        <input class="form-check-input select-all-checkbox" type="checkbox" id="selectAll">
+                                    </div>
+                                </th>
+                                <th class="sortable" data-sort="id">ID <i class="fas fa-sort"></i></th>
+                                <?php if ($marketplace === 'TODOS'): ?>
+                                <th class="sortable" data-sort="marketplace">Marketplace <i class="fas fa-sort"></i></th>
+                                <?php endif; ?>
+                                <th class="sortable" data-sort="fecha_creacion">Fecha <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-sort="cliente">Cliente <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-sort="direccion">Dirección <i class="fas fa-sort"></i></th>
+                                <th class="sortable text-end" data-sort="total">Total <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-sort="estado">Estado <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-sort="transportista">Transportista <i class="fas fa-sort"></i></th>
+                                <th class="sortable" data-sort="fecha_entrega">Entrega <i class="fas fa-sort"></i></th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($orders as $order): ?>
+                            <tr class="order-row" 
+                                data-id="<?= $this->escapeHtml($order['id']) ?>" 
+                                data-table="<?= $table != 'all' ? $this->escapeHtml($table) : 'Orders_' . $this->escapeHtml($order['marketplace']) ?>">
+                                <td>
+                                    <div class="form-check">
+                                        <input class="form-check-input order-checkbox" type="checkbox" 
+                                               value="<?= $this->escapeHtml($order['id']) ?>"
+                                               data-table="<?= $table != 'all' ? $this->escapeHtml($table) : 'Orders_' . $this->escapeHtml($order['marketplace']) ?>">
+                                    </div>
+                                </td>
+                                <td class="order-id">
+                                    <?= $this->escapeHtml($order['id']) ?>
+                                </td>
+                                <?php if ($marketplace === 'TODOS'): ?>
+                                <td>
+                                    <?php
+                                    $mkp = $order['marketplace'] ?? $marketplace;
+                                    $mkpDetails = $marketplaceDetails[$mkp] ?? ['name' => $mkp, 'color' => '#6c757d'];
+                                    ?>
+                                    <span class="badge" style="background-color: <?= $mkpDetails['color'] ?>">
+                                        <?= $this->escapeHtml($mkpDetails['name']) ?>
+                                    </span>
+                                </td>
+                                <?php endif; ?>
+                                <td>
+                                    <?= (new DateTime($order['fecha_creacion']))->format('d/m/Y H:i') ?>
+                                </td>
+                                <td>
+                                    <span class="customer-name"><?= $this->escapeHtml($order['cliente']) ?></span>
+                                    <div class="customer-phone text-muted small"><?= $this->escapeHtml($order['telefono']) ?></div>
+                                </td>
+                                <td>
+                                    <?= $this->escapeHtml($order['direccion']) ?>
+                                </td>
+                                <td class="text-end">
+                                    $<?= number_format((int)$order['total'], 0, ',', '.') ?>
+                                </td>
+                                <td>
+                                    <?php
+                                    $statusClasses = [
+                                        'Nueva' => 'bg-info text-white',
+                                        'En Proceso' => 'bg-primary text-white',
+                                        'Enviada' => 'bg-warning text-dark',
+                                        'Entregada' => 'bg-success text-white',
+                                        'Pendiente de Pago' => 'bg-secondary text-white',
+                                        'Cancelada' => 'bg-danger text-white',
+                                        'Devuelta' => 'bg-dark text-white'
+                                    ];
+                                    $statusClass = $statusClasses[$order['estado']] ?? 'bg-light text-dark';
+                                    ?>
+                                    <span class="badge <?= $statusClass ?>">
+                                        <?= $this->escapeHtml($order['estado']) ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-column">
+                                        <span><?= $this->escapeHtml($order['transportista']) ?></span>
+                                        <small class="text-muted tracking-number">
+                                            <?= $this->escapeHtml($order['num_seguimiento']) ?>
+                                        </small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <?= (new DateTime($order['fecha_entrega']))->format('d/m/Y') ?>
+                                </td>
+                                <td>
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <i class="fas fa-ellipsis-v"></i>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end">
+                                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#orderDetailModal">
+                                                <i class="fas fa-eye"></i> Ver Detalles
+                                            </a></li>
+                                            <li><a class="dropdown-item" href="#">
+                                                <i class="fas fa-print"></i> Imprimir Etiqueta
+                                            </a></li>
+                                            <li><a class="dropdown-item" href="#">
+                                                <i class="fas fa-file-pdf"></i> Descargar Factura
+                                            </a></li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#changeStatusModal">
+                                                <i class="fas fa-sync-alt"></i> Cambiar Estado
+                                            </a></li>
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php endif; ?>
+            </div>
+            
+            <!-- Paginación -->
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="pagination-info">
+                    Mostrando <?= count($orders) ?> de <?= $total ?> órdenes
+                </div>
+                
+                <?php if ($totalPages > 1): ?>
+                <nav>
+                    <ul class="pagination">
+                        <?php 
+                        $prevPage = max(1, $page - 1);
+                        $nextPage = min($totalPages, $page + 1);
+                        ?>
+                        <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
+                            <a class="page-link" href="?page=<?= $prevPage ?>" aria-label="Anterior">
+                                <span aria-hidden="true">&laquo;</span>
+                            </a>
+                        </li>
+                        
+                        <?php for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++): ?>
+                            <li class="page-item <?= $i == $page ? 'active' : '' ?>">
+                                <a class="page-link" href="?page=<?= $i ?>"><?= $i ?></a>
+                            </li>
+                        <?php endfor; ?>
+                        
+                        <li class="page-item <?= $page >= $totalPages ? 'disabled' : '' ?>">
+                            <a class="page-link" href="?page=<?= $nextPage ?>" aria-label="Siguiente">
+                                <span aria-hidden="true">&raquo;</span>
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+                <?php endif; ?>
+                
+                <div class="per-page-selector">
+                    <select class="form-select form-select-sm" onchange="window.location.href='?limit=' + this.value">
+                        <option value="10" <?= $limit == 10 ? 'selected' : '' ?>>10 por página</option>
+                        <option value="25" <?= $limit == 25 ? 'selected' : '' ?>>25 por página</option>
+                        <option value="50" <?= $limit == 50 ? 'selected' : '' ?>>50 por página</option>
+                        <option value="100" <?= $limit == 100 ? 'selected' : '' ?>>100 por página</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modales -->
+    <!-- Modal de Detalle de Orden -->
+    <div class="modal fade" id="orderDetailModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Detalle de Orden</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Información del Cliente</h6>
+                            <div class="mb-2"><strong>Nombre:</strong> Juan Pérez</div>
+                            <div class="mb-2"><strong>Teléfono:</strong> +56 9 1234 5678</div>
+                            <div class="mb-2"><strong>Email:</strong> juan.perez@ejemplo.com</div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Detalles de la Orden</h6>
+                            <div class="mb-2"><strong>ID Orden:</strong> #12345</div>
+                            <div class="mb-2"><strong>Fecha:</strong> 01/04/2025 14:30</div>
+                            <div class="mb-2"><strong>Estado:</strong> <span class="badge bg-primary">En Proceso</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-primary">Imprimir</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Cambio de Estado -->
+    <div class="modal fade" id="changeStatusModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Cambiar Estado de Orden</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="changeStatusForm">
+                        <div class="mb-3">
+                            <label class="form-label">Nuevo Estado</label>
+                            <select class="form-select">
+                                <option>Nueva</option>
+                                <option>En Proceso</option>
+                                <option>Enviada</option>
+                                <option>Entregada</option>
+                                <option>Pendiente de Pago</option>
+                                <option>Cancelada</option>
+                                <option>Devuelta</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Notas (opcional)</label>
+                            <textarea class="form-control" rows="3" placeholder="Comentarios adicionales..."></textarea>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" checked>
+                            <label class="form-check-label">Notificar al cliente</label>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary">Guardar Cambios</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- JavaScript personalizado -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Selector de marketplace
+            const marketplaceSelect = document.getElementById('marketplace-select');
+            if (marketplaceSelect) {
+                marketplaceSelect.addEventListener('change', function() {
+                    // Redirigir a la página de órdenes del marketplace seleccionado
+                    window.location.href = '?marketplace=' + this.value;
+                });
+            }
+
+            // Selección de todas las órdenes
+            const selectAllCheckbox = document.getElementById('selectAll');
+            const orderCheckboxes = document.querySelectorAll('.order-checkbox');
+            
+            if (selectAllCheckbox) {
+                selectAllCheckbox.addEventListener('change', function() {
+                    orderCheckboxes.forEach(checkbox => {
+                        checkbox.checked = this.checked;
+                    });
+                });
+            }
+
+            // Acciones en grupo
+            const bulkActionsDropdown = document.getElementById('bulkActionsDropdown');
+            if (bulkActionsDropdown) {
+                orderCheckboxes.forEach(checkbox => {
+                    checkbox.addEventListener('change', updateBulkActions);
+                });
+            }
+
+            function updateBulkActions() {
+                const selectedCheckboxes = document.querySelectorAll('.order-checkbox:checked');
+                
+                if (bulkActionsDropdown) {
+                    bulkActionsDropdown.disabled = selectedCheckboxes.length === 0;
+                    bulkActionsDropdown.textContent = `Acciones en Grupo (${selectedCheckboxes.length})`;
+                }
+            }
+
+            // Limpiar filtros
+            const clearFiltersBtn = document.getElementById('clearFilters');
+            if (clearFiltersBtn) {
+                clearFiltersBtn.addEventListener('click', function() {
+                    document.querySelectorAll('#filterForm input, #filterForm select').forEach(input => {
+                        input.value = '';
+                    });
+                });
+            }
+        });
+    </script>
+</body>
+</html>
