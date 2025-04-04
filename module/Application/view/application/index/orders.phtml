@@ -1,0 +1,650 @@
+<?php
+/**
+ * @var Laminas\View\Renderer\PhpRenderer $this
+ */
+$this->headTitle('Gestión de Órdenes');
+?>
+
+<div class="container-fluid">
+    <!-- Resumen estadístico -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body p-0">
+                    <div class="row g-0 text-center">
+                        <div class="col-md-2 border-end">
+                            <div class="p-3">
+                                <h5 class="fw-semibold mb-1"><?= isset($stats['total']) ? number_format($stats['total']) : 0 ?></h5>
+                                <span class="text-muted">Total de órdenes</span>
+                            </div>
+                        </div>
+                        <div class="col-md-2 border-end">
+                            <div class="p-3">
+                                <h5 class="fw-semibold mb-1"><?= isset($stats['nuevas']) ? number_format($stats['nuevas']) : 0 ?></h5>
+                                <span class="text-muted">Nuevas</span>
+                            </div>
+                        </div>
+                        <div class="col-md-2 border-end">
+                            <div class="p-3">
+                                <h5 class="fw-semibold mb-1"><?= isset($stats['en_proceso']) ? number_format($stats['en_proceso']) : 0 ?></h5>
+                                <span class="text-muted">En proceso</span>
+                            </div>
+                        </div>
+                        <div class="col-md-2 border-end">
+                            <div class="p-3">
+                                <h5 class="fw-semibold mb-1"><?= isset($stats['enviadas']) ? number_format($stats['enviadas']) : 0 ?></h5>
+                                <span class="text-muted">Enviadas</span>
+                            </div>
+                        </div>
+                        <div class="col-md-2 border-end">
+                            <div class="p-3">
+                                <h5 class="fw-semibold mb-1"><?= isset($stats['pendiente_pago']) ? number_format($stats['pendiente_pago']) : 0 ?></h5>
+                                <span class="text-muted">Pendientes de pago</span>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="p-3">
+                                <h5 class="fw-semibold mb-1"><?= isset($stats['canceladas']) ? number_format($stats['canceladas']) : 0 ?></h5>
+                                <span class="text-muted">Canceladas</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros y botones de acción -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                        <div class="d-flex flex-column flex-md-row gap-3">
+                            <form class="d-flex" role="search">
+                                <div class="input-group">
+                                    <input type="text" class="form-control" placeholder="Buscar órdenes..." name="search" value="<?= isset($search) ? $this->escapeHtml($search) : '' ?>">
+                                    <button class="btn btn-primary" type="submit">
+                                        <i class="fas fa-search"></i>
+                                    </button>
+                                </div>
+                            </form>
+                            
+                            <div class="d-flex gap-2">
+                                <select class="form-select" name="status" id="statusFilter">
+                                    <option value="">Todos los estados</option>
+                                    <option value="Nueva" <?= isset($statusFilter) && $statusFilter === 'Nueva' ? 'selected' : '' ?>>Nueva</option>
+                                    <option value="En Proceso" <?= isset($statusFilter) && $statusFilter === 'En Proceso' ? 'selected' : '' ?>>En Proceso</option>
+                                    <option value="Enviada" <?= isset($statusFilter) && $statusFilter === 'Enviada' ? 'selected' : '' ?>>Enviada</option>
+                                    <option value="Entregada" <?= isset($statusFilter) && $statusFilter === 'Entregada' ? 'selected' : '' ?>>Entregada</option>
+                                    <option value="Pendiente de Pago" <?= isset($statusFilter) && $statusFilter === 'Pendiente de Pago' ? 'selected' : '' ?>>Pendiente de Pago</option>
+                                    <option value="Cancelada" <?= isset($statusFilter) && $statusFilter === 'Cancelada' ? 'selected' : '' ?>>Cancelada</option>
+                                </select>
+                                <select class="form-select" name="marketplace" id="marketplaceFilter">
+                                    <option value="">Todos los marketplaces</option>
+                                    <option value="WALLMART">Walmart</option>
+                                    <option value="RIPLEY">Ripley</option>
+                                    <option value="FALABELLA">Falabella</option>
+                                    <option value="MERCADO_LIBRE">Mercado Libre</option>
+                                    <option value="PARIS">Paris</option>
+                                    <option value="WOOCOMMERCE">WooCommerce</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-outline-primary" id="filterDatesBtn">
+                                <i class="fas fa-calendar-alt me-2"></i>Filtrar por fecha
+                            </button>
+                            <div class="dropdown">
+                                <button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fas fa-cog me-1"></i> Acciones
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="#" id="printLabelsBtn"><i class="fas fa-print me-2"></i>Imprimir etiquetas</a></li>
+                                    <li><a class="dropdown-item" href="#" id="exportCsvBtn"><i class="fas fa-file-csv me-2"></i>Exportar a CSV</a></li>
+                                    <li><a class="dropdown-item" href="#" id="exportExcelBtn"><i class="fas fa-file-excel me-2"></i>Exportar a Excel</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="#" id="bulkUpdateBtn"><i class="fas fa-tasks me-2"></i>Actualización masiva</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla de órdenes -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped">
+                            <thead>
+                                <tr>
+                                    <th width="20">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="selectAllOrders">
+                                        </div>
+                                    </th>
+                                    <th>ID</th>
+                                    <th>Marketplace</th>
+                                    <th>Fecha</th>
+                                    <th>Cliente</th>
+                                    <th>Productos</th>
+                                    <th>Total</th>
+                                    <th>Estado</th>
+                                    <th>Transportista</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if (isset($orders) && !empty($orders)): ?>
+                                    <?php foreach ($orders as $order): ?>
+                                        <tr>
+                                            <td>
+                                                <div class="form-check">
+                                                    <input class="form-check-input order-checkbox" type="checkbox" value="<?= $this->escapeHtml($order['id']) ?>" data-marketplace="<?= $this->escapeHtml($order['marketplace'] ?? 'TODOS') ?>">
+                                                </div>
+                                            </td>
+                                            <td class="fw-semibold"><?= $this->escapeHtml($order['id']) ?></td>
+                                            <td>
+                                                <?php
+                                                    $marketplace = $order['marketplace'] ?? 'TODOS';
+                                                    $badgeClass = 'bg-secondary';
+                                                    
+                                                    switch ($marketplace) {
+                                                        case 'WALLMART': $badgeClass = 'bg-primary'; break;
+                                                        case 'RIPLEY': $badgeClass = 'bg-warning text-dark'; break;
+                                                        case 'FALABELLA': $badgeClass = 'bg-success'; break;
+                                                        case 'MERCADO_LIBRE': $badgeClass = 'bg-warning'; break;
+                                                        case 'PARIS': $badgeClass = 'bg-danger'; break;
+                                                        case 'WOOCOMMERCE': $badgeClass = 'bg-info'; break;
+                                                    }
+                                                ?>
+                                                <span class="badge <?= $badgeClass ?>"><?= $this->escapeHtml($marketplace) ?></span>
+                                            </td>
+                                            <td><?= $this->escapeHtml($order['fecha_creacion'] ?? 'N/A') ?></td>
+                                            <td><?= $this->escapeHtml($order['cliente'] ?? 'N/A') ?></td>
+                                            <td>
+                                                <?php
+                                                    $productos = $order['productos'] ?? '';
+                                                    $productosList = is_string($productos) ? explode(',', $productos) : [];
+                                                    if (count($productosList) > 0) {
+                                                        echo count($productosList) . ' item(s)';
+                                                    } else {
+                                                        echo 'Sin productos';
+                                                    }
+                                                ?>
+                                            </td>
+                                            <td><?= isset($order['total']) ? '$' . number_format($order['total'], 0, ',', '.') : 'N/A' ?></td>
+                                            <td>
+                                                <?php
+                                                    $estado = $order['estado'] ?? '';
+                                                    $estadoClass = 'bg-secondary';
+                                                    
+                                                    switch ($estado) {
+                                                        case 'Nueva': $estadoClass = 'bg-primary'; break;
+                                                        case 'En Proceso': $estadoClass = 'bg-info text-dark'; break;
+                                                        case 'Enviada': $estadoClass = 'bg-success'; break;
+                                                        case 'Entregada': $estadoClass = 'bg-success'; break;
+                                                        case 'Pendiente de Pago': $estadoClass = 'bg-warning text-dark'; break;
+                                                        case 'Cancelada': $estadoClass = 'bg-danger'; break;
+                                                        case 'Devuelta': $estadoClass = 'bg-danger'; break;
+                                                    }
+                                                ?>
+                                                <span class="badge <?= $estadoClass ?>"><?= $this->escapeHtml($estado) ?></span>
+                                            </td>
+                                            <td>
+                                                <?php if (isset($order['transportista']) && !empty($order['transportista'])): ?>
+                                                    <span class="badge bg-light text-dark">
+                                                        <?= $this->escapeHtml($order['transportista']) ?>
+                                                        <?php if (isset($order['num_seguimiento']) && !empty($order['num_seguimiento'])): ?>
+                                                            <span class="fs-xs ms-1">#<?= $this->escapeHtml($order['num_seguimiento']) ?></span>
+                                                        <?php endif; ?>
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="badge bg-light text-dark">Sin asignar</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <div class="d-flex gap-1">
+                                                    <a href="<?= $this->url('application', ['action' => 'order-detail', 'id' => $order['id'], 'table' => $table]) ?>" class="btn btn-sm btn-outline-primary" title="Ver detalle">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                    <button type="button" class="btn btn-sm btn-outline-success update-status-btn" data-id="<?= $this->escapeHtml($order['id']) ?>" data-table="<?= $this->escapeHtml($table) ?>" title="Actualizar estado">
+                                                        <i class="fas fa-sync-alt"></i>
+                                                    </button>
+                                                    <button type="button" class="btn btn-sm btn-outline-info update-carrier-btn" data-id="<?= $this->escapeHtml($order['id']) ?>" data-table="<?= $this->escapeHtml($table) ?>" title="Asignar transportista">
+                                                        <i class="fas fa-truck"></i>
+                                                    </button>
+                                                    <button type="button" class="btn btn-sm btn-outline-secondary print-label-btn" data-id="<?= $this->escapeHtml($order['id']) ?>" data-table="<?= $this->escapeHtml($table) ?>" title="Imprimir etiqueta">
+                                                        <i class="fas fa-print"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <tr>
+                                        <td colspan="10" class="text-center py-4">
+                                            <div class="d-flex flex-column align-items-center">
+                                                <i class="fas fa-search fa-2x mb-3 text-muted"></i>
+                                                <h5 class="text-muted">No se encontraron órdenes</h5>
+                                                <p class="small text-muted">Intenta con otros filtros o elimina los filtros actuales</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Paginación -->
+                    <?php if (isset($totalPages) && $totalPages > 1): ?>
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <div>
+                                Mostrando <?= count($orders) ?> de <?= $total ?? 0 ?> órdenes
+                            </div>
+                            <nav aria-label="Page navigation">
+                                <ul class="pagination mb-0">
+                                    <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
+                                        <a class="page-link" href="<?= $this->url(null, [], ['query' => array_merge($this->params()->fromQuery(), ['page' => $page - 1])], true) ?>" aria-label="Previous">
+                                            <span aria-hidden="true">&laquo;</span>
+                                        </a>
+                                    </li>
+                                    
+                                    <?php
+                                    $start = max(1, $page - 2);
+                                    $end = min($totalPages, $page + 2);
+                                    
+                                    // Mostrar primera página si estamos lejos de ella
+                                    if ($start > 1): ?>
+                                        <li class="page-item">
+                                            <a class="page-link" href="<?= $this->url(null, [], ['query' => array_merge($this->params()->fromQuery(), ['page' => 1])], true) ?>">1</a>
+                                        </li>
+                                        <?php if ($start > 2): ?>
+                                            <li class="page-item disabled">
+                                                <span class="page-link">...</span>
+                                            </li>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
+                                    
+                                    <?php for ($i = $start; $i <= $end; $i++): ?>
+                                        <li class="page-item <?= $i == $page ? 'active' : '' ?>">
+                                            <a class="page-link" href="<?= $this->url(null, [], ['query' => array_merge($this->params()->fromQuery(), ['page' => $i])], true) ?>"><?= $i ?></a>
+                                        </li>
+                                    <?php endfor; ?>
+                                    
+                                    <?php
+                                    // Mostrar última página si estamos lejos de ella
+                                    if ($end < $totalPages): ?>
+                                        <?php if ($end < $totalPages - 1): ?>
+                                            <li class="page-item disabled">
+                                                <span class="page-link">...</span>
+                                            </li>
+                                        <?php endif; ?>
+                                        <li class="page-item">
+                                            <a class="page-link" href="<?= $this->url(null, [], ['query' => array_merge($this->params()->fromQuery(), ['page' => $totalPages])], true) ?>"><?= $totalPages ?></a>
+                                        </li>
+                                    <?php endif; ?>
+                                    
+                                    <li class="page-item <?= $page >= $totalPages ? 'disabled' : '' ?>">
+                                        <a class="page-link" href="<?= $this->url(null, [], ['query' => array_merge($this->params()->fromQuery(), ['page' => $page + 1])], true) ?>" aria-label="Next">
+                                            <span aria-hidden="true">&raquo;</span>
+                                        </a>
+                                    </li>
+                                </ul>
+                            </nav>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modales para las diversas funciones -->
+
+<!-- Modal de filtro por fecha -->
+<div class="modal fade" id="dateFilterModal" tabindex="-1" aria-labelledby="dateFilterModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="dateFilterModalLabel">Filtrar por fecha</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="dateFilterForm" method="get">
+                    <div class="mb-3">
+                        <label for="startDate" class="form-label">Fecha inicial</label>
+                        <input type="date" class="form-control" id="startDate" name="startDate" value="<?= isset($startDate) ? $this->escapeHtml($startDate) : '' ?>">
+                    </div>
+                    <div class="mb-3">
+                        <label for="endDate" class="form-label">Fecha final</label>
+                        <input type="date" class="form-control" id="endDate" name="endDate" value="<?= isset($endDate) ? $this->escapeHtml($endDate) : '' ?>">
+                    </div>
+                    
+                    <!-- Mantener filtros actuales -->
+                    <?php if (isset($search) && !empty($search)): ?>
+                        <input type="hidden" name="search" value="<?= $this->escapeHtml($search) ?>">
+                    <?php endif; ?>
+                    
+                    <?php if (isset($statusFilter) && !empty($statusFilter)): ?>
+                        <input type="hidden" name="status" value="<?= $this->escapeHtml($statusFilter) ?>">
+                    <?php endif; ?>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="applyDateFilter">Aplicar filtro</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de actualización de estado -->
+<div class="modal fade" id="updateStatusModal" tabindex="-1" aria-labelledby="updateStatusModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="updateStatusModalLabel">Actualizar estado de orden</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="updateStatusForm">
+                    <input type="hidden" name="orderId" id="statusOrderId">
+                    <input type="hidden" name="table" id="statusTable">
+                    
+                    <div class="mb-3">
+                        <label for="newStatus" class="form-label">Nuevo estado</label>
+                        <select class="form-select" id="newStatus" name="newStatus" required>
+                            <option value="" selected disabled>Selecciona un estado</option>
+                            <option value="Nueva">Nueva</option>
+                            <option value="En Proceso">En Proceso</option>
+                            <option value="Enviada">Enviada</option>
+                            <option value="Entregada">Entregada</option>
+                            <option value="Pendiente de Pago">Pendiente de Pago</option>
+                            <option value="Cancelada">Cancelada</option>
+                            <option value="Devuelta">Devuelta</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="statusNotes" class="form-label">Notas (opcional)</label>
+                        <textarea class="form-control" id="statusNotes" name="notes" rows="3" placeholder="Notas internas sobre el cambio de estado"></textarea>
+                    </div>
+                    
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="notifyCustomer" name="notifyCustomer" value="1">
+                        <label class="form-check-label" for="notifyCustomer">
+                            Notificar al cliente sobre el cambio de estado
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="saveStatusBtn">Guardar cambios</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de asignación de transportista -->
+<div class="modal fade" id="updateCarrierModal" tabindex="-1" aria-labelledby="updateCarrierModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="updateCarrierModalLabel">Asignar transportista</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="updateCarrierForm">
+                    <input type="hidden" name="orderId" id="carrierOrderId">
+                    <input type="hidden" name="table" id="carrierTable">
+                    
+                    <div class="mb-3">
+                        <label for="newCarrier" class="form-label">Transportista</label>
+                        <select class="form-select" id="newCarrier" name="newCarrier" required>
+                            <option value="" selected disabled>Selecciona un transportista</option>
+                            <option value="Chilexpress">Chilexpress</option>
+                            <option value="Starken">Starken</option>
+                            <option value="Correos de Chile">Correos de Chile</option>
+                            <option value="DHL">DHL</option>
+                            <option value="Fedex">Fedex</option>
+                            <option value="Bluexpress">Bluexpress</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="trackingNumber" class="form-label">Número de seguimiento</label>
+                        <input type="text" class="form-control" id="trackingNumber" name="trackingNumber" placeholder="Ingresa el número de seguimiento">
+                    </div>
+                    
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="updateStatus" name="updateStatus" value="1" checked>
+                        <label class="form-check-label" for="updateStatus">
+                            Actualizar estado a "Enviada"
+                        </label>
+                    </div>
+                    
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="notifyCustomerCarrier" name="notifyCustomer" value="1" checked>
+                        <label class="form-check-label" for="notifyCustomerCarrier">
+                            Notificar al cliente
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="saveCarrierBtn">Guardar cambios</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript para la funcionalidad de la página -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Inicialización de selectores y elementos DOM
+        const filterDatesBtn = document.getElementById('filterDatesBtn');
+        const dateFilterModal = new bootstrap.Modal(document.getElementById('dateFilterModal'));
+        const applyDateFilter = document.getElementById('applyDateFilter');
+        
+        const statusFilterSelect = document.getElementById('statusFilter');
+        const marketplaceFilterSelect = document.getElementById('marketplaceFilter');
+        
+        const updateStatusBtns = document.querySelectorAll('.update-status-btn');
+        const updateStatusModal = new bootstrap.Modal(document.getElementById('updateStatusModal'));
+        
+        const updateCarrierBtns = document.querySelectorAll('.update-carrier-btn');
+        const updateCarrierModal = new bootstrap.Modal(document.getElementById('updateCarrierModal'));
+        
+        const selectAllCheckbox = document.getElementById('selectAllOrders');
+        const orderCheckboxes = document.querySelectorAll('.order-checkbox');
+        
+        // Funcionalidad de filtro por fecha
+        if (filterDatesBtn) {
+            filterDatesBtn.addEventListener('click', function() {
+                dateFilterModal.show();
+            });
+        }
+        
+        if (applyDateFilter) {
+            applyDateFilter.addEventListener('click', function() {
+                document.getElementById('dateFilterForm').submit();
+            });
+        }
+        
+        // Funcionalidad de filtros select
+        if (statusFilterSelect) {
+            statusFilterSelect.addEventListener('change', function() {
+                const currentUrl = new URL(window.location.href);
+                
+                if (this.value) {
+                    currentUrl.searchParams.set('status', this.value);
+                } else {
+                    currentUrl.searchParams.delete('status');
+                }
+                
+                currentUrl.searchParams.set('page', 1); // Reset page
+                window.location.href = currentUrl.toString();
+            });
+        }
+        
+        if (marketplaceFilterSelect) {
+            marketplaceFilterSelect.addEventListener('change', function() {
+                const currentUrl = new URL(window.location.href);
+                
+                if (this.value) {
+                    currentUrl.searchParams.set('marketplace', this.value);
+                } else {
+                    currentUrl.searchParams.delete('marketplace');
+                }
+                
+                currentUrl.searchParams.set('page', 1); // Reset page
+                window.location.href = currentUrl.toString();
+            });
+        }
+        
+        // Funcionalidad de selección de órdenes
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', function() {
+                orderCheckboxes.forEach(checkbox => {
+                    checkbox.checked = this.checked;
+                });
+            });
+        }
+        
+        // Funcionalidad de actualización de estado
+        updateStatusBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const orderId = this.dataset.id;
+                const table = this.dataset.table;
+                
+                document.getElementById('statusOrderId').value = orderId;
+                document.getElementById('statusTable').value = table;
+                
+                updateStatusModal.show();
+            });
+        });
+        
+        if (document.getElementById('saveStatusBtn')) {
+            document.getElementById('saveStatusBtn').addEventListener('click', function() {
+                // Aquí iría el código para enviar la solicitud AJAX para actualizar el estado
+                alert('Funcionalidad en desarrollo: Actualizar estado');
+                updateStatusModal.hide();
+            });
+        }
+        
+        // Funcionalidad de asignación de transportista
+        updateCarrierBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const orderId = this.dataset.id;
+                const table = this.dataset.table;
+                
+                document.getElementById('carrierOrderId').value = orderId;
+                document.getElementById('carrierTable').value = table;
+                
+                updateCarrierModal.show();
+            });
+        });
+        
+        if (document.getElementById('saveCarrierBtn')) {
+            document.getElementById('saveCarrierBtn').addEventListener('click', function() {
+                // Aquí iría el código para enviar la solicitud AJAX para actualizar el transportista
+                alert('Funcionalidad en desarrollo: Asignar transportista');
+                updateCarrierModal.hide();
+            });
+        }
+        
+        // Funcionalidad de botones de acción masiva
+        if (document.getElementById('printLabelsBtn')) {
+            document.getElementById('printLabelsBtn').addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                const selectedOrders = getSelectedOrders();
+                if (selectedOrders.length === 0) {
+                    alert('Por favor, selecciona al menos una orden para imprimir etiquetas.');
+                    return;
+                }
+                
+                // Aquí iría el código para imprimir etiquetas de las órdenes seleccionadas
+                alert(`Funcionalidad en desarrollo: Imprimir ${selectedOrders.length} etiquetas`);
+            });
+        }
+        
+        if (document.getElementById('exportCsvBtn')) {
+            document.getElementById('exportCsvBtn').addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                const selectedOrders = getSelectedOrders();
+                if (selectedOrders.length === 0) {
+                    alert('Por favor, selecciona al menos una orden para exportar.');
+                    return;
+                }
+                
+                // Aquí iría el código para exportar a CSV
+                alert(`Funcionalidad en desarrollo: Exportar ${selectedOrders.length} órdenes a CSV`);
+            });
+        }
+        
+        if (document.getElementById('exportExcelBtn')) {
+            document.getElementById('exportExcelBtn').addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                const selectedOrders = getSelectedOrders();
+                if (selectedOrders.length === 0) {
+                    alert('Por favor, selecciona al menos una orden para exportar.');
+                    return;
+                }
+                
+                // Aquí iría el código para exportar a Excel
+                alert(`Funcionalidad en desarrollo: Exportar ${selectedOrders.length} órdenes a Excel`);
+            });
+        }
+        
+        if (document.getElementById('bulkUpdateBtn')) {
+            document.getElementById('bulkUpdateBtn').addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                const selectedOrders = getSelectedOrders();
+                if (selectedOrders.length === 0) {
+                    alert('Por favor, selecciona al menos una orden para actualizar.');
+                    return;
+                }
+                
+                // Aquí iría el código para actualización masiva
+                alert(`Funcionalidad en desarrollo: Actualización masiva de ${selectedOrders.length} órdenes`);
+            });
+        }
+        
+        // Funcionalidad de impresión de etiquetas individuales
+        document.querySelectorAll('.print-label-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const orderId = this.dataset.id;
+                const table = this.dataset.table;
+                
+                // Aquí iría el código para imprimir la etiqueta individual
+                alert(`Funcionalidad en desarrollo: Imprimir etiqueta para la orden ${orderId}`);
+            });
+        });
+        
+        // Función auxiliar para obtener las órdenes seleccionadas
+        function getSelectedOrders() {
+            const selected = [];
+            document.querySelectorAll('.order-checkbox:checked').forEach(checkbox => {
+                selected.push({
+                    id: checkbox.value,
+                    marketplace: checkbox.dataset.marketplace
+                });
+            });
+            return selected;
+        }
+    });
+</script>
