@@ -1,0 +1,175 @@
+<?php
+// En module/Application/view/layout/login.phtml
+?>
+<?= $this->doctype() ?>
+<html lang="es">
+    <head>
+        <meta charset="utf-8">
+        <?= $this->headTitle('Iniciar Sesión - Lodoro Analytics')->setSeparator(' - ')->setAutoEscape(false) ?>
+
+        <?= $this->headMeta()
+            ->appendName('viewport', 'width=device-width, initial-scale=1.0')
+            ->appendHttpEquiv('X-UA-Compatible', 'IE=edge')
+        ?>
+
+        <!-- Favicon y estilos base -->
+        <?= $this->headLink([
+                'rel'  => 'shortcut icon',
+                'type' => 'image/vnd.microsoft.icon',
+                'href' => $this->basePath() . '/img/favicon.ico'
+            ])
+            ->prependStylesheet($this->basePath('css/style.css'))
+            ->prependStylesheet($this->basePath('css/bootstrap.min.css'))
+        ?>
+
+        <!-- Font Awesome para iconos -->
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        
+        <!-- Google Fonts - Inter -->
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
+
+        <!-- Estilos personalizados -->
+        <style>
+            :root {
+                --primary: #4361ee;
+                --secondary: #6c757d;
+                --success: #4caf50;
+                --danger: #f44336;
+                --warning: #ff9800;
+                --info: #2196f3;
+                --dark: #1e2843;
+                --darker: #151c30;
+                --light: #f8f9fa;
+                --white: #ffffff;
+                --body-bg: #f5f7fb;
+                --text-main: #3b3f5c;
+                --text-muted: #6c757d;
+                --text-light: #cbd5e1;
+                --border-color: #e0e6ed;
+                --shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+                --transition-speed: 0.3s;
+                --font-family: 'Inter', sans-serif;
+            }
+
+            body {
+                font-family: var(--font-family);
+                background-color: var(--body-bg);
+                margin: 0;
+                padding: 0;
+                overflow-x: hidden;
+            }
+            
+            /* Estilos para la página de login */
+            .login-container {
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background-color: var(--body-bg);
+                padding: 1.5rem;
+            }
+            
+            .login-card {
+                width: 100%;
+                max-width: 500px;
+                border-radius: 10px;
+                box-shadow: var(--shadow);
+                overflow: hidden;
+                background-color: var(--white);
+            }
+            
+            .login-header {
+                padding: 2rem;
+                background: linear-gradient(120deg, var(--dark) 0%, var(--primary) 100%);
+                color: white;
+                text-align: center;
+            }
+            
+            .login-logo {
+                font-size: 2rem;
+                font-weight: 700;
+                margin-bottom: 0.5rem;
+            }
+            
+            .login-subtitle {
+                font-size: 1rem;
+                opacity: 0.8;
+            }
+            
+            .login-body {
+                padding: 2rem;
+            }
+            
+            .login-form .form-group {
+                margin-bottom: 1.5rem;
+            }
+            
+            .login-form label {
+                display: block;
+                margin-bottom: 0.5rem;
+                color: var(--text-main);
+                font-weight: 500;
+            }
+            
+            .login-form input {
+                width: 100%;
+                padding: 0.75rem 1rem;
+                border: 1px solid var(--border-color);
+                border-radius: 5px;
+                font-size: 1rem;
+                transition: all 0.3s ease;
+            }
+            
+            .login-form input:focus {
+                border-color: var(--primary);
+                box-shadow: 0 0 0 2px rgba(67, 97, 238, 0.2);
+                outline: none;
+            }
+            
+            .login-form .form-check {
+                display: flex;
+                align-items: center;
+            }
+            
+            .login-form .form-check input {
+                width: auto;
+                margin-right: 0.5rem;
+            }
+            
+            .login-btn {
+                width: 100%;
+                padding: 0.75rem;
+                background-color: var(--primary);
+                color: white;
+                font-size: 1rem;
+                font-weight: 500;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+                transition: all 0.3s ease;
+            }
+            
+            .login-btn:hover {
+                background-color: #3854d1;
+            }
+            
+            .login-footer {
+                padding: 1rem 2rem;
+                text-align: center;
+                border-top: 1px solid var(--border-color);
+                color: var(--text-muted);
+                font-size: 0.875rem;
+            }
+        </style>
+
+        <?= $this->headScript() ?>
+    </head>
+    <body>
+        <!-- Contenido de la página de login -->
+        <?= $this->content ?>
+
+        <?= $this->inlineScript()
+            ->prependFile($this->basePath('js/bootstrap.min.js'))
+        ?>
+    </body>
+</html>
