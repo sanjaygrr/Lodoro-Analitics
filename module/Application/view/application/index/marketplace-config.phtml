@@ -421,7 +421,7 @@
 }
 </style>
 
-<!-- JavaScript para la página -->
+<!-- JavaScript para la página con mejoras para prueba de conexión -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Función para alternar visibilidad de contraseñas/tokens
@@ -492,11 +492,24 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.test-connection').forEach(function(button) {
         button.addEventListener('click', function() {
             const id = this.getAttribute('data-id');
-            testConnection(id);
+            const configElement = button.closest('.card') || button.closest('tr');
+            
+            // Obtener el nombre del marketplace directamente de la UI
+            let marketplace = '';
+            const cardHeader = configElement.querySelector('.card-header h5');
+            const tableCell = configElement.querySelector('td:nth-child(2)');
+            
+            if (cardHeader) {
+                marketplace = cardHeader.textContent.trim();
+            } else if (tableCell) {
+                marketplace = tableCell.textContent.trim();
+            }
+            
+            testConnection(id, marketplace);
         });
     });
     
-    function testConnection(id) {
+    function testConnection(id, marketplace) {
         // Mostrar modal con loader
         const connectionTestModal = new bootstrap.Modal(document.getElementById('connectionTestModal'));
         connectionTestModal.show();
@@ -505,8 +518,24 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('connectionTestLoading').classList.remove('d-none');
         document.getElementById('connectionTestResult').classList.add('d-none');
         
+        // Determinar si se trata de un marketplace especial para proceso especial
+        let specialParam = '';
+        
+        // Verificar cada marketplace por nombre
+        if (marketplace.toLowerCase().includes('walmart')) {
+            specialParam = 'walmart';
+        } else if (marketplace.toLowerCase().includes('mercadolibre')) {
+            specialParam = 'mercadolibre';
+        }
+        
+        // Construir la URL con parámetros adicionales si es necesario
+        let finalUrl = `<?= $this->url('application', ['action' => 'test-connection']) ?>?id=${id}`;
+        if (specialParam) {
+            finalUrl += `&special=${specialParam}`;
+        }
+        
         // Realizar solicitud AJAX
-        fetch(`<?= $this->url('application', ['action' => 'test-connection']) ?>?id=${id}`)
+        fetch(finalUrl)
             .then(response => response.json())
             .then(data => {
                 // Ocultar cargando y mostrar resultados
@@ -520,14 +549,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 const statusCodeElement = document.getElementById('connectionTestStatusCode');
                 const responseBodyElement = document.getElementById('connectionTestResponseBody');
                 
+                // Limpiar clases anteriores
+                alertElement.classList.remove('alert-success', 'alert-danger');
+                
                 // Configurar el tipo de alerta y el ícono
                 if (data.success) {
                     alertElement.classList.add('alert-success');
-                    alertElement.classList.remove('alert-danger');
                     iconElement.innerHTML = '<i class="fas fa-check-circle fa-2x"></i>';
                 } else {
                     alertElement.classList.add('alert-danger');
-                    alertElement.classList.remove('alert-success');
                     iconElement.innerHTML = '<i class="fas fa-exclamation-circle fa-2x"></i>';
                 }
                 
@@ -545,8 +575,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 const iconElement = document.getElementById('connectionTestIcon');
                 const messageElement = document.getElementById('connectionTestMessage');
                 
-                alertElement.classList.add('alert-danger');
                 alertElement.classList.remove('alert-success');
+                alertElement.classList.add('alert-danger');
                 iconElement.innerHTML = '<i class="fas fa-exclamation-triangle fa-2x"></i>';
                 messageElement.textContent = 'Error al realizar la prueba: ' + error.message;
                 

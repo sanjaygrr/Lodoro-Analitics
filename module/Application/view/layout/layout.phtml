@@ -79,13 +79,12 @@
                 z-index: 1000;
                 box-shadow: var(--shadow);
                 overflow-y: auto;
-                width: 70px; /* Estado inicial colapsado */
+                width: 240px; /* Estado expandido por defecto */
             }
 
             /* Control de anchos */
             .sidebar-collapsed {
-                width: 70px !important;
-                overflow: visible;
+                width: 80px !important;
             }
 
             .sidebar-expanded {
@@ -114,9 +113,6 @@
                 color: var(--primary);
                 width: 30px;
                 text-align: center;
-                display: inline-block !important;
-                visibility: visible !important;
-                opacity: 1 !important;
             }
 
             .logo-text {
@@ -124,32 +120,13 @@
                 font-size: 1.25rem;
                 font-weight: 600;
                 white-space: nowrap;
-                opacity: 0;
                 transition: opacity var(--transition-speed) ease;
             }
 
-            .sidebar-expanded .logo-text {
-                opacity: 1;
-            }
-
-            .toggle-btn {
-                margin-left: auto;
-                background: transparent;
-                border: none;
-                color: var(--text-light);
-                cursor: pointer;
-                width: 28px;
-                height: 28px;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                transition: all var(--transition-speed) ease;
-            }
-
-            .toggle-btn:hover {
-                background-color: rgba(255, 255, 255, 0.1);
-                color: var(--white);
+            .sidebar-collapsed .logo-text {
+                opacity: 0;
+                width: 0;
+                display: none;
             }
 
             /* Menú de navegación */
@@ -165,13 +142,16 @@
                 text-transform: uppercase;
                 color: var(--text-light);
                 font-weight: 600;
-                opacity: 0;
-                transition: opacity var(--transition-speed) ease;
                 white-space: nowrap;
+                transition: opacity var(--transition-speed) ease;
             }
 
-            .sidebar-expanded .menu-header {
-                opacity: 1;
+            .sidebar-collapsed .menu-header {
+                opacity: 0;
+                height: 0;
+                padding: 0;
+                margin: 0;
+                overflow: hidden;
             }
 
             .nav-item {
@@ -182,15 +162,13 @@
             .nav-link {
                 display: flex;
                 align-items: center;
-                padding: 10px;
+                padding: 0.7rem 1rem;
                 color: var(--text-light);
                 text-decoration: none;
                 position: relative;
                 transition: all var(--transition-speed) ease;
                 border-radius: 0.25rem;
                 margin: 0 0.5rem;
-                overflow: hidden;
-                padding-left: 50px;
             }
 
             .nav-link:hover, .nav-link.active {
@@ -213,86 +191,25 @@
                 font-size: 1.25rem;
                 min-width: 30px;
                 text-align: center;
-                display: inline-block !important;
-                visibility: visible !important;
-                opacity: 1 !important;
+                margin-right: 10px;
+            }
+
+            .sidebar-collapsed .nav-icon {
+                margin-right: 0;
             }
 
             .nav-text {
-                margin-left: 0.75rem;
-                white-space: nowrap;
-                opacity: 0;
-                transition: opacity var(--transition-speed) ease;
-                display: inline-block;
                 font-weight: 500;
-                margin-right: 30px;
+                white-space: nowrap;
+                transition: opacity var(--transition-speed) ease;
             }
 
-            .sidebar-expanded .nav-text {
-                opacity: 1;
-                visibility: visible;
+            .sidebar-collapsed .nav-text {
+                opacity: 0;
+                width: 0;
+                display: none;
             }
             
-            /* Estado expandido para mostrar todos los títulos */
-            .sidebar-expanded .menu-header,
-            .sidebar-expanded .nav-text,
-            .sidebar-expanded .badge-new {
-                opacity: 1;
-                visibility: visible;
-                display: inline-block;
-            }
-
-            /* Tooltip estilizado */
-            .tooltip-nav {
-                position: absolute;
-                left: 70px;
-                top: 50%;
-                transform: translateY(-50%);
-                background-color: rgba(0, 0, 0, 0.9);
-                color: white;
-                padding: 0.5rem 0.75rem;
-                border-radius: 0.25rem;
-                font-size: 0.8rem;
-                white-space: nowrap;
-                pointer-events: none;
-                opacity: 0;
-                visibility: hidden;
-                z-index: 9999;
-                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-            }
-
-            .tooltip-nav::before {
-                content: '';
-                position: absolute;
-                right: 100%;
-                top: 50%;
-                transform: translateY(-50%);
-                border-width: 6px;
-                border-style: solid;
-                border-color: transparent rgba(0, 0, 0, 0.9) transparent transparent;
-            }
-
-            .sidebar-collapsed .nav-item:hover .tooltip-nav {
-                opacity: 1;
-                visibility: visible;
-                left: 75px;
-            }
-
-            .badge-new {
-                background-color: var(--primary);
-                color: white;
-                padding: 0.15rem 0.5rem;
-                border-radius: 10px;
-                font-size: 0.65rem;
-                margin-left: auto;
-                opacity: 0;
-                transition: opacity var(--transition-speed) ease;
-            }
-
-            .sidebar-expanded .badge-new {
-                opacity: 1;
-            }
-
             /* Insignia de notificación */
             .notification-badge {
                 position: absolute;
@@ -513,6 +430,7 @@
                 justify-content: center;
                 flex-shrink: 0;
                 margin-top: auto;
+                margin-bottom: 10px;
             }
             
             .toggle-btn-bottom {
@@ -538,20 +456,26 @@
                 margin-right: 0.75rem;
                 min-width: 16px;
                 text-align: center;
-                display: inline-block !important;
-                visibility: visible !important;
-                opacity: 1 !important;
+            }
+
+            .sidebar-collapsed .toggle-btn-bottom {
+                justify-content: center;
+            }
+            
+            .sidebar-collapsed .toggle-btn-bottom i {
+                margin-right: 0;
             }
             
             .toggle-text {
                 font-size: 0.875rem;
                 white-space: nowrap;
-                opacity: 0;
                 transition: opacity var(--transition-speed) ease;
             }
             
-            .sidebar-expanded .toggle-text {
-                opacity: 1;
+            .sidebar-collapsed .toggle-text {
+                opacity: 0;
+                width: 0;
+                display: none;
             }
             
             /* Panel de usuario */
@@ -569,31 +493,24 @@
                 height: 36px;
                 border-radius: 50%;
                 background-color: var(--primary);
-                display: flex !important;
+                display: flex;
                 align-items: center;
                 justify-content: center;
                 color: white;
                 font-weight: 600;
                 flex-shrink: 0;
-                visibility: visible !important;
-                opacity: 1 !important;
-            }
-
-            .user-avatar i {
-                display: inline-block !important;
-                visibility: visible !important;
-                opacity: 1 !important;
             }
 
             .user-info {
                 margin-left: 0.75rem;
-                opacity: 0;
-                transition: opacity var(--transition-speed) ease;
                 overflow: hidden;
+                transition: opacity var(--transition-speed) ease;
             }
-
-            .sidebar-expanded .user-info {
-                opacity: 1;
+            
+            .sidebar-collapsed .user-info {
+                opacity: 0;
+                width: 0;
+                display: none;
             }
 
             .user-name {
@@ -609,20 +526,31 @@
                 white-space: nowrap;
             }
 
+            /* Botón de hamburguesa para móviles */
+            .mobile-menu-toggle {
+                display: none;
+                background: transparent;
+                border: none;
+                color: var(--text-main);
+                font-size: 1.5rem;
+                cursor: pointer;
+                margin-right: 1rem;
+            }
+
             /* Contenido principal */
             .main-content {
                 flex: 1;
-                margin-left: 70px;
+                margin-left: 240px;
                 padding: 1.5rem;
                 transition: margin-left var(--transition-speed) ease;
                 overflow-x: hidden;
-                max-width: calc(100% - 70px);
+                max-width: calc(100% - 240px);
                 box-sizing: border-box;
             }
 
-            .sidebar-expanded ~ .main-content {
-                margin-left: 240px;
-                max-width: calc(100% - 240px);
+            .sidebar-collapsed ~ .main-content {
+                margin-left: 80px;
+                max-width: calc(100% - 80px);
             }
 
             /* Navbar superior */
@@ -679,25 +607,19 @@
                 position: relative;
             }
 
-            .nav-menu .nav-item.has-submenu .nav-link {
-                padding-right: 45px !important;
-            }
-
-            .nav-menu .nav-item.has-submenu .nav-text {
-                margin-right: 40px !important;
-            }
-
             .submenu-arrow {
                 position: absolute;
-                right: 2px !important;
+                right: 15px;
                 top: 50%;
                 transform: translateY(-50%);
                 transition: transform var(--transition-speed) ease;
-                z-index: 2;
                 font-size: 0.8rem;
-                display: inline-block !important;
-                visibility: visible !important;
-                opacity: 1 !important;
+            }
+
+            .sidebar-collapsed .submenu-arrow {
+                opacity: 0;
+                visibility: hidden;
+                display: none;
             }
 
             .has-submenu.open .submenu-arrow {
@@ -746,236 +668,286 @@
                 display: none;
             }
 
-            .has-submenu .tooltip-nav {
-                width: auto;
-                max-width: 200px;
-            }
-
-            /* Mejoras para el sidebar colapsado */
-            #sidebar.sidebar-collapsed .nav-item {
-                margin: 5px 0;
-                display: flex;
-                justify-content: center;
-                position: relative;
-            }
-
-            #sidebar.sidebar-collapsed .nav-link {
-                padding: 10px 0;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                width: 100%;
-                height: auto;
-                margin: 5px 0;
-                border-radius: 0;
-            }
-
-            #sidebar.sidebar-collapsed .nav-icon {
-                display: inline-block !important;
-                visibility: visible !important;
-                opacity: 1 !important;
-                font-size: 18px;
-                margin: 0 auto;
-            }
-
-            #sidebar.sidebar-collapsed .toggle-btn-bottom {
-                background-color: rgba(255, 255, 255, 0.15);
-                width: 100%;
-                padding: 10px 0;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                margin: 0 auto;
-            }
-
-            #sidebar.sidebar-collapsed .toggle-btn-bottom i {
-                display: inline-block !important;
-                visibility: visible !important;
-                opacity: 1 !important;
-                margin: 0;
-                font-size: 16px;
+            /* Tooltips para menú colapsado */
+            .nav-tooltip {
+                position: absolute;
+                left: 80px;
+                top: 50%;
+                transform: translateY(-50%);
+                background-color: rgba(0, 0, 0, 0.8);
                 color: white;
+                padding: 0.3rem 0.6rem;
+                border-radius: 0.25rem;
+                font-size: 0.8rem;
+                white-space: nowrap;
+                pointer-events: none;
+                opacity: 0;
+                visibility: hidden;
+                transition: opacity 0.2s ease;
+                z-index: 1001;
             }
 
-            #sidebar.sidebar-collapsed .user-avatar {
-                display: flex !important;
-                visibility: visible !important;
-                opacity: 1 !important;
+            .sidebar-collapsed .nav-item:hover .nav-tooltip {
+                opacity: 1;
+                visibility: visible;
             }
 
-            /* Eliminar efectos que puedan estar causando problemas */
-            #sidebar.sidebar-collapsed .nav-link:hover {
-                transform: none;
-                box-shadow: none;
-                background-color: rgba(255, 255, 255, 0.1);
+            /* Dropdown del usuario */
+            .user-dropdown {
+                position: relative;
+                display: inline-block;
+            }
+            
+            .user-dropdown-menu {
+                position: absolute;
+                right: 0;
+                top: 100%;
+                min-width: 180px;
+                background-color: var(--white);
+                box-shadow: var(--shadow);
+                border-radius: 0.5rem;
+                overflow: hidden;
+                z-index: 1000;
+                display: none;
+            }
+            
+            .user-dropdown-menu.show {
+                display: block;
+            }
+            
+            .user-dropdown-item {
+                padding: 0.75rem 1rem;
+                display: flex;
+                align-items: center;
+                color: var(--text-main);
+                text-decoration: none;
+                transition: all 0.2s ease;
+            }
+            
+            .user-dropdown-item:hover {
+                background-color: rgba(67, 97, 238, 0.05);
+                color: var(--primary);
+            }
+            
+            .user-dropdown-item i {
+                margin-right: 0.75rem;
+                font-size: 1rem;
+                color: var(--text-muted);
+            }
+            
+            .user-dropdown-divider {
+                height: 1px;
+                background-color: var(--border-color);
+                margin: 0;
+            }
+
+            /* Overlay para sidebar en móviles */
+            .sidebar-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.5);
+                z-index: 999;
+                display: none;
+                opacity: 0;
+                transition: opacity var(--transition-speed) ease;
+            }
+            
+            .sidebar-overlay.show {
+                display: block;
+                opacity: 1;
+            }
+
+            /* Estilos de la página de login */
+            .login-container {
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background-color: var(--body-bg);
+                padding: 1.5rem;
+            }
+            
+            .login-card {
+                width: 100%;
+                max-width: 500px;
+                border-radius: 10px;
+                box-shadow: var(--shadow);
+                overflow: hidden;
+                background-color: var(--white);
+            }
+            
+            .login-header {
+                padding: 2rem;
+                background: linear-gradient(120deg, var(--dark) 0%, var(--primary) 100%);
+                color: white;
+                text-align: center;
+            }
+            
+            .login-logo {
+                font-size: 2rem;
+                font-weight: 700;
+                margin-bottom: 0.5rem;
+            }
+            
+            .login-subtitle {
+                font-size: 1rem;
+                opacity: 0.8;
+            }
+            
+            .login-body {
+                padding: 2rem;
+            }
+            
+            .login-form .form-group {
+                margin-bottom: 1.5rem;
+            }
+            
+            .login-form label {
+                display: block;
+                margin-bottom: 0.5rem;
+                color: var(--text-main);
+                font-weight: 500;
+            }
+            
+            .login-form input {
+                width: 100%;
+                padding: 0.75rem 1rem;
+                border: 1px solid var(--border-color);
+                border-radius: 5px;
+                font-size: 1rem;
+                transition: all 0.3s ease;
+            }
+            
+            .login-form input:focus {
+                border-color: var(--primary);
+                box-shadow: 0 0 0 2px rgba(67, 97, 238, 0.2);
+                outline: none;
+            }
+            
+            .login-form .form-check {
+                display: flex;
+                align-items: center;
+            }
+            
+            .login-form .form-check input {
+                width: auto;
+                margin-right: 0.5rem;
+            }
+            
+            .login-btn {
+                width: 100%;
+                padding: 0.75rem;
+                background-color: var(--primary);
+                color: white;
+                font-size: 1rem;
+                font-weight: 500;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+                transition: all 0.3s ease;
+            }
+            
+            .login-btn:hover {
+                background-color: #3854d1;
+            }
+            
+            .login-footer {
+                padding: 1rem 2rem;
+                text-align: center;
+                border-top: 1px solid var(--border-color);
+                color: var(--text-muted);
+                font-size: 0.875rem;
             }
 
             /* Responsividad */
             @media (max-width: 992px) {
-                #sidebar {
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    height: 100%;
-                    z-index: 1000;
-                    transform: translateX(-100%);
-                    transition: transform var(--transition-speed) ease, width var(--transition-speed) ease;
-                    width: 240px !important;
-                }
-                
-                #sidebar.sidebar-collapsed,
-                #sidebar.sidebar-expanded {
-                    transform: translateX(0);
-                }
-                
-                .main-content {
-                    margin-left: 0 !important;
-                    max-width: 100%;
-                }
-                
-                .overlay {
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    background-color: rgba(0, 0, 0, 0.5);
-                    z-index: 999;
-                    display: none;
-                }
-                
-                .sidebar-expanded ~ .overlay {
-                    display: block;
+                /* Botón de hamburguesa visible en móviles */
+                .mobile-menu-toggle {
+                    display: flex;
+                    margin-right: 0.5rem;
                 }
 
-                .notifications-panel {
-                    width: 100%;
-                    max-width: 320px;
+                /* Título de página más pequeño en móvil */
+                .page-title-wrapper {
+                    display: flex;
+                    align-items: center;
                 }
-                
-                .top-navbar {
-                    padding: 0.75rem 1rem;
-                }
-                
+
                 .page-title {
                     font-size: 1.1rem;
                 }
 
-                .submenu {
-                    background-color: rgba(0, 0, 0, 0.3);
+                /* Ocultar sidebar por defecto en móviles */
+                #sidebar {
+                    width: 280px !important;
+                    transform: translateX(-100%);
+                    left: 0;
+                    box-shadow: 5px 0 15px rgba(0, 0, 0, 0.2);
                 }
-                
-                .submenu-link {
-                    padding-left: 2.5rem;
+
+                /* Sidebar visible al activarse */
+                #sidebar.mobile-open {
+                    transform: translateX(0);
                 }
-                
-                #sidebar.sidebar-collapsed .nav-link {
+
+                /* Ajustar contenido principal */
+                .main-content {
+                    margin-left: 0 !important;
+                    max-width: 100% !important;
+                    padding: 1rem;
+                }
+
+                /* Mostrar todos los elementos en móvil */
+                .sidebar-collapsed .menu-header,
+                .sidebar-collapsed .nav-text,
+                .sidebar-collapsed .logo-text,
+                .sidebar-collapsed .toggle-text,
+                .sidebar-collapsed .user-info,
+                .sidebar-collapsed .submenu-arrow {
+                    opacity: 1;
+                    display: block;
+                    width: auto;
+                }
+
+                .nav-text, .logo-text, .toggle-text, .user-info {
+                    opacity: 1 !important;
+                    display: block !important;
+                    width: auto !important;
+                }
+
+                /* Ajustar navbar superior */
+                .top-navbar {
+                    padding: 0.75rem 1rem;
+                }
+
+                /* Ajustar panel de notificaciones */
+                .notifications-panel {
                     width: 100%;
+                    max-width: 300px;
                 }
-            }
 
-            /* CORRECCIÓN CRÍTICA PARA NAVBAR - AÑADIR AL FINAL DE LOS ESTILOS */
-
-            /* Eliminar límites de ancho que pueden estar causando problemas */
-            #sidebar {
-                width: 70px !important;
-                min-width: 70px !important;
-                max-width: 70px !important;
-                overflow-x: hidden !important;
-                overflow-y: auto !important;
-            }
-
-            #sidebar.sidebar-expanded {
-                width: 240px !important;
-                min-width: 240px !important;
-                max-width: 240px !important;
-            }
-
-            /* Forzar que los iconos sean visibles en el navbar colapsado */
-            #sidebar .fas,
-            #sidebar i.fa,
-            #sidebar i.fas,
-            #sidebar i.fa-chart-line,
-            #sidebar i.fa-chart-bar,
-            #sidebar i.fa-shopping-cart,
-            #sidebar i.fa-plug,
-            #sidebar i.fa-cog,
-            #sidebar i.fa-chevron-right,
-            #sidebar i.fa-chevron-left,
-            #sidebar i.fa-angle-right,
-            #sidebar i.fa-user {
-                display: inline-block !important;
-                visibility: visible !important;
-                opacity: 1 !important;
-                color: white !important;
-                font-size: 1.2rem !important;
-            }
-
-            /* Eliminar cualquier padding o margen que pueda estar afectando el posicionamiento */
-            #sidebar .nav-link {
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                padding: 10px 5px !important;
-                margin: 5px 5px !important;
-            }
-
-            /* Mejorar la visibilidad del toggle button */
-            #sidebar .toggle-btn-bottom {
-                background-color: rgba(255, 255, 255, 0.2) !important;
-                border-radius: 4px !important;
-                padding: 10px !important;
-                margin: 10px 5px !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-            }
-
-            /* Asegurar que el avatar del usuario sea visible */
-            #sidebar .user-avatar {
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                width: 40px !important;
-                height: 40px !important;
-                margin: 0 auto !important;
-            }
-
-            /* Evitar que los textos ocupen espacio en modo colapsado */
-            #sidebar.sidebar-collapsed .nav-text,
-            #sidebar.sidebar-collapsed .logo-text,
-            #sidebar.sidebar-collapsed .toggle-text,
-            #sidebar.sidebar-collapsed .user-info,
-            #sidebar.sidebar-collapsed .menu-header {
-                display: none !important;
-            }
-
-            /* Asegurar que la estructura básica del menú funcione */
-            #sidebar .nav-menu {
-                padding: 10px 0 !important;
-            }
-
-            #sidebar .nav-item {
-                margin: 8px 0 !important;
-                text-align: center !important;
-            }
-
-            /* Eliminar toda posibilidad de scroll horizontal */
-            body, html, #sidebar, .app-container, .main-content {
-                overflow-x: hidden !important;
+                /* Ocultar tooltips en móvil */
+                .nav-tooltip {
+                    display: none !important;
+                }
             }
         </style>
 
         <?= $this->headScript() ?>
     </head>
     <body>
+        <?php if ($this->layout()->getTemplate() !== 'layout/login'): ?>
+        <!-- Contenido normal del layout para páginas que no son login -->
         <div class="app-container">
             <!-- Sidebar / Navbar lateral -->
-            <div id="sidebar" class="sidebar-collapsed">
+            <div id="sidebar" class="sidebar-expanded">
                 <div class="sidebar-header">
                     <a href="<?= $this->url('application', ['action' => 'index']) ?>" class="logo-link">
                         <i class="fas fa-chart-line logo-icon"></i>
-                        <div class="logo-text">Lodoro Analytics</div>
+                        <span class="logo-text">Lodoro Analytics</span>
                     </a>
                 </div>
                 
@@ -987,9 +959,9 @@
                         <a href="<?= $this->url('application', ['action' => 'dashboard']) ?>" class="nav-link">
                             <i class="fas fa-chart-bar nav-icon"></i>
                             <span class="nav-text">Análisis de Ventas</span>
-                            <i class="submenu-arrow fas fa-angle-right"></i>
+                            <i class="fas fa-angle-right submenu-arrow"></i>
                         </a>
-                        <div class="tooltip-nav">Análisis de Ventas</div>
+                        <div class="nav-tooltip">Análisis de Ventas</div>
                         <ul class="submenu">
                             <li>
                             <a href="<?= $this->url('application', ['action' => 'dashboard']) ?>" class="submenu-link">
@@ -1038,9 +1010,9 @@
                         <a href="#" class="nav-link">
                             <i class="fas fa-shopping-cart nav-icon"></i>
                             <span class="nav-text">Órdenes y Pedidos</span>
-                            <i class="submenu-arrow fas fa-angle-right"></i>
+                            <i class="fas fa-angle-right submenu-arrow"></i>
                         </a>
-                        <div class="tooltip-nav">Órdenes y Pedidos</div>
+                        <div class="nav-tooltip">Órdenes y Pedidos</div>
                         <ul class="submenu">
                             <li class="submenu-item">
                                 <a href="<?= $this->url('application', ['action' => 'orders']) ?>" class="submenu-link">
@@ -1090,7 +1062,7 @@
                             <i class="fas fa-plug nav-icon"></i>
                             <span class="nav-text">Integraciones</span>
                         </a>
-                        <div class="tooltip-nav">Integraciones</div>
+                        <div class="nav-tooltip">Integraciones</div>
                     </li>
                     
                     <li class="nav-item">
@@ -1098,33 +1070,43 @@
                             <i class="fas fa-cog nav-icon"></i>
                             <span class="nav-text">Configuración</span>
                         </a>
-                        <div class="tooltip-nav">Configuración</div>
+                        <div class="nav-tooltip">Configuración</div>
                     </li>
                 </ul>
                 
                 <!-- Botón de expansión inferior -->
-                <div class="menu-divider"></div>
                 <div class="sidebar-bottom-toggle">
                     <button class="toggle-btn-bottom" id="toggleBtnBottom" title="Expandir/Colapsar">
-                        <i class="fas fa-chevron-right"></i>
-                        <span class="toggle-text">Expandir menú</span>
+                        <i class="fas fa-chevron-left"></i>
+                        <span class="toggle-text">Colapsar menú</span>
                     </button>
                 </div>
                 
-                <!-- Panel de usuario -->
+                <!-- Panel de usuario - Modificado para mostrar información de sesión -->
                 <div class="user-panel">
                     <div class="user-avatar">
                         <i class="fas fa-user"></i>
                     </div>
                     <div class="user-info">
-                        <div class="user-name">Admin</div>
-                        <div class="user-role">Administrador</div>
+                        <?php if ($this->authenticationService()->hasIdentity()): ?>
+                            <?php 
+                            // Obtener datos del usuario desde el contenedor de sesión
+                            $userSession = new \Laminas\Session\Container('user');
+                            $username = $userSession->username ?? $this->authenticationService()->getIdentity();
+                            $role = $userSession->role ?? 'Usuario';
+                            ?>
+                            <div class="user-name"><?= $this->escapeHtml($username) ?></div>
+                            <div class="user-role"><?= $this->escapeHtml($role) ?></div>
+                        <?php else: ?>
+                            <div class="user-name">Invitado</div>
+                            <div class="user-role">Sin autenticar</div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
             
-            <!-- Overlay para dispositivos móviles -->
-            <div class="overlay"></div>
+            <!-- Overlay para sidebar en móviles -->
+            <div class="sidebar-overlay" id="sidebarOverlay"></div>
             
             <!-- Panel de notificaciones -->
             <div class="notifications-panel" id="notificationsPanel">
@@ -1204,18 +1186,42 @@
             
             <!-- Contenido principal -->
             <div class="main-content">
-                <!-- Navbar superior -->
+                <!-- Navbar superior - Modificado para incluir el botón de hamburguesa -->
                 <div class="top-navbar">
-                    <h1 class="page-title">
-                        <?= isset($this->title) ? $this->escapeHtml($this->title) : 'Dashboard' ?>
-                    </h1>
+                    <div class="page-title-wrapper">
+                        <!-- Botón de hamburguesa para móviles -->
+                        <button class="mobile-menu-toggle" id="mobileMenuToggle">
+                            <i class="fas fa-bars"></i>
+                        </button>
+                        <h1 class="page-title">
+                            <?= isset($this->title) ? $this->escapeHtml($this->title) : 'Dashboard' ?>
+                        </h1>
+                    </div>
                     <div class="navbar-actions">
                         <div class="navbar-icon" id="navNotificationsBtn" title="Notificaciones">
                             <i class="fas fa-bell"></i>
                             <span class="notification-badge">5</span>
                         </div>
-                        <div class="navbar-icon" title="Perfil">
+                        <div class="navbar-icon user-dropdown" title="Perfil" id="userDropdownBtn">
                             <i class="fas fa-user"></i>
+                            <div class="user-dropdown-menu" id="userDropdownMenu">
+                                <?php if ($this->authenticationService()->hasIdentity()): ?>
+                                    <a href="<?= $this->url('application', ['action' => 'profile']) ?>" class="user-dropdown-item">
+                                        <i class="fas fa-user-circle"></i> Mi Perfil
+                                    </a>
+                                    <a href="<?= $this->url('application', ['action' => 'account-settings']) ?>" class="user-dropdown-item">
+                                        <i class="fas fa-cog"></i> Ajustes de cuenta
+                                    </a>
+                                    <div class="user-dropdown-divider"></div>
+                                    <a href="<?= $this->url('logout') ?>" class="user-dropdown-item">
+                                        <i class="fas fa-sign-out-alt"></i> Cerrar sesión
+                                    </a>
+                                <?php else: ?>
+                                    <a href="<?= $this->url('login') ?>" class="user-dropdown-item">
+                                        <i class="fas fa-sign-in-alt"></i> Iniciar sesión
+                                    </a>
+                                <?php endif; ?>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1224,6 +1230,10 @@
                 <?= $this->content ?>
             </div>
         </div>
+        <?php else: ?>
+        <!-- Layout para la página de login -->
+        <?= $this->content ?>
+        <?php endif; ?>
 
         <?= $this->inlineScript()->prependFile($this->basePath('js/bootstrap.min.js')) ?>
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -1234,66 +1244,125 @@
                 // Referencias a elementos del DOM
                 const sidebar = document.getElementById('sidebar');
                 const toggleBtnBottom = document.getElementById('toggleBtnBottom');
-                const overlay = document.querySelector('.overlay');
+                const sidebarOverlay = document.getElementById('sidebarOverlay');
+                const mobileMenuToggle = document.getElementById('mobileMenuToggle');
                 const navNotificationsBtn = document.getElementById('navNotificationsBtn');
                 const notificationsPanel = document.getElementById('notificationsPanel');
                 const closeNotifications = document.getElementById('closeNotifications');
                 const overlayNotifications = document.getElementById('overlayNotifications');
+                const userDropdownBtn = document.getElementById('userDropdownBtn');
+                const userDropdownMenu = document.getElementById('userDropdownMenu');
+                
+                // Verificar si estamos en la página de login
+                const isLoginPage = document.querySelector('.login-container') !== null;
+                
+                // Si estamos en la página de login, no ejecutamos el código del sidebar
+                if (isLoginPage) return;
                 
                 // Verificar existencia de elementos
-                if (!sidebar || !toggleBtnBottom) {
+                if (!sidebar) {
                     console.error("Elementos críticos del sidebar no encontrados");
                     return;
                 }
                 
-                // Función para alternar el estado del sidebar
+                // Detectar si es dispositivo móvil
+                const isMobile = window.innerWidth < 992;
+                
+                // Función para alternar el estado del sidebar según el dispositivo
                 function toggleSidebar() {
-                    if (sidebar.classList.contains('sidebar-collapsed')) {
-                        sidebar.classList.remove('sidebar-collapsed');
-                        sidebar.classList.add('sidebar-expanded');
+                    if (isMobile) {
+                        // En móviles, el botón inferior también debe cerrar el menú
+                        sidebar.classList.remove('mobile-open');
+                        sidebarOverlay.classList.remove('show');
+                        document.body.style.overflow = '';
                         
-                        // Actualizar ícono
-                        const icon = toggleBtnBottom.querySelector('i');
-                        if (icon) icon.className = 'fas fa-chevron-left';
-                        
-                        // Actualizar texto
-                        const toggleText = document.querySelector('.toggle-text');
-                        if (toggleText) toggleText.textContent = 'Colapsar menú';
+                        // Restaurar el icono de hamburguesa
+                        const hamburgerIcon = mobileMenuToggle.querySelector('i');
+                        if (hamburgerIcon) {
+                            hamburgerIcon.className = 'fas fa-bars';
+                        }
                     } else {
-                        sidebar.classList.remove('sidebar-expanded');
-                        sidebar.classList.add('sidebar-collapsed');
-                        
-                        // Actualizar ícono
-                        const icon = toggleBtnBottom.querySelector('i');
-                        if (icon) icon.className = 'fas fa-chevron-right';
-                        
-                        // Actualizar texto
-                        const toggleText = document.querySelector('.toggle-text');
-                        if (toggleText) toggleText.textContent = 'Expandir menú';
-                        
-                        // Cerrar todos los submenús abiertos
-                        document.querySelectorAll('.has-submenu.open').forEach(item => {
-                            item.classList.remove('open');
-                        });
+                        // Comportamiento normal en escritorio
+                        if (sidebar.classList.contains('sidebar-collapsed')) {
+                            // Expandir
+                            sidebar.classList.remove('sidebar-collapsed');
+                            sidebar.classList.add('sidebar-expanded');
+                            
+                            // Actualizar ícono y texto
+                            const toggleIcon = toggleBtnBottom.querySelector('i');
+                            if (toggleIcon) toggleIcon.className = 'fas fa-chevron-left';
+                            
+                            const toggleText = toggleBtnBottom.querySelector('.toggle-text');
+                            if (toggleText) toggleText.textContent = 'Colapsar menú';
+                        } else {
+                            // Colapsar
+                            sidebar.classList.remove('sidebar-expanded');
+                            sidebar.classList.add('sidebar-collapsed');
+                            
+                            // Actualizar ícono y texto
+                            const toggleIcon = toggleBtnBottom.querySelector('i');
+                            if (toggleIcon) toggleIcon.className = 'fas fa-chevron-right';
+                            
+                            const toggleText = toggleBtnBottom.querySelector('.toggle-text');
+                            if (toggleText) toggleText.textContent = 'Expandir menú';
+                            
+                            // Cerrar submenús abiertos
+                            document.querySelectorAll('.has-submenu.open').forEach(item => {
+                                item.classList.remove('open');
+                            });
+                        }
                     }
                 }
                 
-                // Asignar evento
-                toggleBtnBottom.addEventListener('click', toggleSidebar);
+                // Función para abrir/cerrar el menú en móviles
+                function toggleMobileMenu() {
+                    // Solo ejecutar en móvil
+                    if (isMobile) {
+                        // Alternar la clase mobile-open para mostrar/ocultar el menú
+                        sidebar.classList.toggle('mobile-open');
+                        
+                        // Alternar la visibilidad del overlay
+                        sidebarOverlay.classList.toggle('show');
+                        
+                        // Cambiar el icono del botón hamburguesa según el estado del menú
+                        const hamburgerIcon = mobileMenuToggle.querySelector('i');
+                        if (hamburgerIcon) {
+                            if (sidebar.classList.contains('mobile-open')) {
+                                // Cambiar a icono X cuando el menú está abierto
+                                hamburgerIcon.className = 'fas fa-times';
+                            } else {
+                                // Volver al icono de hamburguesa cuando el menú está cerrado
+                                hamburgerIcon.className = 'fas fa-bars';
+                            }
+                        }
+                        
+                        // Bloquear/desbloquear el scroll del body
+                        document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
+                    }
+                }
+                
+                // Asignar eventos
+                if (toggleBtnBottom) {
+                    toggleBtnBottom.addEventListener('click', toggleSidebar);
+                }
+                
+                if (mobileMenuToggle) {
+                    mobileMenuToggle.addEventListener('click', toggleMobileMenu);
+                }
                 
                 // Cerrar sidebar con overlay en dispositivos móviles
-                if (overlay) {
-                    overlay.addEventListener('click', function() {
-                        sidebar.classList.remove('sidebar-expanded');
-                        sidebar.classList.add('sidebar-collapsed');
+                if (sidebarOverlay) {
+                    sidebarOverlay.addEventListener('click', function() {
+                        // Cerrar el menú
+                        sidebar.classList.remove('mobile-open');
+                        sidebarOverlay.classList.remove('show');
+                        document.body.style.overflow = '';
                         
-                        // También actualizar el ícono
-                        const icon = toggleBtnBottom.querySelector('i');
-                        if (icon) icon.className = 'fas fa-chevron-right';
-                        
-                        // Y el texto
-                        const toggleText = document.querySelector('.toggle-text');
-                        if (toggleText) toggleText.textContent = 'Expandir menú';
+                        // Restaurar el icono de hamburguesa
+                        const hamburgerIcon = mobileMenuToggle.querySelector('i');
+                        if (hamburgerIcon) {
+                            hamburgerIcon.className = 'fas fa-bars';
+                        }
                     });
                 }
                 
@@ -1305,34 +1374,24 @@
                     
                     if (link) {
                         link.addEventListener('click', function(e) {
+                            // Si estamos en modo colapsado en escritorio, no abriremos submenús
+                            if (!isMobile && sidebar.classList.contains('sidebar-collapsed')) {
+                                // Permitir que el enlace funcione normalmente
+                                return;
+                            }
+                            
                             // Si es un elemento con submenú, prevenir navegación al hacer clic en el enlace principal
-                            if (e.currentTarget.parentElement.classList.contains('has-submenu')) {
-                                e.preventDefault();
-                            }
+                            e.preventDefault();
                             
-                            // Verificar si el sidebar está expandido
-                            const isExpanded = sidebar.classList.contains('sidebar-expanded');
+                            // Cerrar otros submenús abiertos
+                            submenuItems.forEach(otherItem => {
+                                if (otherItem !== item && otherItem.classList.contains('open')) {
+                                    otherItem.classList.remove('open');
+                                }
+                            });
                             
-                            // Solo permitir expandir submenús si el sidebar está expandido
-                            if (isExpanded) {
-                                // Cerrar otros submenús abiertos
-                                submenuItems.forEach(otherItem => {
-                                    if (otherItem !== item && otherItem.classList.contains('open')) {
-                                        otherItem.classList.remove('open');
-                                    }
-                                });
-                                
-                                // Alternar estado del submenú actual
-                                item.classList.toggle('open');
-                            } else {
-                                // Si el sidebar está colapsado, primero expandirlo
-                                toggleSidebar();
-                                
-                                // Esperar a que termine la animación del sidebar y luego abrir el submenú
-                                setTimeout(() => {
-                                    item.classList.add('open');
-                                }, 300);
-                            }
+                            // Alternar estado del submenú actual
+                            item.classList.toggle('open');
                         });
                     }
                 });
@@ -1383,8 +1442,12 @@
                 
                 // Panel de notificaciones
                 function toggleNotifications() {
-                    notificationsPanel.classList.toggle('open');
-                    overlayNotifications.classList.toggle('open');
+                    if (notificationsPanel) {
+                        notificationsPanel.classList.toggle('open');
+                    }
+                    if (overlayNotifications) {
+                        overlayNotifications.classList.toggle('open');
+                    }
                 }
                 
                 if (navNotificationsBtn) {
@@ -1414,6 +1477,34 @@
                         tabs.forEach(t => t.classList.remove('active'));
                         this.classList.add('active');
                     });
+                });
+                
+                // Dropdown del usuario
+                if (userDropdownBtn) {
+                    userDropdownBtn.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        if (userDropdownMenu) {
+                            userDropdownMenu.classList.toggle('show');
+                        }
+                    });
+                    
+                    // Cerrar el dropdown al hacer clic fuera de él
+                    document.addEventListener('click', function(e) {
+                        if (userDropdownMenu && userDropdownMenu.classList.contains('show') && !userDropdownBtn.contains(e.target)) {
+                            userDropdownMenu.classList.remove('show');
+                        }
+                    });
+                }
+                
+                // Detectar cambios de tamaño para ajustar la visualización
+                window.addEventListener('resize', function() {
+                    const newIsMobile = window.innerWidth < 992;
+                    
+                    // Si cambia entre móvil y escritorio o viceversa
+                    if (newIsMobile !== isMobile) {
+                        // Recargar la página para reiniciar todo el estado
+                        location.reload();
+                    }
                 });
             });
         </script>
