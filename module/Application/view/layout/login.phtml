@@ -1,11 +1,13 @@
 <?php
-// En module/Application/view/layout/login.phtml
+/**
+ * @var Laminas\View\Renderer\PhpRenderer $this
+ */
 ?>
 <?= $this->doctype() ?>
 <html lang="es">
     <head>
         <meta charset="utf-8">
-        <?= $this->headTitle('Iniciar Sesión - Lodoro Analytics')->setSeparator(' - ')->setAutoEscape(false) ?>
+        <?= $this->headTitle('Lodoro Analytics')->setSeparator(' - ')->setAutoEscape(false) ?>
 
         <?= $this->headMeta()
             ->appendName('viewport', 'width=device-width, initial-scale=1.0')
@@ -58,8 +60,8 @@
                 padding: 0;
                 overflow-x: hidden;
             }
-            
-            /* Estilos para la página de login */
+
+            /* Estilos de la página de login */
             .login-container {
                 min-height: 100vh;
                 display: flex;
@@ -160,6 +162,20 @@
                 color: var(--text-muted);
                 font-size: 0.875rem;
             }
+
+            /* Mensaje de alerta */
+            .alert {
+                padding: 0.75rem 1rem;
+                margin-bottom: 1rem;
+                border: 1px solid transparent;
+                border-radius: 5px;
+            }
+            
+            .alert-danger {
+                color: #721c24;
+                background-color: #f8d7da;
+                border-color: #f5c6cb;
+            }
         </style>
 
         <?= $this->headScript() ?>
@@ -168,8 +184,6 @@
         <!-- Contenido de la página de login -->
         <?= $this->content ?>
 
-        <?= $this->inlineScript()
-            ->prependFile($this->basePath('js/bootstrap.min.js'))
-        ?>
+        <?= $this->inlineScript()->prependFile($this->basePath('js/bootstrap.min.js')) ?>
     </body>
 </html>

@@ -11,22 +11,29 @@ class LoginForm extends Form implements InputFilterProviderInterface
 {
     public function __construct($name = null)
     {
-        parent::__construct('login');
+        parent::__construct('login-form');
         
+        // Configuración del formulario
+        $this->setAttribute('method', 'post');
+        $this->setAttribute('class', 'login-form');
+        
+        // Campo de nombre de usuario
         $this->add([
             'name' => 'username',
             'type' => Element\Text::class,
             'options' => [
-                'label' => 'Usuario',
+                'label' => 'Nombre de usuario',
             ],
             'attributes' => [
                 'id' => 'username',
                 'class' => 'form-control',
+                'placeholder' => 'Ingrese su nombre de usuario',
                 'required' => true,
                 'autofocus' => true,
             ],
         ]);
         
+        // Campo de contraseña
         $this->add([
             'name' => 'password',
             'type' => Element\Password::class,
@@ -36,39 +43,68 @@ class LoginForm extends Form implements InputFilterProviderInterface
             'attributes' => [
                 'id' => 'password',
                 'class' => 'form-control',
+                'placeholder' => 'Ingrese su contraseña',
                 'required' => true,
             ],
         ]);
         
+        // Checkbox de recordar sesión
         $this->add([
-            'name' => 'remember_me',
+            'name' => 'remember_me',  // Nombre correcto según tu vista
             'type' => Element\Checkbox::class,
             'options' => [
                 'label' => 'Recordarme',
                 'label_attributes' => [
-                    'class' => 'checkbox-inline',
+                    'class' => 'form-check-label',
                 ],
+                'use_hidden_element' => true,
+                'checked_value' => '1',
+                'unchecked_value' => '0',
             ],
             'attributes' => [
                 'id' => 'remember_me',
+                'class' => 'form-check-input',
             ],
         ]);
         
+        // Botón de envío
         $this->add([
-            'name' => 'csrf',
-            'type' => Element\Csrf::class,
-            'options' => [
-                'csrf_options' => [
-                    'timeout' => 600,
-                ],
+            'name' => 'submit',
+            'type' => Element\Submit::class,
+            'attributes' => [
+                'value' => 'Iniciar sesión',
+                'class' => 'login-btn',
             ],
         ]);
     }
     
+    /**
+     * Especificar las reglas de validación del formulario
+     */
     public function getInputFilterSpecification()
     {
         return [
             'username' => [
+                'required' => true,
+                'filters' => [
+                    ['name' => 'StripTags'],
+                    ['name' => 'StringTrim'],
+                ],
+                'validators' => [
+                    [
+                        'name' => 'StringLength',
+                        'options' => [
+                            'min' => 3,
+                            'max' => 50,
+                            'messages' => [
+                                'stringLengthTooShort' => 'El nombre de usuario debe tener al menos %min% caracteres',
+                                'stringLengthTooLong' => 'El nombre de usuario no puede tener más de %max% caracteres',
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            'password' => [
                 'required' => true,
                 'filters' => [
                     ['name' => 'StringTrim'],
@@ -77,24 +113,16 @@ class LoginForm extends Form implements InputFilterProviderInterface
                     [
                         'name' => 'StringLength',
                         'options' => [
-                            'min' => 3,
-                            'max' => 100,
-                            'message' => 'El nombre de usuario debe tener entre 3 y 100 caracteres',
+                            'min' => 6,
+                            'messages' => [
+                                'stringLengthTooShort' => 'La contraseña debe tener al menos %min% caracteres',
+                            ],
                         ],
                     ],
                 ],
             ],
-            'password' => [
-                'required' => true,
-                'validators' => [
-                    [
-                        'name' => 'StringLength',
-                        'options' => [
-                            'min' => 6,
-                            'message' => 'La contraseña debe tener al menos 6 caracteres',
-                        ],
-                    ],
-                ],
+            'remember_me' => [
+                'required' => false,
             ],
         ];
     }

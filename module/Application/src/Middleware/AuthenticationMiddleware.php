@@ -20,20 +20,28 @@ class AuthenticationMiddleware implements MiddlewareInterface
     
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
-        // Check if the user is authenticated
-        if (!$this->authService->hasIdentity()) {
-            // Store the requested URL to redirect after login
+        // Agregar log para depuración
+        error_log('AuthenticationMiddleware: Procesando solicitud a: ' . $request->getUri()->getPath());
+        
+        // Verificar si el usuario está autenticado
+        $isAuthenticated = $this->authService->hasIdentity();
+        error_log('AuthenticationMiddleware: Usuario autenticado: ' . ($isAuthenticated ? 'SÍ' : 'NO'));
+        
+        if (!$isAuthenticated) {
+            // Guardar la URL solicitada para redirigir después del login
             $uri = $request->getUri();
             $path = $uri->getPath();
             
             $sessionContainer = new Container('Redirect');
             $sessionContainer->redirectUrl = $path;
+            error_log('AuthenticationMiddleware: Redirigiendo al login, guardando URL: ' . $path);
             
-            // Redirect to the login page
+            // Redirigir a la página de login
             return new RedirectResponse('/login');
         }
         
-        // User is authenticated, proceed with the request
+        // Usuario autenticado, continuar con la solicitud
+        error_log('AuthenticationMiddleware: Usuario autenticado, continuando...');
         return $handler->handle($request);
     }
 }

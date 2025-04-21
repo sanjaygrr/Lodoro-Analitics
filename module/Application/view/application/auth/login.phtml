@@ -1,22 +1,24 @@
 <?php
+// module/Application/view/application/auth/login.phtml
+
+$this->headTitle('Iniciar Sesión');
+$this->layout('layout/login');
+
 // Preparar el formulario
 $form = $this->form;
 $form->prepare();
-$form->setAttribute('action', $this->url('login'));
-$form->setAttribute('method', 'post');
-$form->setAttribute('class', 'login-form');
 ?>
 
 <div class="login-container">
     <div class="login-card">
         <div class="login-header">
             <div class="login-logo">Lodoro Analytics</div>
-            <div class="login-subtitle">Panel de administración</div>
+            <div class="login-subtitle">Panel de Administración</div>
         </div>
         
         <div class="login-body">
             <?php if ($this->error): ?>
-                <div class="alert alert-danger" role="alert">
+                <div class="alert alert-danger">
                     <?= $this->escapeHtml($this->error) ?>
                 </div>
             <?php endif; ?>
@@ -26,33 +28,27 @@ $form->setAttribute('class', 'login-form');
             <div class="form-group">
                 <?= $this->formLabel($form->get('username')) ?>
                 <?= $this->formElement($form->get('username')) ?>
-                <?php if ($form->get('username')->getMessages()): ?>
-                    <div class="text-danger mt-1">
-                        <?= $this->formElementErrors($form->get('username')) ?>
-                    </div>
-                <?php endif; ?>
+                <?= $this->formElementErrors($form->get('username')) ?>
             </div>
             
             <div class="form-group">
                 <?= $this->formLabel($form->get('password')) ?>
                 <?= $this->formElement($form->get('password')) ?>
-                <?php if ($form->get('password')->getMessages()): ?>
-                    <div class="text-danger mt-1">
-                        <?= $this->formElementErrors($form->get('password')) ?>
-                    </div>
-                <?php endif; ?>
+                <?= $this->formElementErrors($form->get('password')) ?>
             </div>
             
-            <div class="form-group form-check">
-                <?= $this->formElement($form->get('remember_me')) ?>
-                <?= $this->formLabel($form->get('remember_me')) ?>
+            <div class="form-group">
+                <div class="form-check">
+                    <?php if ($form->has('remember_me')): ?>
+                        <?= $this->formElement($form->get('remember_me')) ?>
+                        <?= $this->formLabel($form->get('remember_me')) ?>
+                    <?php endif; ?>
+                </div>
             </div>
             
-            <?= $this->formElement($form->get('csrf')) ?>
-            
-            <button type="submit" class="login-btn">
-                Iniciar Sesión
-            </button>
+            <div class="form-group">
+                <?= $this->formSubmit($form->get('submit')) ?>
+            </div>
             
             <?= $this->form()->closeTag() ?>
         </div>
