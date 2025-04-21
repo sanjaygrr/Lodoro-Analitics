@@ -12,32 +12,63 @@ use Laminas\Db\Sql\Sql;
 use Laminas\Db\Sql\Where;
 use Laminas\Db\Sql\Predicate\Expression;
 use Laminas\View\Model\JsonModel;
+use Laminas\Authentication\AuthenticationService;
 
 class IndexController extends AbstractActionController
 {
     /** @var AdapterInterface */
     private $dbAdapter;
+    
+    /** @var AuthenticationService */
+    private $authService;
 
-    public function __construct(AdapterInterface $dbAdapter)
+    public function __construct(AdapterInterface $dbAdapter, AuthenticationService $authService)
     {
         $this->dbAdapter = $dbAdapter;
+        $this->authService = $authService;
+    }
+    
+    /**
+     * Método para verificar si el usuario está autenticado
+     * Si no lo está, redirige al login
+     */
+    private function checkAuth()
+    {
+        if (!$this->authService->hasIdentity()) {
+            return $this->redirect()->toRoute('login');
+        }
+        
+        return null; // Continuar si está autenticado
     }
 
     /**
      * Acción por defecto: redirige al dashboard.
      */
     public function indexAction()
-{
-    // Podemos agregar aquí cualquier lógica o datos que necesites pasar a la vista
-    return new ViewModel([
-        // Aquí puedes pasar datos a tu vista index.phtml si los necesitas
-    ]);
-}
+    {
+        // Verificar autenticación
+        $redirect = $this->checkAuth();
+        if ($redirect !== null) {
+            return $redirect;
+        }
+        
+        // Podemos agregar aquí cualquier lógica o datos que necesites pasar a la vista
+        return new ViewModel([
+            // Aquí puedes pasar datos a tu vista index.phtml si los necesitas
+        ]);
+    }
+    
     /**
      * Acción que muestra un dashboard con resumen de todas las tablas.
      */
     public function dashboardAction()
     {
+        // Verificar autenticación
+        $redirect = $this->checkAuth();
+        if ($redirect !== null) {
+            return $redirect;
+        }
+        
         $sql = "SELECT table_name, engine, table_rows, create_time, update_time 
                 FROM information_schema.tables 
                 WHERE table_schema = 'dbpgzmb4lvvly0'";
@@ -60,6 +91,12 @@ class IndexController extends AbstractActionController
      */
     public function detailAction()
     {
+        // Verificar autenticación
+        $redirect = $this->checkAuth();
+        if ($redirect !== null) {
+            return $redirect;
+        }
+        
         // Obtener nombre de la tabla desde la ruta
         $table = $this->params()->fromRoute('table', null);
         if (!$table) {
@@ -158,6 +195,12 @@ class IndexController extends AbstractActionController
      */
     private function exportToCsv($table, $whereClause = '', $whereParams = [])
     {
+        // Verificar autenticación
+        $redirect = $this->checkAuth();
+        if ($redirect !== null) {
+            return $redirect;
+        }
+        
         // Consulta para obtener datos filtrados (límite alto para exportación)
         $sql = "SELECT * FROM `$table`" . $whereClause . " LIMIT 10000";
         $statement = $this->dbAdapter->createStatement($sql);
@@ -209,6 +252,12 @@ class IndexController extends AbstractActionController
      */
     public function marketplaceConfigAction()
     {
+        // Verificar autenticación
+        $redirect = $this->checkAuth();
+        if ($redirect !== null) {
+            return $redirect;
+        }
+        
         // Obtener todas las configuraciones existentes
         $sql = "SELECT * FROM api_config ORDER BY marketplace";
         $statement = $this->dbAdapter->createStatement($sql);
@@ -307,6 +356,12 @@ class IndexController extends AbstractActionController
      */
     public function testConnectionAction()
     {
+        // Verificar autenticación
+        $redirect = $this->checkAuth();
+        if ($redirect !== null) {
+            return $redirect;
+        }
+        
         $id = $this->params()->fromQuery('id');
         if (!$id) {
             return $this->jsonResponse(['success' => false, 'message' => 'ID de configuración no proporcionado']);
@@ -401,6 +456,12 @@ class IndexController extends AbstractActionController
      */
     public function ordersAction()
     {
+        // Verificar autenticación
+        $redirect = $this->checkAuth();
+        if ($redirect !== null) {
+            return $redirect;
+        }
+        
         // Obtenemos estadísticas resumidas por marketplace y estado
         $statsSql = "SELECT 
                         COUNT(*) as total,
@@ -620,6 +681,12 @@ class IndexController extends AbstractActionController
      */
     public function ordersDetailAction()
     {
+        // Verificar autenticación
+        $redirect = $this->checkAuth();
+        if ($redirect !== null) {
+            return $redirect;
+        }
+        
         // Obtener el marketplace desde la ruta
         $table = $this->params()->fromRoute('table', null);
         if (!$table) {
@@ -737,6 +804,12 @@ class IndexController extends AbstractActionController
      */
     public function orderDetailAction()
     {
+        // Verificar autenticación
+        $redirect = $this->checkAuth();
+        if ($redirect !== null) {
+            return $redirect;
+        }
+        
         // Obtener ID de orden y tabla (marketplace) desde los parámetros
         $orderId = $this->params()->fromRoute('id', null);
         $table = $this->params()->fromRoute('table', null);
@@ -814,6 +887,12 @@ class IndexController extends AbstractActionController
      */
     public function updateOrderStatusAction()
     {
+        // Verificar autenticación
+        $redirect = $this->checkAuth();
+        if ($redirect !== null) {
+            return $redirect;
+        }
+        
         if (!$this->getRequest()->isPost()) {
             return $this->jsonResponse(['success' => false, 'message' => 'Se requiere método POST']);
         }
@@ -879,6 +958,12 @@ class IndexController extends AbstractActionController
      */
     public function updateOrderCarrierAction()
     {
+        // Verificar autenticación
+        $redirect = $this->checkAuth();
+        if ($redirect !== null) {
+            return $redirect;
+        }
+        
         if (!$this->getRequest()->isPost()) {
             return $this->jsonResponse(['success' => false, 'message' => 'Se requiere método POST']);
         }
@@ -967,6 +1052,12 @@ class IndexController extends AbstractActionController
      */
     public function bulkOrdersAction()
     {
+        // Verificar autenticación
+        $redirect = $this->checkAuth();
+        if ($redirect !== null) {
+            return $redirect;
+        }
+        
         if (!$this->getRequest()->isPost()) {
             return $this->jsonResponse(['success' => false, 'message' => 'Se requiere método POST']);
         }

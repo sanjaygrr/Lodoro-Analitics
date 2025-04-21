@@ -22,19 +22,26 @@ return [
                         'action'     => 'index',
                     ],
                 ],
+                // Asegúrate de que tenga el middleware
+                'middleware' => [
+                    AuthenticationMiddleware::class,
+                ],
             ],
             'application' => [
                 'type'    => Segment::class,
                 'options' => [
-                    // Se agregó el parámetro opcional "table"
                     'route'    => '/application[/:action[/:table]]',
                     'defaults' => [
                         'controller' => Controller\IndexController::class,
                         'action'     => 'index',
                     ],
                 ],
+                // Asegúrate de que tenga el middleware
+                'middleware' => [
+                    AuthenticationMiddleware::class,
+                ],
             ],
-            // Nuevas rutas para autenticación
+            // Rutas para autenticación (estas NO deben tener middleware)
             'login' => [
                 'type' => Literal::class,
                 'options' => [
@@ -68,12 +75,10 @@ return [
                     AuthenticationMiddleware::class,
                 ],
             ],
-            // Agrega aquí otras rutas protegidas que necesiten autenticación
         ],
     ],
     'controllers' => [
         'factories' => [
-            // Se reemplaza InvokableFactory por la factory personalizada:
             Controller\IndexController::class => IndexControllerFactory::class,
             Controller\AuthController::class => Controller\Factory\AuthControllerFactory::class,
         ],
@@ -102,12 +107,13 @@ return [
             'application/auth/login'  => __DIR__ . '/../view/application/auth/login.phtml',
             'error/404'               => __DIR__ . '/../view/error/404.phtml',
             'error/index'             => __DIR__ . '/../view/error/index.phtml',
+            'layout/login'            => __DIR__ . '/../view/layout/login.phtml',
         ],
         'template_path_stack' => [
             __DIR__ . '/../view',
         ],
     ],
-        'view_helpers' => [
+    'view_helpers' => [
         'factories' => [
             'authenticationService' => function($container) {
                 return new View\Helper\AuthenticationServiceHelper(
