@@ -1,7 +1,68 @@
 <?php
 /**
  * @var Laminas\View\Renderer\PhpRenderer $this
+ * @var \Laminas\Db\Adapter\AdapterInterface $dbAdapter
  */
+
+// Obtener datos reales de la base de datos
+$marketplacesCount = 0;
+$ordersThisMonth = 0;
+$ordersNeedingAttention = 0;
+$ordersInTransit = 0;
+
+try {
+    // Asumiendo que $dbAdapter está disponible a través de la inyección de dependencias
+    if (isset($this->dbAdapter)) {
+        // Contar marketplaces conectados
+        $marketplacesQuery = "SELECT COUNT(*) as total FROM marketplaces WHERE status = 'active'";
+        $marketplacesResult = $this->dbAdapter->query($marketplacesQuery, \Laminas\Db\Adapter\Adapter::QUERY_MODE_EXECUTE);
+        if ($marketplacesResult && $marketplacesResult->count() > 0) {
+            $marketplacesCount = $marketplacesResult->current()['total'];
+        }
+        
+        // Contar pedidos del mes actual
+        $firstDayOfMonth = date('Y-m-01');
+        $lastDayOfMonth = date('Y-m-t');
+        $ordersQuery = "SELECT COUNT(*) as total FROM orders WHERE order_date BETWEEN '$firstDayOfMonth' AND '$lastDayOfMonth'";
+        $ordersResult = $this->dbAdapter->query($ordersQuery, \Laminas\Db\Adapter\Adapter::QUERY_MODE_EXECUTE);
+        if ($ordersResult && $ordersResult->count() > 0) {
+            $ordersThisMonth = $ordersResult->current()['total'];
+        }
+        
+        // Contar pedidos que requieren atención
+        $attentionQuery = "SELECT COUNT(*) as total FROM orders WHERE status = 'needs_attention' OR has_issue = 1";
+        $attentionResult = $this->dbAdapter->query($attentionQuery, \Laminas\Db\Adapter\Adapter::QUERY_MODE_EXECUTE);
+        if ($attentionResult && $attentionResult->count() > 0) {
+            $ordersNeedingAttention = $attentionResult->current()['total'];
+        }
+        
+        // Contar envíos en tránsito
+        $transitQuery = "SELECT COUNT(*) as total FROM orders WHERE status = 'in_transit'";
+        $transitResult = $this->dbAdapter->query($transitQuery, \Laminas\Db\Adapter\Adapter::QUERY_MODE_EXECUTE);
+        if ($transitResult && $transitResult->count() > 0) {
+            $ordersInTransit = $transitResult->current()['total'];
+        }
+    }
+} catch (\Exception $e) {
+    // Manejar errores de consulta silenciosamente en producción
+    // En desarrollo, podrías registrar el error o mostrarlo dependiendo de la configuración
+}
+
+// Obtener las últimas actualizaciones del sistema
+$systemUpdates = [];
+try {
+    if (isset($this->dbAdapter)) {
+        $updatesQuery = "SELECT * FROM system_updates ORDER BY update_date DESC LIMIT 3";
+        $updatesResult = $this->dbAdapter->query($updatesQuery, \Laminas\Db\Adapter\Adapter::QUERY_MODE_EXECUTE);
+        if ($updatesResult) {
+            foreach ($updatesResult as $update) {
+                $systemUpdates[] = $update;
+            }
+        }
+    }
+} catch (\Exception $e) {
+    // Manejar errores
+}
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -96,7 +157,7 @@
                                 <div class="col-md-3 mb-4 mb-md-0">
                                     <div class="d-flex flex-column">
                                         <span class="h2 text-primary fw-bold">
-                                            <i class="fas fa-store me-2"></i> 6
+                                            <i class="fas fa-store me-2"></i> <?= $marketplacesCount ?>
                                         </span>
                                         <span class="text-muted">Marketplaces conectados</span>
                                     </div>
@@ -105,7 +166,7 @@
                                     <div class="d-flex flex-column">
                                         <span class="h2 text-success fw-bold">
                                             <i class="fas fa-shopping-cart me-2"></i> 
-                                            <?= rand(300, 999) ?>
+                                            <?= $ordersThisMonth ?>
                                         </span>
                                         <span class="text-muted">Pedidos este mes</span>
                                     </div>
@@ -114,7 +175,7 @@
                                     <div class="d-flex flex-column">
                                         <span class="h2 text-danger fw-bold">
                                             <i class="fas fa-exclamation-circle me-2"></i> 
-                                            <?= rand(5, 20) ?>
+                                            <?= $ordersNeedingAttention ?>
                                         </span>
                                         <span class="text-muted">Pedidos requieren atención</span>
                                     </div>
@@ -123,7 +184,7 @@
                                     <div class="d-flex flex-column">
                                         <span class="h2 text-info fw-bold">
                                             <i class="fas fa-truck me-2"></i> 
-                                            <?= rand(50, 150) ?>
+                                            <?= $ordersInTransit ?>
                                         </span>
                                         <span class="text-muted">Envíos en tránsito</span>
                                     </div>
@@ -148,42 +209,38 @@
                         </div>
                         <div class="card-body">
                             <div class="timeline">
-                                <div class="timeline-item pb-3 mb-3 border-bottom">
-                                    <div class="d-flex">
-                                        <div class="me-3 text-primary">
-                                            <i class="fas fa-code-branch fa-lg"></i>
+                                <?php if (empty($systemUpdates)): ?>
+                                    <p class="text-center text-muted">No hay actualizaciones recientes.</p>
+                                <?php else: ?>
+                                    <?php foreach ($systemUpdates as $index => $update): ?>
+                                        <div class="timeline-item <?= $index < count($systemUpdates) - 1 ? 'pb-3 mb-3 border-bottom' : '' ?>">
+                                            <div class="d-flex">
+                                                <div class="me-3 <?= $update['type'] == 'feature' ? 'text-primary' : ($update['type'] == 'integration' ? 'text-success' : 'text-info') ?>">
+                                                    <i class="fas <?= $update['type'] == 'feature' ? 'fa-code-branch' : ($update['type'] == 'integration' ? 'fa-truck-loading' : 'fa-chart-line') ?> fa-lg"></i>
+                                                </div>
+                                                <div>
+                                                    <h5 class="mb-1"><?= htmlspecialchars($update['title']) ?></h5>
+                                                    <p class="text-muted mb-1"><?= htmlspecialchars($update['description']) ?></p>
+                                                    <small class="text-muted">
+                                                        <?php
+                                                        $updateDate = new DateTime($update['update_date']);
+                                                        $now = new DateTime();
+                                                        $diff = $updateDate->diff($now);
+                                                        
+                                                        if ($diff->days == 0) {
+                                                            echo 'Actualizado hoy';
+                                                        } elseif ($diff->days == 1) {
+                                                            echo 'Actualizado ayer';
+                                                        } else {
+                                                            echo 'Actualizado hace ' . $diff->days . ' días';
+                                                        }
+                                                        ?>
+                                                    </small>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <h5 class="mb-1">Versión <?= date('Y.m.d') ?></h5>
-                                            <p class="text-muted mb-1">Mejoras en la integración y análisis multichannel</p>
-                                            <small class="text-muted">Actualizado hoy</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="timeline-item pb-3 mb-3 border-bottom">
-                                    <div class="d-flex">
-                                        <div class="me-3 text-success">
-                                            <i class="fas fa-truck-loading fa-lg"></i>
-                                        </div>
-                                        <div>
-                                            <h5 class="mb-1">Nuevos transportistas soportados</h5>
-                                            <p class="text-muted mb-1">Añadidas integraciones con 3 nuevos operadores logísticos</p>
-                                            <small class="text-muted">Actualizado hace 3 días</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="timeline-item">
-                                    <div class="d-flex">
-                                        <div class="me-3 text-info">
-                                            <i class="fas fa-chart-line fa-lg"></i>
-                                        </div>
-                                        <div>
-                                            <h5 class="mb-1">Nuevos reportes analíticos</h5>
-                                            <p class="text-muted mb-1">Reportes mejorados de rendimiento por marketplace y categoría</p>
-                                            <small class="text-muted">Actualizado hace 7 días</small>
-                                        </div>
-                                    </div>
-                                </div>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
