@@ -170,8 +170,9 @@ public function dashboardAction()
             $sqlVentasTotales = "SELECT 
                 SUM(monto_total_boleta) as total_ventas,
                 COUNT(*) as total_registros
-            FROM MKP_PARIS";
-            
+            FROM MKP_PARIS
+            WHERE MONTH(fecha_creacion) = MONTH(CURDATE())
+            AND YEAR(fecha_creacion) = YEAR(CURDATE())";
             $statementVentasTotales = $this->dbAdapter->createStatement($sqlVentasTotales);
             $resultVentasTotales = $statementVentasTotales->execute()->current();
             
@@ -593,11 +594,14 @@ public function detailAction()
             
             // CONSULTA 1: Ventas totales (todo el historial) - con unicidad de boletas
             try {
-                $sqlVentasTotales = "SELECT 
-                    COUNT(DISTINCT `$colNumeroBoletaDesambiguado`) AS registros_totales,
-                    SUM(`$colMontoTotal`) AS monto_total_ventas
-                FROM `$actualTableName`
-                WHERE $condicionNoCancelado";
+                $sqlVentasTotales = $sqlVentasTotales = "SELECT 
+                COUNT(DISTINCT `$colNumeroBoletaDesambiguado`) AS registros_totales,
+                SUM(`$colMontoTotal`) AS monto_total_ventas
+            FROM `$actualTableName`
+            WHERE $condicionNoCancelado
+              AND MONTH(fecha_creacion) = MONTH(CURDATE())
+              AND YEAR(fecha_creacion) = YEAR(CURDATE())";
+            
                 
                 $statementVentasTotales = $this->dbAdapter->createStatement($sqlVentasTotales);
                 $resultVentasTotales = $statementVentasTotales->execute()->current();
@@ -632,12 +636,14 @@ public function detailAction()
             // CONSULTA 2: Ventas del mes actual - con unicidad de boletas
             try {
                 $sqlVentasMes = "SELECT 
-                    COUNT(DISTINCT `$colNumeroBoletaDesambiguado`) AS registros_mes,
-                    SUM(`$colMontoTotal`) AS monto_mes,
-                    SUM(`$colImpuesto`) AS impuesto_mes
-                FROM `$actualTableName`
-                WHERE $condicionMesActual
-                AND $condicionNoCancelado";
+                COUNT(DISTINCT numero_boleta) AS registros_mes,
+                SUM(precio_base) AS monto_mes,
+                SUM(monto_impuesto_boleta) AS impuesto_mes
+            FROM MKP_PARIS
+            WHERE MONTH(fecha_creacion) = MONTH(CURDATE())
+              AND YEAR(fecha_creacion) = YEAR(CURDATE())
+              AND estado != 'Cancelado'";
+            
                 
                 $statementVentasMes = $this->dbAdapter->createStatement($sqlVentasMes);
                 $resultVentasMes = $statementVentasMes->execute()->current();
