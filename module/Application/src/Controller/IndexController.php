@@ -395,8 +395,6 @@ public function dashboardAction()
     }
 
 
-
-
 /**
  * Acción para mostrar el detalle de una tabla con paginación.
  * Se espera recibir el parámetro 'table' en la URL.
@@ -498,19 +496,22 @@ public function detailAction()
     $totalVentas = 0;
     $valorCancelado = 0;
     $transaccionesCanceladas = 0;
-    $jsonVentasAnuales = '[]';
-    $jsonTopProductos = '[]';
+    $ventasAnualesArray = [];
+    $topProductosArray = [];
     
-    // Si estamos viendo la tabla MKP_PARIS o similares, cargar datos adicionales para KPIs
-    $isParisMkp = false;
+    // Si estamos viendo una tabla que contiene datos de ventas, cargar KPIs
+    $isMarketplaceTable = false;
     
-    // Comprobar si la tabla actual es MKP_PARIS o similar
+    // Comprobar si la tabla actual es un marketplace (MKP_)
     if (!empty($data) && (
+        stripos($table, 'mkp_') !== false || 
         stripos($table, 'paris') !== false || 
-        stripos($table, 'mkp_p') !== false ||
-        stripos($table, 'mkpparis') !== false
+        stripos($table, 'falabella') !== false ||
+        stripos($table, 'ripley') !== false ||
+        stripos($table, 'wallmart') !== false ||
+        stripos($table, 'mercado_libre') !== false
     )) {
-        $isParisMkp = true;
+        $isMarketplaceTable = true;
         $actualTableName = $table;  // Nombre real de la tabla que estamos viendo
         
         try {
@@ -534,7 +535,7 @@ public function detailAction()
                 elseif (stripos($columnName, 'impuesto') !== false || stripos($columnName, 'iva') !== false || stripos($columnName, 'tax') !== false) {
                     $columnMap['impuesto'] = $columnName;
                 }
-                elseif (stripos($columnName, 'monto_total') !== false || stripos($columnName, 'total_boleta') !== false || stripos($columnName, 'precio_con') !== false) {
+                elseif (stripos($columnName, 'monto_total') !== false || stripos($columnName, 'total_boleta') !== false || stripos($columnName, 'precio_con') !== false || stripos($columnName, 'precio_despues_descuento') !== false) {
                     $columnMap['monto_total'] = $columnName;
                 }
                 elseif (stripos($columnName, 'fecha_crea') !== false || stripos($columnName, 'date_created') !== false || stripos($columnName, 'creation_date') !== false) {
@@ -543,10 +544,10 @@ public function detailAction()
                 elseif (stripos($columnName, 'estado') !== false || stripos($columnName, 'status') !== false || stripos($columnName, 'state') !== false) {
                     $columnMap['estado'] = $columnName;
                 }
-                elseif (stripos($columnName, 'numero_boleta') !== false || stripos($columnName, 'num_boleta') !== false || stripos($columnName, 'order_id') !== false) {
+                elseif (stripos($columnName, 'numero_boleta') !== false || stripos($columnName, 'num_boleta') !== false || stripos($columnName, 'orden_id') !== false || stripos($columnName, 'order_id') !== false || stripos($columnName, 'id_factura') !== false || stripos($columnName, 'pedido_id') !== false) {
                     $columnMap['numero_boleta'] = $columnName;
                 }
-                elseif (stripos($columnName, 'producto') !== false || stripos($columnName, 'product') !== false || stripos($columnName, 'item') !== false) {
+                elseif (stripos($columnName, 'producto') !== false || stripos($columnName, 'product') !== false || stripos($columnName, 'item') !== false || stripos($columnName, 'sku') !== false || stripos($columnName, 'descripcion') !== false) {
                     $columnMap['producto'] = $columnName;
                 }
                 elseif (stripos($columnName, 'monto_liquidacion') !== false || stripos($columnName, 'liquidacion') !== false) {
@@ -562,165 +563,167 @@ public function detailAction()
             error_log("Mapeo de columnas: " . json_encode($columnMap));
             
             // Establecer nombres de columna (o usar valores predeterminados si no se encuentran)
-            $colPrecioBase = $columnMap['precio_base'] ?? 'precio_base';
+            $colPrecioBase = $columnMap['precio_base'] ?? 'precio_sin_impuesto';
             $colImpuesto = $columnMap['impuesto'] ?? 'impuesto';
-            $colMontoTotal = $columnMap['monto_total'] ?? 'monto_total_boleta';
+            $colMontoTotal = $columnMap['monto_total'] ?? 'precio_despues_descuento';
             $colFechaCreacion = $columnMap['fecha_creacion'] ?? 'fecha_creacion';
             $colEstado = $columnMap['estado'] ?? 'estado';
-            $colNumeroBoletaDesambiguado = $columnMap['numero_boleta'] ?? 'numero_boleta';
+            $colNumeroBoletaDesambiguado = $columnMap['numero_boleta'] ?? 'id';
             $colProducto = $columnMap['producto'] ?? 'nombre_producto';
             $colMontoLiquidacion = $columnMap['monto_liquidacion'] ?? 'monto_liquidacion';
             $colMontoImpuestoBoleta = $columnMap['monto_impuesto_boleta'] ?? 'monto_impuesto_boleta';
             
             // Mes y año actuales para filtrar datos
-            $mes = date('n');  // Número de mes (1-12)
-            $anio = date('Y'); // Año actual
+            $mesActual = (int)date('n');  // Número de mes (1-12) con conversión explícita a entero
+            $anioActual = (int)date('Y'); // Año actual con conversión explícita a entero
             
-            try {
-                // CONSULTA #1: Ventas Totales usando exactamente la consulta proporcionada
-                $sqlVentasTotales = "SELECT
-                    estado,
-                    COUNT(*) AS cantidad_boletas,
-                    SUM(`$colMontoTotal`) AS total_boleta,
-                    SUM(`$colMontoImpuestoBoleta`) AS total_impuesto,
-                    SUM(`$colMontoLiquidacion`) AS total_base
-                FROM (
-                    SELECT
-                        `$colNumeroBoletaDesambiguado` AS numero_boleta,
-                        `$colEstado` AS estado,
-                        MAX(`$colMontoTotal`) AS monto_total_boleta,
-                        MAX(`$colMontoImpuestoBoleta`) AS monto_impuesto_boleta,
-                        MAX(`$colMontoLiquidacion`) AS monto_liquidacion
-                    FROM `$actualTableName`
-                    GROUP BY numero_boleta, estado
-                ) AS boletas_unicas
-                GROUP BY estado";
+            // Condición para filtrar registros cancelados (usado en múltiples consultas)
+            $condicionNoCancelado = "LOWER(`$colEstado`) NOT LIKE '%cancel%' 
+                AND LOWER(`$colEstado`) NOT LIKE '%anulad%'
+                AND LOWER(`$colEstado`) NOT LIKE '%rechaz%'
+                AND LOWER(`$colEstado`) NOT LIKE '%delet%'";
                 
-                error_log("Ejecutando consulta de ventas totales: $sqlVentasTotales");
+            $condicionSiCancelado = "LOWER(`$colEstado`) LIKE '%cancel%' 
+                OR LOWER(`$colEstado`) LIKE '%anulad%'
+                OR LOWER(`$colEstado`) LIKE '%rechaz%'
+                OR LOWER(`$colEstado`) LIKE '%delet%'";
+                
+            // Condición para el mes actual
+            $condicionMesActual = "MONTH(`$colFechaCreacion`) = $mesActual AND YEAR(`$colFechaCreacion`) = $anioActual";
+            
+            // CONSULTA 1: Ventas totales (todo el historial) - con unicidad de boletas
+            try {
+                $sqlVentasTotales = "SELECT 
+                    COUNT(DISTINCT `$colNumeroBoletaDesambiguado`) AS registros_totales,
+                    SUM(`$colMontoTotal`) AS monto_total_ventas
+                FROM `$actualTableName`
+                WHERE $condicionNoCancelado";
                 
                 $statementVentasTotales = $this->dbAdapter->createStatement($sqlVentasTotales);
-                $resultVentasTotales = $statementVentasTotales->execute();
+                $resultVentasTotales = $statementVentasTotales->execute()->current();
                 
-                if ($resultVentasTotales->count() > 0) {
-                    $totalVentas = 0;
-                    $totalRegistros = 0;
-                    $valorCancelado = 0;
-                    $transaccionesCanceladas = 0;
+                if ($resultVentasTotales) {
+                    $totalRegistros = (int)($resultVentasTotales['registros_totales'] ?? 0);
+                    $totalVentas = (float)($resultVentasTotales['monto_total_ventas'] ?? 0);
+                }
+            } catch (\Exception $e) {
+                error_log("Error en consulta de ventas totales: " . $e->getMessage());
+                
+                // Consulta alternativa sin DISTINCT si hay error
+                try {
+                    $sqlVentasTotalesAlt = "SELECT 
+                        COUNT(*) AS registros_totales,
+                        SUM(`$colMontoTotal`) AS monto_total_ventas
+                    FROM `$actualTableName`
+                    WHERE $condicionNoCancelado";
                     
-                    error_log("Resultados obtenidos de ventas totales: " . $resultVentasTotales->count());
+                    $statementVentasTotalesAlt = $this->dbAdapter->createStatement($sqlVentasTotalesAlt);
+                    $resultVentasTotalesAlt = $statementVentasTotalesAlt->execute()->current();
                     
-                    // Procesar resultados por estado
-                    foreach ($resultVentasTotales as $row) {
-                        error_log("Procesando estado: " . $row['estado'] . " - Cantidad: " . $row['cantidad_boletas'] . " - Total: " . $row['total_boleta']);
-                        
-                        $estado = strtolower($row['estado']);
-                        
-                        // Si es estado cancelado
-                        if (
-                            stripos($estado, 'cancel') !== false || 
-                            stripos($estado, 'delet') !== false || 
-                            stripos($estado, 'reject') !== false || 
-                            stripos($estado, 'expired') !== false
-                        ) {
-                            $valorCancelado += (float)($row['total_boleta'] ?? 0);
-                            $transaccionesCanceladas += (int)($row['cantidad_boletas'] ?? 0);
-                            error_log("Venta cancelada detectada: " . $row['estado'] . " - Valor: " . $row['total_boleta']);
-                        } else {
-                            // Sumar al total (excluyendo cancelados)
-                            $totalVentas += (float)($row['total_boleta'] ?? 0);
-                            $totalRegistros += (int)($row['cantidad_boletas'] ?? 0);
-                        }
+                    if ($resultVentasTotalesAlt) {
+                        $totalRegistros = (int)($resultVentasTotalesAlt['registros_totales'] ?? 0);
+                        $totalVentas = (float)($resultVentasTotalesAlt['monto_total_ventas'] ?? 0);
                     }
-                    
-                    error_log("Total ventas calculado: $totalVentas - Total registros: $totalRegistros");
-                    error_log("Valor cancelado calculado: $valorCancelado - Transacciones canceladas: $transaccionesCanceladas");
-                } else {
-                    error_log("No se encontraron resultados en la consulta de ventas totales.");
-                    
-                    // Consulta alternativa simple en caso de error
-                    $sqlVentasTotalesSimple = "SELECT 
-                        COUNT(DISTINCT `$colNumeroBoletaDesambiguado`) AS total_registros,
-                        SUM(`$colMontoTotal`) AS total_ventas
-                    FROM `$actualTableName`
-                    WHERE `$colEstado` NOT LIKE '%cancel%' 
-                      AND `$colEstado` NOT LIKE '%delet%'
-                      AND `$colEstado` NOT LIKE '%reject%'
-                      AND `$colEstado` NOT LIKE '%expired%'";
-                    
-                    $stmtSimple = $this->dbAdapter->createStatement($sqlVentasTotalesSimple);
-                    $resultSimple = $stmtSimple->execute()->current();
-                    
-                    $totalVentas = (float)($resultSimple['total_ventas'] ?? 0);
-                    $totalRegistros = (int)($resultSimple['total_registros'] ?? 0);
-                    
-                    // Consulta alternativa para ventas canceladas
-                    $sqlCanceladasSimple = "SELECT 
-                        COUNT(DISTINCT `$colNumeroBoletaDesambiguado`) AS total_canceladas,
-                        SUM(`$colMontoTotal`) AS valor_cancelado
-                    FROM `$actualTableName`
-                    WHERE `$colEstado` LIKE '%cancel%' 
-                       OR `$colEstado` LIKE '%delet%'
-                       OR `$colEstado` LIKE '%reject%'
-                       OR `$colEstado` LIKE '%expired%'";
-                    
-                    $stmtCanceladasSimple = $this->dbAdapter->createStatement($sqlCanceladasSimple);
-                    $resultCanceladasSimple = $stmtCanceladasSimple->execute()->current();
-                    
-                    $valorCancelado = (float)($resultCanceladasSimple['valor_cancelado'] ?? 0);
-                    $transaccionesCanceladas = (int)($resultCanceladasSimple['total_canceladas'] ?? 0);
+                } catch (\Exception $e2) {
+                    error_log("Error en consulta alternativa de ventas totales: " . $e2->getMessage());
                 }
+            }
+            
+            // CONSULTA 2: Ventas del mes actual - con unicidad de boletas
+            try {
+                $sqlVentasMes = "SELECT 
+                    COUNT(DISTINCT `$colNumeroBoletaDesambiguado`) AS registros_mes,
+                    SUM(`$colMontoTotal`) AS monto_mes,
+                    SUM(`$colImpuesto`) AS impuesto_mes
+                FROM `$actualTableName`
+                WHERE $condicionMesActual
+                AND $condicionNoCancelado";
                 
-                // CONSULTA #2: Venta Bruta Mensual e Impuesto Bruto Mensual con boletas únicas (del mes actual)
-                $sqlVentaMensual = "SELECT
-                    SUM(total_base) AS venta_bruta,
-                    SUM(total_impuesto) AS impuesto_bruto,
-                    SUM(cantidad_boletas) AS cantidad_boletas
-                FROM (
-                    SELECT
-                        estado,
-                        COUNT(*) AS cantidad_boletas,
-                        SUM(`$colMontoTotal`) AS total_boleta,
-                        SUM(`$colMontoImpuestoBoleta`) AS total_impuesto,
-                        SUM(`$colMontoLiquidacion`) AS total_base
-                    FROM (
-                        SELECT
-                            `$colNumeroBoletaDesambiguado` AS numero_boleta,
-                            `$colEstado` AS estado,
-                            MAX(`$colMontoTotal`) AS monto_total_boleta,
-                            MAX(`$colMontoImpuestoBoleta`) AS monto_impuesto_boleta,
-                            MAX(`$colMontoLiquidacion`) AS monto_liquidacion
-                        FROM `$actualTableName`
-                        WHERE MONTH(`$colFechaCreacion`) = $mes AND YEAR(`$colFechaCreacion`) = $anio
-                        GROUP BY numero_boleta, estado
-                    ) AS boletas_unicas
-                    GROUP BY estado
-                ) AS resumen_mensual
-                WHERE LOWER(estado) NOT LIKE '%cancel%'
-                  AND LOWER(estado) NOT LIKE '%delet%'
-                  AND LOWER(estado) NOT LIKE '%reject%'
-                  AND LOWER(estado) NOT LIKE '%expired%'";
+                $statementVentasMes = $this->dbAdapter->createStatement($sqlVentasMes);
+                $resultVentasMes = $statementVentasMes->execute()->current();
                 
-                $statementVentaMensual = $this->dbAdapter->createStatement($sqlVentaMensual);
-                $resultVentaMensual = $statementVentaMensual->execute()->current();
-                
-                if ($resultVentaMensual) {
-                    $ventaBrutaMensual = (float)($resultVentaMensual['venta_bruta'] ?? 0);
-                    $impuestoBrutoMensual = (float)($resultVentaMensual['impuesto_bruto'] ?? 0);
-                    $totalTransaccionesMes = (int)($resultVentaMensual['cantidad_boletas'] ?? 0);
-                    
-                    error_log("Venta bruta mensual: $ventaBrutaMensual, Impuesto: $impuestoBrutoMensual, Transacciones: $totalTransaccionesMes");
+                if ($resultVentasMes) {
+                    $totalTransaccionesMes = (int)($resultVentasMes['registros_mes'] ?? 0);
+                    $ventaBrutaMensual = (float)($resultVentasMes['monto_mes'] ?? 0);
+                    $impuestoBrutoMensual = (float)($resultVentasMes['impuesto_mes'] ?? 0);
                 }
+            } catch (\Exception $e) {
+                error_log("Error en consulta de ventas mes: " . $e->getMessage());
                 
-                // CONSULTA #3: Datos para el gráfico de ventas anuales con unicidad por boleta
-                $sqlVentasPorMes = "SELECT
+                // Consulta alternativa sin DISTINCT si hay error
+                try {
+                    $sqlVentasMesAlt = "SELECT 
+                        COUNT(*) AS registros_mes,
+                        SUM(`$colMontoTotal`) AS monto_mes,
+                        SUM(`$colImpuesto`) AS impuesto_mes
+                    FROM `$actualTableName`
+                    WHERE $condicionMesActual
+                    AND $condicionNoCancelado";
+                    
+                    $statementVentasMesAlt = $this->dbAdapter->createStatement($sqlVentasMesAlt);
+                    $resultVentasMesAlt = $statementVentasMesAlt->execute()->current();
+                    
+                    if ($resultVentasMesAlt) {
+                        $totalTransaccionesMes = (int)($resultVentasMesAlt['registros_mes'] ?? 0);
+                        $ventaBrutaMensual = (float)($resultVentasMesAlt['monto_mes'] ?? 0);
+                        $impuestoBrutoMensual = (float)($resultVentasMesAlt['impuesto_mes'] ?? 0);
+                    }
+                } catch (\Exception $e2) {
+                    error_log("Error en consulta alternativa de ventas mes: " . $e2->getMessage());
+                }
+            }
+            
+            // CONSULTA 3: Ventas canceladas del mes actual - con unicidad de boletas
+            try {
+                $sqlCanceladas = "SELECT 
+                    COUNT(DISTINCT `$colNumeroBoletaDesambiguado`) AS registros_cancelados,
+                    SUM(`$colMontoTotal`) AS monto_cancelado
+                FROM `$actualTableName`
+                WHERE $condicionMesActual
+                AND ($condicionSiCancelado)";
+                
+                $statementCanceladas = $this->dbAdapter->createStatement($sqlCanceladas);
+                $resultCanceladas = $statementCanceladas->execute()->current();
+                
+                if ($resultCanceladas) {
+                    $transaccionesCanceladas = (int)($resultCanceladas['registros_cancelados'] ?? 0);
+                    $valorCancelado = (float)($resultCanceladas['monto_cancelado'] ?? 0);
+                }
+            } catch (\Exception $e) {
+                error_log("Error en consulta de canceladas: " . $e->getMessage());
+                
+                // Consulta alternativa sin DISTINCT si hay error
+                try {
+                    $sqlCanceladasAlt = "SELECT 
+                        COUNT(*) AS registros_cancelados,
+                        SUM(`$colMontoTotal`) AS monto_cancelado
+                    FROM `$actualTableName`
+                    WHERE $condicionMesActual
+                    AND ($condicionSiCancelado)";
+                    
+                    $statementCanceladasAlt = $this->dbAdapter->createStatement($sqlCanceladasAlt);
+                    $resultCanceladasAlt = $statementCanceladasAlt->execute()->current();
+                    
+                    if ($resultCanceladasAlt) {
+                        $transaccionesCanceladas = (int)($resultCanceladasAlt['registros_cancelados'] ?? 0);
+                        $valorCancelado = (float)($resultCanceladasAlt['monto_cancelado'] ?? 0);
+                    }
+                } catch (\Exception $e2) {
+                    error_log("Error en consulta alternativa de canceladas: " . $e2->getMessage());
+                }
+            }
+            
+            // CONSULTA 4: Ventas por mes del año actual (para gráfico anual) - con unicidad de boletas
+            try {
+                $sqlVentasPorMes = "SELECT 
                     mes_anio,
                     nombre_mes,
-                    SUM(total_boleta) AS total_monto,
-                    SUM(cantidad_boletas) AS cantidad_boletas
+                    SUM(total_boleta) AS ventas,
+                    SUM(cantidad_boletas) AS cantidad
                 FROM (
                     SELECT
                         DATE_FORMAT(`$colFechaCreacion`, '%Y-%m') AS mes_anio,
-                        DATE_FORMAT(`$colFechaCreacion`, '%b %Y') AS nombre_mes,
+                        DATE_FORMAT(`$colFechaCreacion`, '%M %Y') AS nombre_mes,
                         estado,
                         COUNT(*) AS cantidad_boletas,
                         SUM(`$colMontoTotal`) AS total_boleta
@@ -731,101 +734,243 @@ public function detailAction()
                             MAX(`$colFechaCreacion`) AS fecha_creacion,
                             MAX(`$colMontoTotal`) AS monto_total_boleta
                         FROM `$actualTableName`
+                        WHERE YEAR(`$colFechaCreacion`) = $anioActual
                         GROUP BY numero_boleta, estado
                     ) AS boletas_unicas
                     GROUP BY mes_anio, nombre_mes, estado
                 ) AS ventas_mensuales
-                WHERE LOWER(estado) NOT LIKE '%cancel%'
-                  AND LOWER(estado) NOT LIKE '%delet%'
-                  AND LOWER(estado) NOT LIKE '%reject%'
-                  AND LOWER(estado) NOT LIKE '%expired%'
+                WHERE $condicionNoCancelado
                 GROUP BY mes_anio, nombre_mes
                 ORDER BY mes_anio ASC";
                 
                 $statementVentasPorMes = $this->dbAdapter->createStatement($sqlVentasPorMes);
                 $resultVentasPorMes = $statementVentasPorMes->execute();
                 
+                // Generar array con todos los meses del año actual
                 $ventasAnualesArray = [];
+                $mesesDelAnio = [];
                 
+                // Crear el arreglo de meses completo del año - asegurando que todos los valores son enteros
+                for ($mes = 1; $mes <= 12; $mes++) {
+                    $timestamp = mktime(0, 0, 0, (int)$mes, 1, $anioActual);
+                    $nombreMes = date('F Y', $timestamp); // Nombre de mes en inglés con año
+                    $mesAnio = date('Y-m', $timestamp);
+                    $mesesDelAnio[$mesAnio] = [
+                        'mes' => $nombreMes,
+                        'ventas' => 0,
+                        'cantidad' => 0
+                    ];
+                }
+                
+                // Rellenar con datos reales donde existan
                 if ($resultVentasPorMes->count() > 0) {
                     foreach ($resultVentasPorMes as $row) {
-                        $ventasAnualesArray[] = [
+                        $mesAnio = date('Y-m', strtotime($row['mes_anio']));
+                        $mesesDelAnio[$mesAnio] = [
                             'mes' => $row['nombre_mes'],
-                            'monto' => (float)($row['total_monto'] ?? 0),
-                            'cantidad' => (int)($row['cantidad_boletas'] ?? 0)
+                            'ventas' => (float)($row['ventas'] ?? 0),
+                            'cantidad' => (int)($row['cantidad'] ?? 0)
+                        ];
+                    }
+                }
+                
+                // Convertir a array simple para JSON
+                foreach ($mesesDelAnio as $mesData) {
+                    $ventasAnualesArray[] = $mesData;
+                }
+                
+                // Solo incluir hasta el mes actual (opcional) - asegurando que $mesActual es entero
+                $ventasAnualesArray = array_slice($ventasAnualesArray, 0, (int)$mesActual);
+                
+            } catch (\Exception $e) {
+                error_log("Error en consulta de ventas por mes: " . $e->getMessage());
+                
+                // Consulta alternativa más simple si hay error
+                try {
+                    $sqlVentasPorMesAlt = "SELECT 
+                        DATE_FORMAT(`$colFechaCreacion`, '%Y-%m') AS mes_anio,
+                        DATE_FORMAT(`$colFechaCreacion`, '%M %Y') AS nombre_mes,
+                        COUNT(DISTINCT `$colNumeroBoletaDesambiguado`) AS cantidad,
+                        SUM(`$colMontoTotal`) AS ventas
+                    FROM `$actualTableName`
+                    WHERE $condicionNoCancelado
+                    AND YEAR(`$colFechaCreacion`) = $anioActual
+                    GROUP BY mes_anio, nombre_mes
+                    ORDER BY mes_anio ASC";
+                    
+                    $statementVentasPorMesAlt = $this->dbAdapter->createStatement($sqlVentasPorMesAlt);
+                    $resultVentasPorMesAlt = $statementVentasPorMesAlt->execute();
+                    
+                    // Generar array con todos los meses del año actual
+                    $ventasAnualesArray = [];
+                    $mesesDelAnio = [];
+                    
+                    // Crear el arreglo de meses completo del año - asegurando que todos los valores son enteros
+                    for ($mes = 1; $mes <= 12; $mes++) {
+                        $timestamp = mktime(0, 0, 0, (int)$mes, 1, $anioActual);
+                        $nombreMes = date('F Y', $timestamp); // Nombre de mes en inglés con año
+                        $mesAnio = date('Y-m', $timestamp);
+                        $mesesDelAnio[$mesAnio] = [
+                            'mes' => $nombreMes,
+                            'ventas' => 0,
+                            'cantidad' => 0
                         ];
                     }
                     
-                    error_log("Datos de ventas anuales: " . json_encode($ventasAnualesArray));
-                    $jsonVentasAnuales = json_encode($ventasAnualesArray);
+                    // Rellenar con datos reales donde existan
+                    if ($resultVentasPorMesAlt->count() > 0) {
+                        foreach ($resultVentasPorMesAlt as $row) {
+                            $mesAnio = date('Y-m', strtotime($row['mes_anio']));
+                            $mesesDelAnio[$mesAnio] = [
+                                'mes' => $row['nombre_mes'],
+                                'ventas' => (float)($row['ventas'] ?? 0),
+                                'cantidad' => (int)($row['cantidad'] ?? 0)
+                            ];
+                        }
+                    }
+                    
+                    // Convertir a array simple para JSON
+                    foreach ($mesesDelAnio as $mesData) {
+                        $ventasAnualesArray[] = $mesData;
+                    }
+                    
+                    // Solo incluir hasta el mes actual (opcional) - asegurando que $mesActual es entero
+                    $ventasAnualesArray = array_slice($ventasAnualesArray, 0, (int)$mesActual);
+                    
+                } catch (\Exception $e2) {
+                    error_log("Error en consulta alternativa de ventas por mes: " . $e2->getMessage());
                 }
-                
-                // CONSULTA #4: Top 10 productos más vendidos del mes actual
-                $sqlTopProductos = "SELECT
+            }
+            
+            // CONSULTA 5: Top 10 productos del mes actual - con unicidad de boletas
+            try {
+                $sqlTopProductos = "SELECT 
                     producto,
-                    SUM(cantidad) AS cantidad_total,
-                    SUM(monto_total) AS monto_total
+                    SUM(cantidad) AS cantidad,
+                    SUM(ventas) AS ventas
                 FROM (
                     SELECT
                         `$colProducto` AS producto,
                         COUNT(DISTINCT `$colNumeroBoletaDesambiguado`) AS cantidad,
-                        SUM(`$colMontoTotal`) AS monto_total
+                        SUM(`$colMontoTotal`) AS ventas
                     FROM `$actualTableName`
-                    WHERE MONTH(`$colFechaCreacion`) = $mes 
-                      AND YEAR(`$colFechaCreacion`) = $anio
-                      AND LOWER(`$colEstado`) NOT LIKE '%cancel%'
-                      AND LOWER(`$colEstado`) NOT LIKE '%delet%'
-                      AND LOWER(`$colEstado`) NOT LIKE '%reject%'
-                      AND LOWER(`$colEstado`) NOT LIKE '%expired%'
-                      AND `$colProducto` IS NOT NULL
-                      AND `$colProducto` != ''
+                    WHERE $condicionMesActual
+                    AND $condicionNoCancelado
+                    AND `$colProducto` IS NOT NULL
+                    AND `$colProducto` != ''
                     GROUP BY producto
                 ) AS productos_unicos
                 GROUP BY producto
-                ORDER BY monto_total DESC
+                ORDER BY ventas DESC
                 LIMIT 10";
                 
                 $statementTopProductos = $this->dbAdapter->createStatement($sqlTopProductos);
                 $resultTopProductos = $statementTopProductos->execute();
                 
-                $topProductosArray = [];
-                
                 if ($resultTopProductos->count() > 0) {
                     foreach ($resultTopProductos as $row) {
-                        // Evitar errores por valores nulos
+                        // Extraer nombre del producto (limitar a 50 caracteres)
                         $nombreProducto = $row['producto'] ?? 'Producto sin nombre';
+                        if (strlen($nombreProducto) > 50) {
+                            $nombreProducto = substr($nombreProducto, 0, 47) . '...';
+                        }
                         
                         $topProductosArray[] = [
-                            'nombre' => substr($nombreProducto, 0, 50) . (strlen($nombreProducto) > 50 ? '...' : ''),
-                            'cantidad' => (int)($row['cantidad_total'] ?? 0),
-                            'monto' => (float)($row['monto_total'] ?? 0)
+                            'nombre' => $nombreProducto,
+                            'ventas' => (float)($row['ventas'] ?? 0),
+                            'cantidad' => (int)($row['cantidad'] ?? 0)
                         ];
                     }
+                } else {
+                    // Si no hay productos este mes, buscar de cualquier fecha
+                    $sqlTopProductosHistorico = "SELECT 
+                        producto,
+                        SUM(cantidad) AS cantidad,
+                        SUM(ventas) AS ventas
+                    FROM (
+                        SELECT
+                            `$colProducto` AS producto,
+                            COUNT(DISTINCT `$colNumeroBoletaDesambiguado`) AS cantidad,
+                            SUM(`$colMontoTotal`) AS ventas
+                        FROM `$actualTableName`
+                        WHERE $condicionNoCancelado
+                        AND `$colProducto` IS NOT NULL
+                        AND `$colProducto` != ''
+                        GROUP BY producto
+                    ) AS productos_unicos_historicos
+                    GROUP BY producto
+                    ORDER BY ventas DESC
+                    LIMIT 10";
                     
-                    error_log("Top productos: " . json_encode($topProductosArray));
-                    $jsonTopProductos = json_encode($topProductosArray);
+                    $statementTopProductosHistorico = $this->dbAdapter->createStatement($sqlTopProductosHistorico);
+                    $resultTopProductosHistorico = $statementTopProductosHistorico->execute();
+                    
+                    if ($resultTopProductosHistorico->count() > 0) {
+                        foreach ($resultTopProductosHistorico as $row) {
+                            $nombreProducto = $row['producto'] ?? 'Producto sin nombre';
+                            if (strlen($nombreProducto) > 50) {
+                                $nombreProducto = substr($nombreProducto, 0, 47) . '...';
+                            }
+                            
+                            $topProductosArray[] = [
+                                'nombre' => $nombreProducto,
+                                'ventas' => (float)($row['ventas'] ?? 0),
+                                'cantidad' => (int)($row['cantidad'] ?? 0)
+                            ];
+                        }
+                    }
                 }
-                
             } catch (\Exception $e) {
-                // Log del error para depuración
-                error_log("Error en consultas de KPIs: " . $e->getMessage());
-                error_log("Rastreo: " . $e->getTraceAsString());
+                error_log("Error en consulta de top productos: " . $e->getMessage());
                 
-                // Establecer valores predeterminados
-                $ventaBrutaMensual = 0;
-                $impuestoBrutoMensual = 0;
-                $totalTransaccionesMes = 0;
-                $totalVentas = 0;
-                $totalRegistros = 0;
-                $valorCancelado = 0;
-                $transaccionesCanceladas = 0;
-                $jsonVentasAnuales = '[]';
-                $jsonTopProductos = '[]';
+                // Consulta alternativa sin subconsultas
+                try {
+                    $sqlTopProductosAlt = "SELECT 
+                        `$colProducto` AS producto,
+                        COUNT(DISTINCT `$colNumeroBoletaDesambiguado`) AS cantidad,
+                        SUM(`$colMontoTotal`) AS ventas
+                    FROM `$actualTableName`
+                    WHERE $condicionMesActual
+                    AND $condicionNoCancelado
+                    AND `$colProducto` IS NOT NULL
+                    AND `$colProducto` != ''
+                    GROUP BY producto
+                    ORDER BY ventas DESC
+                    LIMIT 10";
+                    
+                    $statementTopProductosAlt = $this->dbAdapter->createStatement($sqlTopProductosAlt);
+                    $resultTopProductosAlt = $statementTopProductosAlt->execute();
+                    
+                    if ($resultTopProductosAlt->count() > 0) {
+                        $topProductosArray = []; // Limpiamos por si acaso
+                        foreach ($resultTopProductosAlt as $row) {
+                            $nombreProducto = $row['producto'] ?? 'Producto sin nombre';
+                            if (strlen($nombreProducto) > 50) {
+                                $nombreProducto = substr($nombreProducto, 0, 47) . '...';
+                            }
+                            
+                            $topProductosArray[] = [
+                                'nombre' => $nombreProducto,
+                                'ventas' => (float)($row['ventas'] ?? 0),
+                                'cantidad' => (int)($row['cantidad'] ?? 0)
+                            ];
+                        }
+                    }
+                } catch (\Exception $e2) {
+                    error_log("Error en consulta alternativa de top productos: " . $e2->getMessage());
+                }
             }
+            
         } catch (\Exception $e) {
-            error_log("Error al obtener columnas: " . $e->getMessage());
+            // Log del error para depuración
+            error_log("Error en consultas de KPIs: " . $e->getMessage());
+            error_log("Rastreo: " . $e->getTraceAsString());
         }
     }
+    
+    // Codificar los arrays para pasar a la vista (con manejo de errores)
+    $jsonVentasAnuales = json_encode($ventasAnualesArray) ?: '[]';
+    $jsonTopProductos = json_encode($topProductosArray) ?: '[]';
     
     return new ViewModel([
         'table'                   => $table,
@@ -836,18 +981,19 @@ public function detailAction()
         'total'                   => $total,
         'search'                  => $search,
         'filters'                 => $filters,
-        'ventaBrutaMensual'       => $ventaBrutaMensual ?? 0,
-        'impuestoBrutoMensual'    => $impuestoBrutoMensual ?? 0,
-        'totalTransaccionesMes'   => $totalTransaccionesMes ?? 0,
-        'totalVentas'             => $totalVentas ?? 0,
-        'totalRegistros'          => $totalRegistros ?? 0,
-        'valorCancelado'          => $valorCancelado ?? 0,
-        'transaccionesCanceladas' => $transaccionesCanceladas ?? 0,
-        'jsonVentasAnuales'       => $jsonVentasAnuales ?? '[]',
-        'jsonTopProductos'        => $jsonTopProductos ?? '[]',
-        'isParisMkp'              => $isParisMkp
+        'ventaBrutaMensual'       => $ventaBrutaMensual,
+        'impuestoBrutoMensual'    => $impuestoBrutoMensual,
+        'totalTransaccionesMes'   => $totalTransaccionesMes,
+        'totalVentas'             => $totalVentas,
+        'totalRegistros'          => $totalRegistros,
+        'valorCancelado'          => $valorCancelado,
+        'transaccionesCanceladas' => $transaccionesCanceladas,
+        'jsonVentasAnuales'       => $jsonVentasAnuales,
+        'jsonTopProductos'        => $jsonTopProductos
     ]);
 }
+
+
     /**
      * Método para exportar a CSV
      */

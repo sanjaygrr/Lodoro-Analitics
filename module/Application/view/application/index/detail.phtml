@@ -11,7 +11,29 @@
      * @var int    $total       Total de registros.
      * @var string $search      Término de búsqueda global.
      * @var array  $filters     Filtros aplicados.
+     * 
+     * Variables para KPIs y gráficos:
+     * @var float $ventaBrutaMensual
+     * @var float $impuestoBrutoMensual
+     * @var int $totalTransaccionesMes
+     * @var float $valorCancelado
+     * @var int $transaccionesCanceladas
+     * @var float $totalVentas
+     * @var int $totalRegistros
+     * @var string $jsonVentasAnuales
+     * @var string $jsonTopProductos
      */
+
+    // Asegurarse de que todas las variables KPI existan
+    if (!isset($ventaBrutaMensual)) $ventaBrutaMensual = 0;
+    if (!isset($impuestoBrutoMensual)) $impuestoBrutoMensual = 0;
+    if (!isset($totalTransaccionesMes)) $totalTransaccionesMes = 0;
+    if (!isset($valorCancelado)) $valorCancelado = 0;
+    if (!isset($transaccionesCanceladas)) $transaccionesCanceladas = 0;
+    if (!isset($totalVentas)) $totalVentas = 0;
+    if (!isset($totalRegistros)) $totalRegistros = $total ?? 0;
+    if (!isset($jsonVentasAnuales)) $jsonVentasAnuales = '[]';
+    if (!isset($jsonTopProductos)) $jsonTopProductos = '[]';
 
     // Función para formatear los nombres de las columnas
     function formatColumnName($column) {
@@ -91,6 +113,8 @@
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.13.2/themes/base/jquery-ui.min.css">
         <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
         <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+        <!-- Chart.js para gráficos (una sola inclusión) -->
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
     </head>
     <body>
 
@@ -148,791 +172,801 @@
 
         <div class="dashboard-content">
             <!-- Dashboard de resumen con KPIs y gráficos -->
-            <?php if (!empty($data)): 
-                // Función para formatear valores numéricos como moneda
-                function formatCurrency($amount) {
-                    return '$ ' . number_format($amount, 2, ',', '.');
-                }
-                
-                // Preprocesar datos para KPIs y gráficos
-                $totalVentas = 0;
-                $totalImpuestos = 0;
-                $totalCosto = 0;
-                $totalMargen = 0;
-                
-                // Contadores para visualizaciones
-                $ventasPorMes = [];
-                $margenPorMes = [];
-                $ventasPorCliente = [];
-                $ventasPorProducto = [];
-                $topProductos = [];
-                
-                // Procesar cada fila para extraer datos relevantes
-                foreach ($data as $row) {
-                    // Datos financieros
-                    $precio = isset($row['precio_despues_descuento']) ? floatval($row['precio_despues_descuento']) : 0;
-                    $costo = isset($row['costo']) ? floatval($row['costo']) : 0;
-                    $impuesto = isset($row['impuesto']) ? floatval($row['impuesto']) : 0;
-                    $margen = $precio - $costo;
-                    
-                    $totalVentas += $precio;
-                    $totalImpuestos += $impuesto;
-                    $totalCosto += $costo;
-                    $totalMargen += $margen;
-                    
-                    // Extraer fecha para agrupación por mes
-                    $fechaCreacion = '';
-                    if (isset($row['fecha_creacion'])) {
-                        $fecha = null;
-                        $formatos = ['Y-m-d H:i:s', 'Y-m-d H:i', 'Y-m-d', 'd/m/Y'];
-                        
-                        foreach ($formatos as $formato) {
-                            $fechaObj = DateTime::createFromFormat($formato, $row['fecha_creacion']);
-                            if ($fechaObj !== false) {
-                                $fecha = $fechaObj;
-                                break;
-                            }
-                        }
-                        
-                        if ($fecha) {
-                            $mes = $fecha->format('Y-m');
-                            $mesNombre = $fecha->format('M Y');
-                            
-                            // Agrupar ventas por mes
-                            if (!isset($ventasPorMes[$mes])) {
-                                $ventasPorMes[$mes] = [
-                                    'nombre' => $mesNombre,
-                                    'ventas' => 0,
-                                    'impuestos' => 0,
-                                    'costo' => 0,
-                                    'margen' => 0,
-                                    'cantidad' => 0
-                                ];
-                            }
-                            
-                            $ventasPorMes[$mes]['ventas'] += $precio;
-                            $ventasPorMes[$mes]['impuestos'] += $impuesto;
-                            $ventasPorMes[$mes]['costo'] += $costo;
-                            $ventasPorMes[$mes]['margen'] += $margen;
-                            $ventasPorMes[$mes]['cantidad']++;
-                        }
-                    }
-                    
-                    // Agrupar por cliente
-                    $nombreCliente = isset($row['nombre_cliente']) ? $row['nombre_cliente'] : 'Sin especificar';
-                    if (!empty($nombreCliente)) {
-                        if (!isset($ventasPorCliente[$nombreCliente])) {
-                            $ventasPorCliente[$nombreCliente] = 0;
-                        }
-                        $ventasPorCliente[$nombreCliente] += $precio;
-                    }
-                    
-                    // Agrupar por producto
-                    $nombreProducto = isset($row['nombre_producto']) ? $row['nombre_producto'] : '';
-                    $sku = isset($row['codigo_sku']) ? $row['codigo_sku'] : '';
-                    $productoKey = !empty($nombreProducto) ? $nombreProducto : $sku;
-                    
-                    if (!empty($productoKey)) {
-                        if (!isset($ventasPorProducto[$productoKey])) {
-                            $ventasPorProducto[$productoKey] = [
-                                'ventas' => 0,
-                                'cantidad' => 0,
-                                'margen' => 0
-                            ];
-                        }
-                        $ventasPorProducto[$productoKey]['ventas'] += $precio;
-                        $ventasPorProducto[$productoKey]['cantidad']++;
-                        $ventasPorProducto[$productoKey]['margen'] += $margen;
-                    }
-                }
-                
-                // Ordenar ventas por mes (cronológicamente)
-                ksort($ventasPorMes);
-                
-                // Obtener los 5 clientes con más ventas
-                arsort($ventasPorCliente);
-                $topClientes = array_slice($ventasPorCliente, 0, 10, true);
-                
-                // Obtener los 10 productos más vendidos (por valor)
-                uasort($ventasPorProducto, function($a, $b) {
-                    return $b['ventas'] <=> $a['ventas'];
-                });
-                $topProductos = array_slice($ventasPorProducto, 0, 10, true);
-                
-                // Calcular porcentajes para KPIs
-                $margenPromedio = $totalVentas > 0 ? ($totalMargen / $totalVentas * 100) : 0;
-                
-                // Preparar datos para gráficos en formato JSON
-                $datosVentasMes = [];
-                $datosMargenMes = [];
-                
-                foreach ($ventasPorMes as $mes => $info) {
-                    $datosVentasMes[] = [
-                        'mes' => $info['nombre'],
-                        'ventas' => round($info['ventas'], 2),
-                        'costo' => round($info['costo'], 2)
-                    ];
-                    
-                    $datosMargenMes[] = [
-                        'mes' => $info['nombre'],
-                        'margen' => round($info['margen'], 2),
-                        'porcentaje' => $info['ventas'] > 0 ? round(($info['margen'] / $info['ventas'] * 100), 2) : 0
-                    ];
-                }
-                
-                $jsonVentasMes = json_encode($datosVentasMes);
-                $jsonMargenMes = json_encode($datosMargenMes);
-                
-                // Preparar datos para gráfico de clientes
-                $datosClientes = [];
-                foreach ($topClientes as $cliente => $ventas) {
-                    $datosClientes[] = [
-                        'nombre' => $cliente,
-                        'ventas' => round($ventas, 2)
-                    ];
-                }
-                $jsonClientes = json_encode($datosClientes);
-                
-                // Preparar datos para gráfico de productos
-                $datosProductos = [];
-                foreach ($topProductos as $producto => $info) {
-                    $datosProductos[] = [
-                        'nombre' => $producto,
-                        'ventas' => round($info['ventas'], 2),
-                        'cantidad' => $info['cantidad'],
-                        'margen' => round($info['margen'], 2)
-                    ];
-                }
-                $jsonProductos = json_encode($datosProductos);
-            ?>
-
-            <div class="dashboard-summary">
-                <div class="dashboard-header">
-                    <div class="header-content">
-                        <h2 class="section-title">
-                            <i class="fas fa-chart-line"></i>
-                            <span>Dashboard de Resumen</span>
-                        </h2>
-                        <div class="dashboard-actions">
-                            <button class="btn btn-primary" id="toggle-charts">
-                                <i class="fas fa-chart-bar"></i>
-                                <span>Mostrar/Ocultar Gráficos</span>
-                            </button>
-                            <div class="date-filter">
-                                <i class="fas fa-calendar-alt"></i>
-                                <select id="periodo-select" class="period-select">
-                                    <option value="todos">Todos los períodos</option>
-                                    <?php foreach ($ventasPorMes as $mes => $info): ?>
-                                        <option value="<?= $mes ?>"><?= $info['nombre'] ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
+            <?php if (!empty($data) && (stripos($table, 'paris') !== false || stripos($table, 'mkp') !== false)): ?>
                 <!-- Tarjetas de KPIs -->
                 <div class="kpi-container">
+                    <!-- Venta Bruta Mensual -->
                     <div class="kpi-card">
                         <div class="kpi-icon">
                             <i class="fas fa-dollar-sign"></i>
                         </div>
                         <div class="kpi-content">
-                            <h3 class="kpi-title">Ventas Totales</h3>
-                            <div class="kpi-value"><?= formatCurrency($totalVentas) ?></div>
+                            <h3 class="kpi-title">Venta Bruta Mensual</h3>
+                            <div class="kpi-value">$ <?= number_format($ventaBrutaMensual, 0, ',', '.') ?></div>
                             <div class="kpi-description">
-                                <?= count($data) ?> transacciones
+                                <?= $totalTransaccionesMes ?> transacciones este mes
                             </div>
                         </div>
                     </div>
                     
+                    <!-- Impuesto Bruto Mensual -->
                     <div class="kpi-card">
                         <div class="kpi-icon">
                             <i class="fas fa-percentage"></i>
                         </div>
                         <div class="kpi-content">
-                            <h3 class="kpi-title">Margen Promedio</h3>
-                            <div class="kpi-value"><?= number_format($margenPromedio, 2) ?>%</div>
+                            <h3 class="kpi-title">Impuesto Bruto Mensual</h3>
+                            <div class="kpi-value">$ <?= number_format($impuestoBrutoMensual, 0, ',', '.') ?></div>
                             <div class="kpi-description">
-                                Total: <?= formatCurrency($totalMargen) ?>
+                                IVA de ventas mensuales
                             </div>
                         </div>
                     </div>
                     
+                    <!-- Ventas Totales -->
                     <div class="kpi-card">
                         <div class="kpi-icon">
-                            <i class="fas fa-shopping-cart"></i>
+                            <i class="fas fa-chart-line"></i>
                         </div>
                         <div class="kpi-content">
-                            <h3 class="kpi-title">Valor Promedio</h3>
-                            <div class="kpi-value">
-                                <?= formatCurrency($totalVentas / (count($data) ?: 1)) ?>
-                            </div>
+                            <h3 class="kpi-title">Ventas Totales</h3>
+                            <div class="kpi-value">$ <?= number_format($totalVentas, 0, ',', '.') ?></div>
                             <div class="kpi-description">
-                                Por transacción
+                                <?= $totalRegistros ?> transacciones totales
                             </div>
                         </div>
                     </div>
                     
-                    <div class="kpi-card">
-                        <div class="kpi-icon">
-                            <i class="fas fa-chart-pie"></i>
+                    <!-- Ventas Canceladas -->
+                    <div class="kpi-card" style="border-left-color: #f44336;">
+                        <div class="kpi-icon" style="color: #f44336;">
+                            <i class="fas fa-ban"></i>
                         </div>
                         <div class="kpi-content">
-                            <h3 class="kpi-title">Impuestos</h3>
-                            <div class="kpi-value"><?= formatCurrency($totalImpuestos) ?></div>
+                            <h3 class="kpi-title">Ventas Canceladas</h3>
+                            <div class="kpi-value">$ <?= number_format($valorCancelado, 0, ',', '.') ?></div>
                             <div class="kpi-description">
-                                <?= number_format($totalImpuestos / ($totalVentas ?: 1) * 100, 2) ?>% del total
+                                <?= $transaccionesCanceladas ?> pedidos cancelados
                             </div>
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Sección de gráficos -->
-                <div id="charts-section" class="charts-container">
-                    <div class="chart-row">
-                        <div class="chart-card">
-                            <div class="chart-header">
-                                <h3 class="chart-title">Ventas por Mes</h3>
-                            </div>
-                            <div class="chart-body">
-                                <canvas id="ventasMesChart"></canvas>
-                            </div>
+                <div class="charts-grid">
+                    <!-- Gráfico de Ventas Anuales -->
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3>Ventas Anuales</h3>
                         </div>
-                        
-                        <div class="chart-card">
-                            <div class="chart-header">
-                                <h3 class="chart-title">Margen por Mes</h3>
-                            </div>
-                            <div class="chart-body">
-                                <canvas id="margenMesChart"></canvas>
-                            </div>
+                        <div class="chart-body">
+                            <canvas id="ventasAnualesChart"></canvas>
                         </div>
                     </div>
                     
-                    <div class="chart-row">
-                        <div class="chart-card">
-                            <div class="chart-header">
-                                <h3 class="chart-title">Top 10 Clientes</h3>
-                            </div>
-                            <div class="chart-body">
-                                <canvas id="clientesChart"></canvas>
-                            </div>
+                    <!-- Gráfico de Top 10 Productos -->
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3>Top 10 Productos del Mes</h3>
                         </div>
-                        
-                        <div class="chart-card">
-                            <div class="chart-header">
-                                <h3 class="chart-title">Top 10 Productos</h3>
-                            </div>
-                            <div class="chart-body">
-                                <canvas id="productosChart"></canvas>
-                            </div>
+                        <div class="chart-body">
+                            <canvas id="topProductosChart"></canvas>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Incluir Chart.js -->
-            <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
-
-            <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                // Inicializar los gráficos
-                const ventasMesData = <?= $jsonVentasMes ?>;
-                const margenMesData = <?= $jsonMargenMes ?>;
-                const clientesData = <?= $jsonClientes ?>;
-                const productosData = <?= $jsonProductos ?>;
-                
-                // Colores para los gráficos
-                const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#4361ee';
-                const secondaryColor = getComputedStyle(document.documentElement).getPropertyValue('--secondary').trim() || '#6c757d';
-                const successColor = getComputedStyle(document.documentElement).getPropertyValue('--success').trim() || '#4caf50';
-                const warningColor = getComputedStyle(document.documentElement).getPropertyValue('--warning').trim() || '#ff9800';
-                const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--primary-light').trim() || '#4895ef';
-                
-                // Mostrar/ocultar sección de gráficos
-                const toggleChartsBtn = document.getElementById('toggle-charts');
-                const chartsSection = document.getElementById('charts-section');
-                
-                toggleChartsBtn.addEventListener('click', function() {
-                    if (chartsSection.style.display === 'none') {
-                        chartsSection.style.display = 'block';
-                        // Redimensionar gráficos para que se rendericen correctamente
-                        setTimeout(() => {
-                            window.dispatchEvent(new Event('resize'));
-                        }, 100);
+                <!-- Script para inicializar gráficos - ÚNICO BLOQUE DE INICIALIZACIÓN -->
+                <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    console.log("DOM cargado, inicializando gráficos...");
+                    
+                    // Verificar que Chart.js está disponible
+                    if (typeof Chart === 'undefined') {
+                        console.error("Chart.js no está cargado correctamente");
+                        document.getElementById('ventasAnualesChart').parentNode.innerHTML = 
+                            '<div class="error-message">Error: Chart.js no está disponible</div>';
+                        document.getElementById('topProductosChart').parentNode.innerHTML = 
+                            '<div class="error-message">Error: Chart.js no está disponible</div>';
+                        return;
                     } else {
-                        chartsSection.style.display = 'none';
+                        console.log("Chart.js cargado correctamente:", Chart.version);
                     }
-                });
-                
-                // Gráfico de ventas por mes
-                let ventasMesChart = null;
-                if (document.getElementById('ventasMesChart')) {
-                    ventasMesChart = new Chart(
-                        document.getElementById('ventasMesChart').getContext('2d'),
-                        {
-                            type: 'bar',
-                            data: {
-                                labels: ventasMesData.map(item => item.mes),
-                                datasets: [
-                                    {
-                                        label: 'Ventas',
-                                        data: ventasMesData.map(item => item.ventas),
-                                        backgroundColor: primaryColor,
-                                        borderColor: primaryColor,
-                                        borderWidth: 1
-                                    },
-                                    {
-                                        label: 'Costo',
-                                        data: ventasMesData.map(item => item.costo),
-                                        backgroundColor: secondaryColor,
-                                        borderColor: secondaryColor,
-                                        borderWidth: 1
-                                    }
-                                ]
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: {
-                                    title: {
-                                        display: false
-                                    },
-                                    legend: {
-                                        position: 'top',
-                                        align: 'end'
-                                    },
-                                    tooltip: {
-                                        callbacks: {
-                                            label: function(context) {
-                                                return context.dataset.label + ': $ ' + 
-                                                    new Intl.NumberFormat('es-CL').format(context.raw.toFixed(2));
-                                            }
-                                        }
-                                    }
-                                },
-                                scales: {
-                                    y: {
-                                        beginAtZero: true,
-                                        ticks: {
-                                            callback: function(value) {
-                                                return '$ ' + new Intl.NumberFormat('es-CL').format(value);
-                                            }
-                                        }
-                                    }
-                                }
+                    
+                    try {
+                        // Parsear los datos JSON con manejo de errores
+                        let ventasAnualesData = [];
+                        let topProductosData = [];
+                        
+                        try {
+                            ventasAnualesData = <?= $jsonVentasAnuales ?>;
+                            if (!Array.isArray(ventasAnualesData)) {
+                                throw new Error('Los datos de ventas anuales no son un array válido');
                             }
+                            console.log("Datos de ventas anuales cargados:", ventasAnualesData);
+                        } catch (e) {
+                            console.error("Error al procesar datos de ventas anuales:", e);
+                            ventasAnualesData = [];
                         }
-                    );
-                }
-                
-                // Gráfico de margen por mes
-                let margenMesChart = null;
-                if (document.getElementById('margenMesChart')) {
-                    margenMesChart = new Chart(
-                        document.getElementById('margenMesChart').getContext('2d'),
-                        {
-                            type: 'line',
-                            data: {
-                                labels: margenMesData.map(item => item.mes),
-                                datasets: [
-                                    {
-                                        label: 'Margen ($)',
-                                        data: margenMesData.map(item => item.margen),
-                                        backgroundColor: 'rgba(76, 175, 80, 0.2)',
-                                        borderColor: successColor,
-                                        borderWidth: 2,
-                                        fill: true,
-                                        tension: 0.2,
-                                        yAxisID: 'y'
+                        
+                        try {
+                            topProductosData = <?= $jsonTopProductos ?>;
+                            if (!Array.isArray(topProductosData)) {
+                                throw new Error('Los datos de top productos no son un array válido');
+                            }
+                            console.log("Datos de productos cargados:", topProductosData);
+                        } catch (e) {
+                            console.error("Error al procesar datos de top productos:", e);
+                            topProductosData = [];
+                        }
+                        
+                        // Verificar que los canvas existen
+                        const ventasAnualesElement = document.getElementById('ventasAnualesChart');
+                        if (!ventasAnualesElement) {
+                            console.error("No se encontró el elemento para el gráfico de ventas anuales");
+                            return;
+                        }
+                        
+                        const topProductosElement = document.getElementById('topProductosChart');
+                        if (!topProductosElement) {
+                            console.error("No se encontró el elemento para el gráfico de top productos");
+                            return;
+                        }
+                        
+                        // Gráfico de ventas anuales
+                        if (ventasAnualesData && ventasAnualesData.length > 0) {
+                            const ventasCtx = ventasAnualesElement.getContext('2d');
+                            new Chart(ventasCtx, {
+                                type: 'bar',
+                                data: {
+                                    labels: ventasAnualesData.map(item => item.mes),
+                                    datasets: [{
+                                        label: 'Ventas',
+                                        data: ventasAnualesData.map(item => item.ventas),
+                                        backgroundColor: 'rgba(67, 97, 238, 0.7)',
+                                        borderColor: 'rgba(67, 97, 238, 1)',
+                                        borderWidth: 1
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        legend: {
+                                            position: 'top',
+                                        },
+                                        tooltip: {
+                                            callbacks: {
+                                                label: function(context) {
+                                                    let label = context.dataset.label || '';
+                                                    if (label) {
+                                                        label += ': ';
+                                                    }
+                                                    if (context.parsed.y !== null) {
+                                                        label += new Intl.NumberFormat('es-CL', { 
+                                                            style: 'currency', 
+                                                            currency: 'CLP' 
+                                                        }).format(context.parsed.y);
+                                                    }
+                                                    return label;
+                                                },
+                                                afterLabel: function(context) {
+                                                    const index = context.dataIndex;
+                                                    const boletas = ventasAnualesData[index].cantidad || 0;
+                                                    return `Boletas: ${boletas}`;
+                                                }
+                                            }
+                                        }
                                     },
-                                    {
-                                        label: 'Margen (%)',
-                                        data: margenMesData.map(item => item.porcentaje),
-                                        backgroundColor: 'rgba(255, 152, 0, 0.2)',
-                                        borderColor: warningColor,
-                                        borderWidth: 2,
-                                        borderDash: [5, 5],
-                                        fill: false,
-                                        tension: 0.2,
-                                        yAxisID: 'y1'
-                                    }
-                                ]
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: {
-                                    legend: {
-                                        position: 'top',
-                                        align: 'end'
-                                    },
-                                    tooltip: {
-                                        callbacks: {
-                                            label: function(context) {
-                                                if (context.dataset.label.includes('$')) {
-                                                    return context.dataset.label + ': $ ' + 
-                                                        new Intl.NumberFormat('es-CL').format(context.raw.toFixed(2));
-                                                } else {
-                                                    return context.dataset.label + ': ' + 
-                                                        context.raw.toFixed(2) + '%';
+                                    scales: {
+                                        y: {
+                                            beginAtZero: true,
+                                            ticks: {
+                                                callback: function(value) {
+                                                    return new Intl.NumberFormat('es-CL', { 
+                                                        style: 'currency', 
+                                                        currency: 'CLP',
+                                                        maximumFractionDigits: 0
+                                                    }).format(value);
                                                 }
                                             }
                                         }
                                     }
-                                },
-                                scales: {
-                                    y: {
-                                        beginAtZero: true,
-                                        position: 'left',
-                                        ticks: {
-                                            callback: function(value) {
-                                                return '$ ' + new Intl.NumberFormat('es-CL').format(value);
-                                            }
-                                        }
-                                    },
-                                    y1: {
-                                        beginAtZero: true,
-                                        position: 'right',
-                                        max: 100,
-                                        grid: {
-                                            drawOnChartArea: false
-                                        },
-                                        ticks: {
-                                            callback: function(value) {
-                                                return value + '%';
-                                            }
-                                        }
-                                    }
                                 }
-                            }
-                        }
-                    );
-                }
-                
-                // Gráfico de clientes
-                let clientesChart = null;
-                if (document.getElementById('clientesChart')) {
-                    clientesChart = new Chart(
-                        document.getElementById('clientesChart').getContext('2d'),
-                        {
-                            type: 'doughnut',
-                            data: {
-                                labels: clientesData.map(item => item.nombre),
-                                datasets: [
-                                    {
-                                        data: clientesData.map(item => item.ventas),
-                                        backgroundColor: [
-                                            primaryColor,
-                                            accentColor,
-                                            successColor,
-                                            warningColor,
-                                            '#9c27b0'
-                                        ],
-                                        borderWidth: 1
-                                    }
-                                ]
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: {
-                                    legend: {
-                                        position: 'right'
-                                    },
-                                    tooltip: {
-                                        callbacks: {
-                                            label: function(context) {
-                                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                                const percentage = Math.round((context.raw / total * 100) * 10) / 10;
-                                                return context.label + ': $ ' + 
-                                                    new Intl.NumberFormat('es-CL').format(context.raw.toFixed(2)) +
-                                                    ' (' + percentage + '%)';
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    );
-                }
-                
-                // Gráfico de productos
-                let productosChart = null;
-                if (document.getElementById('productosChart')) {
-                    // En Chart.js 3.x, 'horizontalBar' se reemplaza por configurando 'indexAxis' a 'y'
-                    productosChart = new Chart(
-                        document.getElementById('productosChart').getContext('2d'),
-                        {
-                            type: 'bar',
-                            data: {
-                                labels: productosData.map(item => {
-                                    // Acortar nombres largos para mejor visualización
-                                    const nombre = item.nombre;
-                                    return nombre.length > 25 ? nombre.substring(0, 22) + '...' : nombre;
-                                }),
-                                datasets: [
-                                    {
-                                        label: 'Ventas ($)',
-                                        data: productosData.map(item => item.ventas),
-                                        backgroundColor: primaryColor,
-                                        borderColor: primaryColor,
-                                        borderWidth: 1
-                                    }
-                                ]
-                            },
-                            options: {
-                                indexAxis: 'y',
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: {
-                                    legend: {
-                                        position: 'top',
-                                        align: 'end'
-                                    },
-                                    tooltip: {
-                                        callbacks: {
-                                            title: function(tooltipItems) {
-                                                // Mostrar nombre completo en tooltip
-                                                const index = tooltipItems[0].dataIndex;
-                                                return productosData[index].nombre;
-                                            },
-                                            label: function(context) {
-                                                const index = context.dataIndex;
-                                                const item = productosData[index];
-                                                let output = [];
-                                                
-                                                output.push('Ventas: $ ' + new Intl.NumberFormat('es-CL').format(item.ventas.toFixed(2)));
-                                                output.push('Cantidad: ' + item.cantidad);
-                                                output.push('Margen: $ ' + new Intl.NumberFormat('es-CL').format(item.margen.toFixed(2)));
-                                                
-                                                return output;
-                                            }
-                                        }
-                                    }
-                                },
-                                scales: {
-                                    x: {
-                                        beginAtZero: true,
-                                        ticks: {
-                                            callback: function(value) {
-                                                return '$ ' + new Intl.NumberFormat('es-CL').format(value);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    );
-                }
-                
-                // Filtro por período
-                const periodoSelect = document.getElementById('periodo-select');
-                if (periodoSelect) {
-                    periodoSelect.addEventListener('change', function() {
-                        const periodo = this.value;
-                        if (periodo === 'todos') {
-                            // Reiniciar gráficos a todos los datos
-                            alert('Mostrando datos de todos los períodos');
-                            window.location.reload(); // Simplificado - podría mejorarse para no recargar toda la página
+                            });
                         } else {
-                            // Filtrar datos por período
-                            alert('Filtrando por período: ' + periodo);
-                            // Aquí iría la implementación para filtrar los datos por mes
-                            // Para una implementación completa, utilizaríamos AJAX para obtener los datos filtrados
+                            console.warn("No hay datos para mostrar en el gráfico de ventas anuales");
+                            ventasAnualesElement.parentNode.innerHTML = '<div class="no-data-message">No hay datos disponibles para mostrar</div>';
+                        }
+                        
+                        // Gráfico de top 10 productos
+                        if (topProductosData && topProductosData.length > 0) {
+                            const productosCtx = topProductosElement.getContext('2d');
+                            new Chart(productosCtx, {
+                                type: 'bar',
+                                data: {
+                                    labels: topProductosData.map(item => {
+                                        // Acortar nombres largos
+                                        const nombre = item.nombre || '';
+                                        return nombre.length > 20 ? nombre.substring(0, 18) + '...' : nombre;
+                                    }),
+                                    datasets: [{
+                                        label: 'Ventas',
+                                        data: topProductosData.map(item => item.ventas),
+                                        backgroundColor: 'rgba(76, 175, 80, 0.7)',
+                                        borderColor: 'rgba(76, 175, 80, 1)',
+                                        borderWidth: 1
+                                    }]
+                                },
+                                options: {
+                                    indexAxis: 'y',
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        legend: {
+                                            position: 'top',
+                                        },
+                                        tooltip: {
+                                            callbacks: {
+                                                title: function(tooltipItems) {
+                                                    // Mostrar nombre completo en tooltip
+                                                    const index = tooltipItems[0].dataIndex;
+                                                    return topProductosData[index].nombre;
+                                                },
+                                                label: function(context) {
+                                                    let label = "Ventas: ";
+                                                    if (context.parsed.x !== null) {
+                                                        label += new Intl.NumberFormat('es-CL', { 
+                                                            style: 'currency', 
+                                                            currency: 'CLP' 
+                                                        }).format(context.parsed.x);
+                                                    }
+                                                    return label;
+                                                },
+                                                afterLabel: function(context) {
+                                                    const index = context.dataIndex;
+                                                    const cantidad = topProductosData[index].cantidad || 0;
+                                                    return "Cantidad: " + cantidad;
+                                                }
+                                            }
+                                        }
+                                    },
+                                    scales: {
+                                        x: {
+                                            beginAtZero: true,
+                                            ticks: {
+                                                callback: function(value) {
+                                                    return new Intl.NumberFormat('es-CL', { 
+                                                        style: 'currency', 
+                                                        currency: 'CLP',
+                                                        maximumFractionDigits: 0
+                                                    }).format(value);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        } else {
+                            console.warn("No hay datos para mostrar en el gráfico de top productos");
+                            topProductosElement.parentNode.innerHTML = '<div class="no-data-message">No hay datos disponibles para mostrar</div>';
+                        }
+                    } catch (error) {
+                        console.error("Error al inicializar los gráficos:", error);
+                    }
+                });
+                </script>
+
+                <style>
+                /* Estilos para mensajes de error y sin datos */
+                .error-message, .no-data-message {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    height: 100%;
+                    padding: 20px;
+                    text-align: center;
+                    color: #6c757d;
+                    font-style: italic;
+                    background-color: #f8f9fa;
+                    border-radius: 4px;
+                    border: 1px dashed #dee2e6;
+                }
+
+                .error-message {
+                    color: #dc3545;
+                    border-color: #f5c6cb;
+                    background-color: #f8d7da;
+                }
+
+                .no-data-message {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    height: 100%;
+                    width: 100%;
+                    color: var(--text-muted);
+                    font-style: italic;
+                    text-align: center;
+                    padding: 30px;
+                    background-color: rgba(0, 0, 0, 0.03);
+                    border-radius: 4px;
+                }
+                
+                /* Tarjetas de KPIs */
+                .kpi-container {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+                    gap: 1.5rem;
+                    margin-bottom: 1.5rem;
+                }
+
+                .kpi-card {
+                    background-color: var(--card-bg);
+                    border-radius: var(--border-radius);
+                    box-shadow: var(--shadow);
+                    padding: 1.5rem;
+                    display: flex;
+                    align-items: center;
+                    gap: 1rem;
+                    border: 1px solid var(--border-color);
+                    transition: transform 0.3s ease, box-shadow 0.3s ease;
+                }
+
+                .kpi-card:hover {
+                    transform: translateY(-5px);
+                    box-shadow: var(--shadow-lg);
+                }
+
+                .kpi-icon {
+                    width: 3.5rem;
+                    height: 3.5rem;
+                    border-radius: 50%;
+                    background-color: rgba(67, 97, 238, 0.1);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    flex-shrink: 0;
+                }
+
+                .kpi-icon i {
+                    font-size: 1.5rem;
+                    color: var(--primary);
+                }
+
+                .kpi-content {
+                    flex-grow: 1;
+                }
+
+                .kpi-title {
+                    font-size: 0.875rem;
+                    color: var(--text-muted);
+                    margin-bottom: 0.25rem;
+                }
+
+                .kpi-value {
+                    font-size: 1.5rem;
+                    font-weight: 600;
+                    color: var(--text-main);
+                    margin-bottom: 0.25rem;
+                }
+
+                .kpi-description {
+                    font-size: 0.813rem;
+                    color: var(--text-muted);
+                }
+
+                /* Contenedor de gráficos */
+                .charts-container {
+                    margin-bottom: 1.5rem;
+                }
+
+                .charts-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+                    gap: 1.5rem;
+                    margin-bottom: 1.5rem;
+                }
+
+                .chart-card {
+                    background-color: var(--card-bg);
+                    border-radius: var(--border-radius);
+                    box-shadow: var(--shadow);
+                    overflow: hidden;
+                    border: 1px solid var(--border-color);
+                }
+
+                .chart-header {
+                    padding: 1rem 1.5rem;
+                    border-bottom: 1px solid var(--border-color);
+                    background-color: var(--light);
+                }
+
+                .chart-header h3 {
+                    font-size: 1.1rem;
+                    font-weight: 600;
+                    margin: 0;
+                }
+
+                .chart-body {
+                    padding: 1.5rem;
+                    height: 300px;
+                    position: relative;
+                }
+                </style>
+
+    <script>
+    // Esperamos a que el documento esté completamente cargado
+    $(document).ready(function() {
+        console.log("Documento cargado");
+        
+        // Función para formatear fecha para mostrar
+        function formatDateForDisplay(dateString) {
+            if (!dateString) return '';
+            
+            // Crear un objeto Date a partir de la cadena
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return dateString; // Si no es una fecha válida, devolver original
+            
+            // Formatear como DD/MM/YYYY
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0'); // Mes es base 0
+            const year = date.getFullYear();
+            
+            return `${day}/${month}/${year}`;
+        }
+        
+        // Función para formatear fecha para el servidor
+        function formatDateForServer(dateString) {
+            if (!dateString) return '';
+            
+            // Si está en formato DD/MM/YYYY, convertir a YYYY-MM-DD
+            if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateString)) {
+                const parts = dateString.split('/');
+                return `${parts[2]}-${String(parts[1]).padStart(2, '0')}-${String(parts[0]).padStart(2, '0')}`;
+            }
+            
+            return dateString;
+        }
+        
+        // Inicializar datepicker con formato español
+        $(".datepicker").datepicker({
+            dateFormat: "dd/mm/yy", // Formato visual para el usuario
+            changeMonth: true,
+            changeYear: true,
+            yearRange: "1900:2100",
+            showOtherMonths: true,
+            selectOtherMonths: true,
+            onSelect: function(dateText) {
+                console.log("Fecha seleccionada:", dateText);
+                $(this).val(dateText);
+                filterTableInRealTime();
+            }
+        });
+        
+        // Convertir valores iniciales de fechas al formato de visualización
+        $(".datepicker").each(function() {
+            const val = $(this).val();
+            if (val) {
+                $(this).val(formatDateForDisplay(val));
+            }
+        });
+        
+        console.log("Datepickers inicializados:", $(".datepicker").length);
+        
+        // Mostrar el panel de filtros si hay filtros aplicados
+        if ($('.column-filter[value!=""]').length > 0 || $('#global-search').val() || $('.datepicker[value!=""]').length > 0) {
+            $('#filters-panel').show();
+        }
+
+        // Mostrar/ocultar el panel de filtros
+        $('#toggle-filters').on('click', function() {
+            $('#filters-panel').slideToggle(300);
+        });
+
+        // Filtrar en tiempo real al escribir en campos
+        $('.column-filter').on('input', function() {
+            filterTableInRealTime();
+        });
+
+        // Filtrar en tiempo real al escribir en búsqueda global
+        $('#global-search').on('input', function() {
+            filterTableInRealTime();
+        });
+
+        // Filtrado en tiempo real
+        function filterTableInRealTime() {
+            // Obtener el valor de búsqueda global
+            var globalSearchTerm = $('#global-search').val().toLowerCase();
+            
+            // Mostrar todas las filas primero
+            $('#detailTable tbody tr').show();
+            
+            // Aplicar búsqueda global
+            if (globalSearchTerm) {
+                $('#detailTable tbody tr').each(function() {
+                    var rowText = $(this).text().toLowerCase();
+                    if (rowText.indexOf(globalSearchTerm) === -1) {
+                        $(this).hide();
+                    }
+                });
+            }
+            
+            // Aplicar filtros de columna
+            $('.column-filter').each(function() {
+                var columnIndex = $(this).data('column-index');
+                var filterValue = $(this).val().toLowerCase();
+                
+                if (filterValue) {
+                    $(this).addClass('active-filter');
+                    $('#detailTable tbody tr:visible').each(function() {
+                        var cellText = $(this).find('td').eq(columnIndex).text().toLowerCase();
+                        if (cellText.indexOf(filterValue) === -1) {
+                            $(this).hide();
                         }
                     });
+                } else {
+                    $(this).removeClass('active-filter');
                 }
             });
-            </script>
+            
+            // Actualizar contador
+            $('#visible-count').text($('#detailTable tbody tr:visible').length);
+        }
 
-            <style>
-            /* Estilos para el dashboard de resumen */
-            .dashboard-summary {
-                margin-bottom: 2rem;
+        // Limpiar filtros
+        $('#clear-filters').on('click', function(e) {
+            e.preventDefault();
+            
+            // Verificar si hay filtros aplicados a nivel de servidor
+            var hasServerFilters = $('.column-filter[value!=""]').length > 0 || 
+                                $('#global-search').val() || 
+                                $('.datepicker[value!=""]').length > 0;
+            
+            // Limpiar campos
+            $('.column-filter').val('').removeClass('active-filter');
+            $('.datepicker').val('').removeClass('active-filter');
+            $('#global-search').val('');
+            
+            if (hasServerFilters) {
+                // Si había filtros en servidor, redirigir sin filtros
+                window.location.href = '<?= $this->url('application', ['action' => 'detail', 'table' => $table]) ?>?limit=50';
+            } else {
+                // Solo filtrado local
+                $('#detailTable tbody tr').show();
+                $('#visible-count').text($('#detailTable tbody tr').length);
             }
+            
+            return false;
+        });
 
-            .section-title {
-                font-size: 1.5rem;
-                margin-bottom: 1rem;
-                display: flex;
-                align-items: center;
-                gap: 0.75rem;
+        // Buscar con botón global
+        $('#global-search-btn').on('click', function() {
+            var searchTerm = $('#global-search').val();
+            sendToServer({search: searchTerm});
+        });
+
+        // Búsqueda global con Enter
+        $('#global-search').on('keypress', function(e) {
+            if (e.which === 13) {
+                var searchTerm = $(this).val();
+                sendToServer({search: searchTerm});
+                return false;
             }
+        });
 
-            .section-title i {
-                color: var(--primary);
-            }
-
-            .dashboard-actions {
-                display: flex;
-                align-items: center;
-                gap: 1rem;
-            }
-
-            .date-filter {
-                display: flex;
-                align-items: center;
-                background-color: var(--light);
-                border-radius: var(--border-radius);
-                padding: 0.5rem 1rem;
-                border: 1px solid var(--border-color);
-            }
-
-            .date-filter i {
-                color: var(--primary);
-                margin-right: 0.5rem;
-            }
-
-            .period-select {
-                background: none;
-                border: none;
-                font-size: 0.875rem;
-                color: var(--text-main);
-                cursor: pointer;
-                padding-right: 1rem;
-            }
-
-            .period-select:focus {
-                outline: none;
-            }
-
-            /* Tarjetas de KPIs */
-            .kpi-container {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-                gap: 1.5rem;
-                margin-bottom: 1.5rem;
-            }
-
-            .kpi-card {
-                background-color: var(--card-bg);
-                border-radius: var(--border-radius);
-                box-shadow: var(--shadow);
-                padding: 1.5rem;
-                display: flex;
-                align-items: center;
-                gap: 1rem;
-                border: 1px solid var(--border-color);
-                transition: transform 0.3s ease, box-shadow 0.3s ease;
-            }
-
-            .kpi-card:hover {
-                transform: translateY(-5px);
-                box-shadow: var(--shadow-lg);
-            }
-
-            .kpi-icon {
-                width: 3.5rem;
-                height: 3.5rem;
-                border-radius: 50%;
-                background-color: rgba(67, 97, 238, 0.1);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                flex-shrink: 0;
-            }
-
-            .kpi-icon i {
-                font-size: 1.5rem;
-                color: var(--primary);
-            }
-
-            .kpi-content {
-                flex-grow: 1;
-            }
-
-            .kpi-title {
-                font-size: 0.875rem;
-                color: var(--text-muted);
-                margin-bottom: 0.25rem;
-            }
-
-            .kpi-value {
-                font-size: 1.5rem;
-                font-weight: 600;
-                color: var(--text-main);
-                margin-bottom: 0.25rem;
-            }
-
-            .kpi-description {
-                font-size: 0.813rem;
-                color: var(--text-muted);
-            }
-
-            /* Contenedor de gráficos */
-            .charts-container {
-                margin-bottom: 1.5rem;
-            }
-
-            .chart-row {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
-                gap: 1.5rem;
-                margin-bottom: 1.5rem;
-            }
-
-            .chart-card {
-                background-color: var(--card-bg);
-                border-radius: var(--border-radius);
-                box-shadow: var(--shadow);
-                overflow: hidden;
-                border: 1px solid var(--border-color);
-            }
-
-            .chart-header {
-                padding: 1rem 1.5rem;
-                border-bottom: 1px solid var(--border-color);
-                background-color: var(--light);
-            }
-
-            .chart-title {
-                font-size: 1rem;
-                font-weight: 600;
-                color: var(--text-main);
-                margin: 0;
-            }
-
-            .chart-body {
-                padding: 1.5rem;
-                height: 300px;
-                position: relative;
-            }
-
-            /* Responsive */
-            @media (max-width: 768px) {
-                .kpi-container {
-                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        // Buscar en toda la base de datos
+        $('#apply-all-filters').on('click', function() {
+            var filters = {};
+            var hasFilters = false;
+            
+            // Recolectar todos los filtros regulares
+            $('.column-filter').each(function() {
+                var value = $(this).val();
+                if (value) {
+                    hasFilters = true;
+                    var column = $(this).data('column');
+                    filters['filter_' + column] = value;
                 }
-                
-                .chart-row {
-                    grid-template-columns: 1fr;
+            });
+            
+            // Recolectar filtros de fecha
+            $('.datepicker').each(function() {
+                var value = $(this).val();
+                if (value) {
+                    hasFilters = true;
+                    var column = $(this).data('column');
+                    // Convertir al formato que entiende el servidor
+                    filters['filter_' + column] = formatDateForServer(value);
                 }
-                
-                .chart-card {
-                    margin-bottom: 1rem;
+            });
+            
+            // Agregar búsqueda global
+            var searchTerm = $('#global-search').val();
+            if (searchTerm) {
+                hasFilters = true;
+                filters.search = searchTerm;
+            }
+            
+            if (hasFilters) {
+                sendToServer(filters);
+            } else {
+                alert("No hay filtros aplicados para buscar.");
+            }
+        });
+
+        // Cambiar tamaño de página
+        $('#page-size-select').on('change', function() {
+            var filters = getCurrentFilters();
+            filters.limit = $(this).val();
+            filters.page = 1; // Volver a primera página
+            sendToServer(filters);
+        });
+
+        // Obtener filtros actuales
+        function getCurrentFilters() {
+            var filters = {};
+            
+            // Agregar filtros de campo normales
+            $('.column-filter').each(function() {
+                var value = $(this).val();
+                if (value) {
+                    var column = $(this).data('column');
+                    filters['filter_' + column] = value;
                 }
-                
-                .dashboard-actions {
-                    flex-direction: column;
-                    align-items: flex-start;
-                    gap: 0.75rem;
+            });
+            
+            // Agregar filtros de fechas
+            $('.datepicker').each(function() {
+                var value = $(this).val();
+                if (value) {
+                    var column = $(this).data('column');
+                    // Convertir al formato que entiende el servidor
+                    filters['filter_' + column] = formatDateForServer(value);
                 }
-                
-                .date-filter {
-                    width: 100%;
-                    justify-content: space-between;
+            });
+            
+            // Agregar búsqueda global
+            var searchTerm = $('#global-search').val();
+            if (searchTerm) {
+                filters.search = searchTerm;
+            }
+            
+            // Agregar paginación
+            filters.page = $('#page-input').val();
+            filters.limit = $('#limit-input').val();
+            
+            return filters;
+        }
+
+        // Enviar al servidor
+        function sendToServer(params) {
+            // Completar con parámetros actuales
+            var currentParams = getCurrentFilters();
+            // Sobrescribir con nuevos parámetros
+            for (var key in params) {
+                currentParams[key] = params[key];
+            }
+            
+            // Crear formulario y enviar
+            var form = $('<form>', {
+                'method': 'GET',
+                'action': window.location.pathname
+            });
+            
+            for (var key in currentParams) {
+                $('<input>').attr({
+                    'type': 'hidden',
+                    'name': key,
+                    'value': currentParams[key]
+                }).appendTo(form);
+            }
+            
+            form.appendTo('body').submit();
+        }
+
+        // Exportar a CSV
+        $('#export-csv').on('click', function() {
+            var filters = getCurrentFilters();
+            filters.export = 'csv';
+            // Agregar parámetro para indicar qué columnas excluir
+            filters.hidden_columns = 'id_estado,url_pdf_boleta,link_factura';
+            sendToServer(filters);
+        });
+
+        // Inicialmente filtramos para aplicar los filtros que puedan estar en la URL
+        filterTableInRealTime();
+    });
+
+    // Función para buscar en el servidor con un filtro específico
+    function applyServerFilter(column) {
+        console.log("Aplicando filtro para columna:", column);
+        
+        var input = $('input[data-column="' + column + '"]');
+        var value = input.val();
+        
+        if (value) {
+            // Si es una fecha, convertir al formato del servidor
+            if (input.hasClass('datepicker')) {
+                // Convertir de DD/MM/YYYY a YYYY-MM-DD
+                if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(value)) {
+                    const parts = value.split('/');
+                    value = `${parts[2]}-${String(parts[1]).padStart(2, '0')}-${String(parts[0]).padStart(2, '0')}`;
                 }
             }
-
-            /* Compatibilidad con Chart.js 3.x */
-            canvas {
-                max-width: 100%;
+            
+            var filters = {};
+            filters['filter_' + column] = value;
+            
+            // Crear formulario y enviar
+            var form = $('<form>', {
+                'method': 'GET',
+                'action': window.location.pathname
+            });
+            
+            // Añadir filtro
+            $('<input>').attr({
+                'type': 'hidden',
+                'name': 'filter_' + column,
+                'value': value
+            }).appendTo(form);
+            
+            // Añadir parámetros de paginación
+            $('<input>').attr({
+                'type': 'hidden',
+                'name': 'limit',
+                'value': $('#limit-input').val()
+            }).appendTo(form);
+            
+            // Añadir otros filtros activos
+            $('.column-filter').not(input).each(function() {
+                var val = $(this).val();
+                if (val) {
+                    var col = $(this).data('column');
+                    $('<input>').attr({
+                        'type': 'hidden',
+                        'name': 'filter_' + col,
+                        'value': val
+                    }).appendTo(form);
+                }
+            });
+            
+            // Añadir otros datepickers activos
+            $('.datepicker').not(input).each(function() {
+                var val = $(this).val();
+                if (val) {
+                    var col = $(this).data('column');
+                    // Convertir al formato que entiende el servidor
+                    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(val)) {
+                        const parts = val.split('/');
+                        val = `${parts[2]}-${String(parts[1]).padStart(2, '0')}-${String(parts[0]).padStart(2, '0')}`;
+                    }
+                    $('<input>').attr({
+                        'type': 'hidden',
+                        'name': 'filter_' + col,
+                        'value': val
+                    }).appendTo(form);
+                }
+            });
+            
+            // Búsqueda global
+            var searchTerm = $('#global-search').val();
+            if (searchTerm) {
+                $('<input>').attr({
+                    'type': 'hidden',
+                    'name': 'search',
+                    'value': searchTerm
+                }).appendTo(form);
             }
-            </style>
+            
+            // Enviar formulario
+            form.appendTo('body').submit();
+        }
+    }
+    </script>
 
-            <?php endif; // Fin del condicional para el dashboard ?>
+    </body>
+    </html>
+            <?php endif; ?>
 
             <?php if (!empty($data)): ?>
                 <?php
@@ -1979,377 +2013,3 @@
             transform: translateX(-50%);
         }
     }
-    </style>
-
-    <script>
-    // Esperamos a que el documento esté completamente cargado
-    $(document).ready(function() {
-        console.log("Documento cargado");
-        
-        // Función para formatear fecha para mostrar
-        function formatDateForDisplay(dateString) {
-            if (!dateString) return '';
-            
-            // Crear un objeto Date a partir de la cadena
-            const date = new Date(dateString);
-            if (isNaN(date.getTime())) return dateString; // Si no es una fecha válida, devolver original
-            
-            // Formatear como DD/MM/YYYY
-            const day = String(date.getDate()).padStart(2, '0');
-            const month = String(date.getMonth() + 1).padStart(2, '0'); // Mes es base 0
-            const year = date.getFullYear();
-            
-            return `${day}/${month}/${year}`;
-        }
-        
-        // Función para formatear fecha para el servidor
-        function formatDateForServer(dateString) {
-            if (!dateString) return '';
-            
-            // Si está en formato DD/MM/YYYY, convertir a YYYY-MM-DD
-            if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateString)) {
-                const parts = dateString.split('/');
-                return `${parts[2]}-${String(parts[1]).padStart(2, '0')}-${String(parts[0]).padStart(2, '0')}`;
-            }
-            
-            return dateString;
-        }
-        
-        // Inicializar datepicker con formato español
-        $(".datepicker").datepicker({
-            dateFormat: "dd/mm/yy", // Formato visual para el usuario
-            changeMonth: true,
-            changeYear: true,
-            yearRange: "1900:2100",
-            showOtherMonths: true,
-            selectOtherMonths: true,
-            onSelect: function(dateText) {
-                console.log("Fecha seleccionada:", dateText);
-                $(this).val(dateText);
-                filterTableInRealTime();
-            }
-        });
-        
-        // Convertir valores iniciales de fechas al formato de visualización
-        $(".datepicker").each(function() {
-            const val = $(this).val();
-            if (val) {
-                $(this).val(formatDateForDisplay(val));
-            }
-        });
-        
-        console.log("Datepickers inicializados:", $(".datepicker").length);
-        
-        // Mostrar el panel de filtros si hay filtros aplicados
-        if ($('.column-filter[value!=""]').length > 0 || $('#global-search').val() || $('.datepicker[value!=""]').length > 0) {
-            $('#filters-panel').show();
-        }
-
-        // Mostrar/ocultar el panel de filtros
-        $('#toggle-filters').on('click', function() {
-            $('#filters-panel').slideToggle(300);
-        });
-
-        // Filtrar en tiempo real al escribir en campos
-        $('.column-filter').on('input', function() {
-            filterTableInRealTime();
-        });
-
-        // Filtrar en tiempo real al escribir en búsqueda global
-        $('#global-search').on('input', function() {
-            filterTableInRealTime();
-        });
-
-        // Filtrado en tiempo real
-        function filterTableInRealTime() {
-            // Obtener el valor de búsqueda global
-            var globalSearchTerm = $('#global-search').val().toLowerCase();
-            
-            // Mostrar todas las filas primero
-            $('#detailTable tbody tr').show();
-            
-            // Aplicar búsqueda global
-            if (globalSearchTerm) {
-                $('#detailTable tbody tr').each(function() {
-                    var rowText = $(this).text().toLowerCase();
-                    if (rowText.indexOf(globalSearchTerm) === -1) {
-                        $(this).hide();
-                    }
-                });
-            }
-            
-            // Aplicar filtros de columna
-            $('.column-filter').each(function() {
-                var columnIndex = $(this).data('column-index');
-                var filterValue = $(this).val().toLowerCase();
-                
-                if (filterValue) {
-                    $(this).addClass('active-filter');
-                    $('#detailTable tbody tr:visible').each(function() {
-                        var cellText = $(this).find('td').eq(columnIndex).text().toLowerCase();
-                        if (cellText.indexOf(filterValue) === -1) {
-                            $(this).hide();
-                        }
-                    });
-                } else {
-                    $(this).removeClass('active-filter');
-                }
-            });
-            
-            // Actualizar contador
-            $('#visible-count').text($('#detailTable tbody tr:visible').length);
-        }
-
-        // Limpiar filtros
-        $('#clear-filters').on('click', function(e) {
-            e.preventDefault();
-            
-            // Verificar si hay filtros aplicados a nivel de servidor
-            var hasServerFilters = $('.column-filter[value!=""]').length > 0 || 
-                                $('#global-search').val() || 
-                                $('.datepicker[value!=""]').length > 0;
-            
-            // Limpiar campos
-            $('.column-filter').val('').removeClass('active-filter');
-            $('.datepicker').val('').removeClass('active-filter');
-            $('#global-search').val('');
-            
-            if (hasServerFilters) {
-                // Si había filtros en servidor, redirigir sin filtros
-                window.location.href = '<?= $this->url('application', ['action' => 'detail', 'table' => $table]) ?>?limit=50';
-            } else {
-                // Solo filtrado local
-                $('#detailTable tbody tr').show();
-                $('#visible-count').text($('#detailTable tbody tr').length);
-            }
-            
-            return false;
-        });
-
-        // Buscar con botón global
-        $('#global-search-btn').on('click', function() {
-            var searchTerm = $('#global-search').val();
-            sendToServer({search: searchTerm});
-        });
-
-        // Búsqueda global con Enter
-        $('#global-search').on('keypress', function(e) {
-            if (e.which === 13) {
-                var searchTerm = $(this).val();
-                sendToServer({search: searchTerm});
-                return false;
-            }
-        });
-
-        // Buscar en toda la base de datos
-        $('#apply-all-filters').on('click', function() {
-            var filters = {};
-            var hasFilters = false;
-            
-            // Recolectar todos los filtros regulares
-            $('.column-filter').each(function() {
-                var value = $(this).val();
-                if (value) {
-                    hasFilters = true;
-                    var column = $(this).data('column');
-                    filters['filter_' + column] = value;
-                }
-            });
-            
-            // Recolectar filtros de fecha
-            $('.datepicker').each(function() {
-                var value = $(this).val();
-                if (value) {
-                    hasFilters = true;
-                    var column = $(this).data('column');
-                    // Convertir al formato que entiende el servidor
-                    filters['filter_' + column] = formatDateForServer(value);
-                }
-            });
-            
-            // Agregar búsqueda global
-            var searchTerm = $('#global-search').val();
-            if (searchTerm) {
-                hasFilters = true;
-                filters.search = searchTerm;
-            }
-            
-            if (hasFilters) {
-                sendToServer(filters);
-            } else {
-                alert("No hay filtros aplicados para buscar.");
-            }
-        });
-
-        // Cambiar tamaño de página
-        $('#page-size-select').on('change', function() {
-            var filters = getCurrentFilters();
-            filters.limit = $(this).val();
-            filters.page = 1; // Volver a primera página
-            sendToServer(filters);
-        });
-
-        // Obtener filtros actuales
-        function getCurrentFilters() {
-            var filters = {};
-            
-            // Agregar filtros de campo normales
-            $('.column-filter').each(function() {
-                var value = $(this).val();
-                if (value) {
-                    var column = $(this).data('column');
-                    filters['filter_' + column] = value;
-                }
-            });
-            
-            // Agregar filtros de fechas
-            $('.datepicker').each(function() {
-                var value = $(this).val();
-                if (value) {
-                    var column = $(this).data('column');
-                    // Convertir al formato que entiende el servidor
-                    filters['filter_' + column] = formatDateForServer(value);
-                }
-            });
-            
-            // Agregar búsqueda global
-            var searchTerm = $('#global-search').val();
-            if (searchTerm) {
-                filters.search = searchTerm;
-            }
-            
-            // Agregar paginación
-            filters.page = $('#page-input').val();
-            filters.limit = $('#limit-input').val();
-            
-            return filters;
-        }
-
-        // Enviar al servidor
-        function sendToServer(params) {
-            // Completar con parámetros actuales
-            var currentParams = getCurrentFilters();
-            // Sobrescribir con nuevos parámetros
-            for (var key in params) {
-                currentParams[key] = params[key];
-            }
-            
-            // Crear formulario y enviar
-            var form = $('<form>', {
-                'method': 'GET',
-                'action': window.location.pathname
-            });
-            
-            for (var key in currentParams) {
-                $('<input>').attr({
-                    'type': 'hidden',
-                    'name': key,
-                    'value': currentParams[key]
-                }).appendTo(form);
-            }
-            
-            form.appendTo('body').submit();
-        }
-
-        // Exportar a CSV
-        $('#export-csv').on('click', function() {
-            var filters = getCurrentFilters();
-            filters.export = 'csv';
-            // Agregar parámetro para indicar qué columnas excluir
-            filters.hidden_columns = 'id_estado,url_pdf_boleta,link_factura';
-            sendToServer(filters);
-        });
-
-        // Inicialmente filtramos para aplicar los filtros que puedan estar en la URL
-        filterTableInRealTime();
-    });
-
-    // Función para buscar en el servidor con un filtro específico
-    function applyServerFilter(column) {
-        console.log("Aplicando filtro para columna:", column);
-        
-        var input = $('input[data-column="' + column + '"]');
-        var value = input.val();
-        
-        if (value) {
-            // Si es una fecha, convertir al formato del servidor
-            if (input.hasClass('datepicker')) {
-                // Convertir de DD/MM/YYYY a YYYY-MM-DD
-                if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(value)) {
-                    const parts = value.split('/');
-                    value = `${parts[2]}-${String(parts[1]).padStart(2, '0')}-${String(parts[0]).padStart(2, '0')}`;
-                }
-            }
-            
-            var filters = {};
-            filters['filter_' + column] = value;
-            
-            // Crear formulario y enviar
-            var form = $('<form>', {
-                'method': 'GET',
-                'action': window.location.pathname
-            });
-            
-            // Añadir filtro
-            $('<input>').attr({
-                'type': 'hidden',
-                'name': 'filter_' + column,
-                'value': value
-            }).appendTo(form);
-            
-            // Añadir parámetros de paginación
-            $('<input>').attr({
-                'type': 'hidden',
-                'name': 'limit',
-                'value': $('#limit-input').val()
-            }).appendTo(form);
-            
-            // Añadir otros filtros activos
-            $('.column-filter').not(input).each(function() {
-                var val = $(this).val();
-                if (val) {
-                    var col = $(this).data('column');
-                    $('<input>').attr({
-                        'type': 'hidden',
-                        'name': 'filter_' + col,
-                        'value': val
-                    }).appendTo(form);
-                }
-            });
-            
-            // Añadir otros datepickers activos
-            $('.datepicker').not(input).each(function() {
-                var val = $(this).val();
-                if (val) {
-                    var col = $(this).data('column');
-                    // Convertir al formato que entiende el servidor
-                    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(val)) {
-                        const parts = val.split('/');
-                        val = `${parts[2]}-${String(parts[1]).padStart(2, '0')}-${String(parts[0]).padStart(2, '0')}`;
-                    }
-                    $('<input>').attr({
-                        'type': 'hidden',
-                        'name': 'filter_' + col,
-                        'value': val
-                    }).appendTo(form);
-                }
-            });
-            
-            // Búsqueda global
-            var searchTerm = $('#global-search').val();
-            if (searchTerm) {
-                $('<input>').attr({
-                    'type': 'hidden',
-                    'name': 'search',
-                    'value': searchTerm
-                }).appendTo(form);
-            }
-            
-            // Enviar formulario
-            form.appendTo('body').submit();
-        }
-    }
-    </script>
-
-    </body>
-    </html>
