@@ -4,7 +4,7 @@
  */
 ?>
 <?= $this->doctype() ?>
-<html lang="es">
+<html lang="es" data-theme="light">
     <head>
         <meta charset="utf-8">
         <?= $this->headTitle('Lodoro Analytics')->setSeparator(' - ')->setAutoEscape(false) ?>
@@ -33,391 +33,375 @@
         <!-- Estilos personalizados -->
         <style>
             :root {
+                /* Light Mode Colors */
                 --primary: #4361ee;
+                --primary-light: #4895ef;
+                --primary-dark: #3f37c9;
                 --secondary: #6c757d;
                 --success: #4caf50;
                 --danger: #f44336;
                 --warning: #ff9800;
                 --info: #2196f3;
-                --dark: #1e2843;
-                --darker: #151c30;
-                --light: #f8f9fa;
-                --white: #ffffff;
-                --body-bg: #f5f7fb;
+                --background: #f5f7fb;
+                --header-bg: #ffffff;
+                --sidebar-bg: #ffffff;
+                --card-bg: #ffffff;
                 --text-main: #3b3f5c;
                 --text-muted: #6c757d;
                 --text-light: #cbd5e1;
                 --border-color: #e0e6ed;
+                --shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
                 --shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+                --overlay-bg: rgba(0, 0, 0, 0.5);
+                --sidebar-active: #eef2ff;
+                --sidebar-hover: #f1f3fa;
                 --transition-speed: 0.3s;
-                --font-family: 'Inter', sans-serif;
+            }
+
+            /* Dark Mode Colors */
+            html[data-theme="dark"] {
+                --primary: #6366f1;
+                --primary-light: #818cf8;
+                --primary-dark: #4f46e5;
+                --background: #1e1e2d;
+                --header-bg: #151521;
+                --sidebar-bg: #151521;
+                --card-bg: #1e1e2d;
+                --text-main: #e2e8f0;
+                --text-muted: #94a3b8;
+                --text-light: #cbd5e1;
+                --border-color: #30304d;
+                --shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.15);
+                --shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.25);
+                --sidebar-active: #2a2b41;
+                --sidebar-hover: #252636;
             }
 
             body {
-                font-family: var(--font-family);
-                background-color: var(--body-bg);
+                font-family: 'Inter', sans-serif;
+                background-color: var(--background);
+                color: var(--text-main);
                 margin: 0;
                 padding: 0;
                 overflow-x: hidden;
+                transition: background-color var(--transition-speed) ease, 
+                            color var(--transition-speed) ease;
+                min-height: 100vh;
             }
 
             /* Contenedor principal */
             .app-container {
                 display: flex;
                 min-height: 100vh;
+                position: relative;
             }
 
-            /* Sidebar */
-            #sidebar {
-                background: linear-gradient(180deg, var(--dark) 0%, var(--darker) 100%);
-                color: var(--white);
-                min-height: 100vh;
-                transition: all var(--transition-speed) ease;
+            /* Header principal - CORREGIDO */
+            .main-header {
                 position: fixed;
                 top: 0;
                 left: 0;
-                z-index: 1000;
-                box-shadow: var(--shadow);
-                overflow-y: auto;
-                width: 240px; /* Estado expandido por defecto */
-            }
-
-            /* Control de anchos */
-            .sidebar-collapsed {
-                width: 80px !important;
-            }
-
-            .sidebar-expanded {
-                width: 240px !important;
-            }
-
-            /* Cabecera del sidebar */
-            .sidebar-header {
-                padding: 1rem;
+                right: 0;
+                height: 60px;
+                background-color: var(--header-bg);
                 display: flex;
                 align-items: center;
-                height: 70px;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                justify-content: space-between;
+                padding: 0 1rem;
+                box-shadow: var(--shadow-sm);
+                z-index: 9999 !important; /* Aumentado para garantizar visibilidad */
+                transition: background-color var(--transition-speed) ease;
+                border-bottom: 1px solid var(--border-color);
             }
-            
-            .logo-link {
+
+            /* Header children */
+            .header-left {
                 display: flex;
                 align-items: center;
-                text-decoration: none;
-                color: var(--white);
-                width: 100%;
-            }
-
-            .logo-icon {
-                font-size: 1.5rem;
-                color: var(--primary);
-                width: 30px;
-                text-align: center;
-            }
-
-            .logo-text {
-                margin-left: 0.75rem;
-                font-size: 1.25rem;
-                font-weight: 600;
-                white-space: nowrap;
-                transition: opacity var(--transition-speed) ease;
-            }
-
-            .sidebar-collapsed .logo-text {
-                opacity: 0;
-                width: 0;
-                display: none;
-            }
-
-            /* Menú de navegación */
-            .nav-menu {
-                list-style: none;
-                padding: 1rem 0;
-                margin: 0;
-            }
-
-            .menu-header {
-                padding: 0.5rem 1rem;
-                font-size: 0.75rem;
-                text-transform: uppercase;
-                color: var(--text-light);
-                font-weight: 600;
-                white-space: nowrap;
-                transition: opacity var(--transition-speed) ease;
-            }
-
-            .sidebar-collapsed .menu-header {
-                opacity: 0;
-                height: 0;
-                padding: 0;
-                margin: 0;
-                overflow: hidden;
-            }
-
-            .nav-item {
-                margin: 0.25rem 0;
                 position: relative;
+                z-index: 10000;
             }
 
-            .nav-link {
+            .header-right {
                 display: flex;
                 align-items: center;
-                padding: 0.7rem 1rem;
-                color: var(--text-light);
-                text-decoration: none;
+                gap: 0.75rem;
                 position: relative;
-                transition: all var(--transition-speed) ease;
-                border-radius: 0.25rem;
-                margin: 0 0.5rem;
+                z-index: 10000;
             }
 
-            .nav-link:hover, .nav-link.active {
-                color: var(--white);
-                background-color: rgba(255, 255, 255, 0.1);
-            }
-
-            .nav-link.active::before {
-                content: '';
-                position: absolute;
-                left: 0;
-                top: 0;
-                height: 100%;
-                width: 3px;
-                background-color: var(--primary);
-                border-radius: 0 2px 2px 0;
-            }
-
-            .nav-icon {
-                font-size: 1.25rem;
-                min-width: 30px;
-                text-align: center;
-                margin-right: 10px;
-            }
-
-            .sidebar-collapsed .nav-icon {
-                margin-right: 0;
-            }
-
-            .nav-text {
-                font-weight: 500;
-                white-space: nowrap;
-                transition: opacity var(--transition-speed) ease;
-            }
-
-            .sidebar-collapsed .nav-text {
-                opacity: 0;
-                width: 0;
-                display: none;
-            }
-
-            /* Separador */
-            .menu-divider {
-                height: 1px;
-                background-color: rgba(255, 255, 255, 0.1);
-                margin: 10px auto;
-            }
-
-            /* Botón de expansión inferior */
-            .sidebar-bottom-toggle {
-                padding: 0.5rem 1rem;
-                display: flex;
-                justify-content: center;
-                flex-shrink: 0;
-                margin-top: auto;
-                margin-bottom: 10px;
-            }
-            
-            .toggle-btn-bottom {
-                background: transparent;
+            /* Menu toggle - CORREGIDO */
+            .menu-toggle {
+                background: none;
                 border: none;
-                color: var(--white);
+                color: var(--text-main);
+                font-size: 1.25rem;
                 cursor: pointer;
-                width: 100%;
-                padding: 0.5rem;
-                border-radius: 0.25rem;
+                width: 40px;
+                height: 40px;
                 display: flex;
                 align-items: center;
-                justify-content: flex-start;
-                transition: all var(--transition-speed) ease;
-            }
-            
-            .toggle-btn-bottom:hover {
-                background-color: rgba(255, 255, 255, 0.2);
-                color: var(--white);
-            }
-            
-            .toggle-btn-bottom i {
-                margin-right: 0.75rem;
-                min-width: 16px;
-                text-align: center;
+                justify-content: center;
+                border-radius: 0.25rem;
+                margin-right: 1rem;
+                position: relative;
+                z-index: 10001;
+                pointer-events: auto;
+                transition: background-color var(--transition-speed) ease,
+                            color var(--transition-speed) ease;
             }
 
-            .sidebar-collapsed .toggle-btn-bottom {
-                justify-content: center;
+            .menu-toggle:hover {
+                background-color: var(--sidebar-hover);
             }
-            
-            .sidebar-collapsed .toggle-btn-bottom i {
-                margin-right: 0;
-            }
-            
-            .toggle-text {
-                font-size: 0.875rem;
-                white-space: nowrap;
-                transition: opacity var(--transition-speed) ease;
-            }
-            
-            .sidebar-collapsed .toggle-text {
-                opacity: 0;
-                width: 0;
-                display: none;
-            }
-            
-            /* Panel de usuario */
-            .user-panel {
-                padding: 0.75rem 1rem;
-                border-top: 1px solid rgba(255, 255, 255, 0.1);
-                background-color: var(--darker);
+
+            .app-logo {
+                font-size: 1.25rem;
+                font-weight: 600;
+                color: var(--text-main);
+                text-decoration: none;
                 display: flex;
                 align-items: center;
-                flex-shrink: 0;
+                gap: 0.5rem;
+                transition: color var(--transition-speed) ease;
+            }
+
+            .app-logo i {
+                color: var(--primary);
+            }
+
+            .app-logo:hover {
+                color: var(--primary);
+            }
+
+            /* Botón de tema (dark/light) */
+            .theme-toggle {
+                background: none;
+                border: none;
+                color: var(--text-main);
+                font-size: 1.25rem;
+                cursor: pointer;
+                width: 40px;
+                height: 40px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 0.25rem;
+                position: relative;
+                z-index: 10001;
+                pointer-events: auto;
+                transition: background-color var(--transition-speed) ease,
+                            color var(--transition-speed) ease;
+            }
+
+            .theme-toggle:hover {
+                background-color: var(--sidebar-hover);
+            }
+
+            html[data-theme="light"] .theme-toggle .fa-sun {
+                display: none;
+            }
+
+            html[data-theme="dark"] .theme-toggle .fa-moon {
+                display: none;
+            }
+
+            /* Dropdown del usuario */
+            .user-dropdown {
+                position: relative;
+            }
+
+            .user-dropdown-toggle {
+                background: none;
+                border: none;
+                color: var(--text-main);
+                cursor: pointer;
+                padding: 0.5rem;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                border-radius: 0.25rem;
+                position: relative;
+                z-index: 10001;
+                pointer-events: auto;
+                transition: background-color var(--transition-speed) ease,
+                            color var(--transition-speed) ease;
+            }
+
+            .user-dropdown-toggle:hover {
+                background-color: var(--sidebar-hover);
             }
 
             .user-avatar {
-                width: 36px;
-                height: 36px;
+                width: 30px;
+                height: 30px;
                 border-radius: 50%;
                 background-color: var(--primary);
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 color: white;
-                font-weight: 600;
-                flex-shrink: 0;
-            }
-
-            .user-info {
-                margin-left: 0.75rem;
-                overflow: hidden;
-                transition: opacity var(--transition-speed) ease;
-            }
-            
-            .sidebar-collapsed .user-info {
-                opacity: 0;
-                width: 0;
-                display: none;
             }
 
             .user-name {
-                font-weight: 500;
-                font-size: 0.875rem;
-                white-space: nowrap;
-                color: white;
-            }
-
-            .user-role {
-                font-size: 0.75rem;
-                color: var(--text-light);
-                white-space: nowrap;
-            }
-
-            /* Botón de hamburguesa para móviles */
-            .mobile-menu-toggle {
                 display: none;
-                background: transparent;
-                border: none;
-                color: var(--text-main);
-                font-size: 1.5rem;
-                cursor: pointer;
-                margin-right: 1rem;
             }
 
-            /* Contenido principal */
-            .main-content {
-                flex: 1;
-                margin-left: 240px;
-                padding: 1.5rem;
-                transition: margin-left var(--transition-speed) ease;
-                overflow-x: hidden;
-                max-width: calc(100% - 240px);
-                box-sizing: border-box;
+            @media (min-width: 576px) {
+                .user-name {
+                    display: block;
+                }
             }
 
-            .sidebar-collapsed ~ .main-content {
-                margin-left: 80px;
-                max-width: calc(100% - 80px);
-            }
-
-            /* Navbar superior */
-            .top-navbar {
-                background-color: var(--white);
-                padding: 0.75rem 1.5rem;
-                box-shadow: var(--shadow);
-                margin-bottom: 1.5rem;
+            .user-dropdown-menu {
+                position: absolute;
+                top: 100%;
+                right: 0;
+                width: 200px;
+                background-color: var(--card-bg);
                 border-radius: 0.5rem;
+                box-shadow: var(--shadow);
+                overflow: hidden;
+                display: none;
+                z-index: 10003;
+                margin-top: 0.5rem;
+                border: 1px solid var(--border-color);
+                transition: background-color var(--transition-speed) ease;
+            }
+
+            .user-dropdown-menu.show {
+                display: block;
+            }
+
+            .user-dropdown-menu a {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                padding: 0.75rem 1rem;
+                color: var(--text-main);
+                text-decoration: none;
+                transition: background-color var(--transition-speed) ease,
+                            color var(--transition-speed) ease;
+            }
+
+            .user-dropdown-menu a:hover {
+                background-color: var(--sidebar-hover);
+            }
+
+            .user-dropdown-menu .divider {
+                height: 1px;
+                background-color: var(--border-color);
+                margin: 0.25rem 0;
+                transition: background-color var(--transition-speed) ease;
+            }
+
+            /* Sidebar */
+            .sidebar {
+                position: fixed;
+                top: 60px;
+                left: 0;
+                width: 260px;
+                height: calc(100vh - 60px);
+                background-color: var(--sidebar-bg);
+                box-shadow: var(--shadow);
+                transform: translateX(-100%);
+                transition: transform var(--transition-speed) ease,
+                            background-color var(--transition-speed) ease;
+                z-index: 1020;
+                overflow-y: auto;
+                border-right: 1px solid var(--border-color);
+            }
+
+            .sidebar.show {
+                transform: translateX(0);
+            }
+
+            .sidebar-header {
+                padding: 1rem;
+                border-bottom: 1px solid var(--border-color);
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
-                width: 100%;
-                box-sizing: border-box;
-                overflow: visible;
             }
 
-            .page-title {
-                font-size: 1.25rem;
+            .sidebar-header h3 {
+                font-size: 1rem;
                 font-weight: 600;
                 color: var(--text-main);
                 margin: 0;
             }
 
-            .navbar-actions {
+            .sidebar-close {
                 display: flex;
                 align-items: center;
-                gap: 1rem;
-                flex-wrap: nowrap;
-                min-width: fit-content;
+                justify-content: center;
+                width: 28px;
+                height: 28px;
+                border-radius: 0.25rem;
+                background: none;
+                border: none;
+                color: var(--text-main);
+                cursor: pointer;
+                transition: background-color var(--transition-speed) ease;
             }
 
-            .navbar-icon {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            position: relative;
-            color: var(--text-muted);
-            transition: all var(--transition-speed) ease;
-            flex-shrink: 0;
-        }
+            .sidebar-close:hover {
+                background-color: var(--sidebar-hover);
+            }
 
-        .navbar-icon:hover {
-            background-color: rgba(67, 97, 238, 0.1);
-            color: var(--primary);
-        }
+            .nav-menu {
+                list-style: none;
+                padding: 0;
+                margin: 0;
+            }
 
-            /* Submenús */
-            .has-submenu {
+            .nav-category {
+                padding: 0.75rem 1rem 0.5rem;
+                font-size: 0.75rem;
+                text-transform: uppercase;
+                color: var(--text-muted);
+                font-weight: 600;
+            }
+
+            .nav-item {
                 position: relative;
             }
 
-            .submenu-arrow {
-                position: absolute;
-                right: 15px;
-                top: 50%;
-                transform: translateY(-50%);
+            .nav-link {
+                display: flex;
+                align-items: center;
+                padding: 0.75rem 1rem;
+                color: var(--text-main);
+                text-decoration: none;
+                transition: background-color var(--transition-speed) ease,
+                            color var(--transition-speed) ease;
+            }
+
+            .nav-link:hover {
+                background-color: var(--sidebar-hover);
+            }
+
+            .nav-link.active {
+                background-color: var(--sidebar-active);
+                color: var(--primary);
+                font-weight: 500;
+            }
+
+            .nav-link i.nav-icon {
+                margin-right: 0.75rem;
+                min-width: 20px;
+                text-align: center;
+                font-size: 1rem;
+            }
+
+            .nav-link .nav-arrow {
+                margin-left: auto;
                 transition: transform var(--transition-speed) ease;
                 font-size: 0.8rem;
             }
 
-            .sidebar-collapsed .submenu-arrow {
-                opacity: 0;
-                visibility: hidden;
-                display: none;
-            }
-
-            .has-submenu.open .submenu-arrow {
-                transform: translateY(-50%) rotate(90deg);
+            .nav-item.open .nav-link .nav-arrow {
+                transform: rotate(90deg);
             }
 
             .submenu {
@@ -426,301 +410,93 @@
                 max-height: 0;
                 overflow: hidden;
                 transition: max-height var(--transition-speed) ease;
-                background-color: rgba(0, 0, 0, 0.2);
+                background-color: var(--sidebar-hover);
             }
 
-            .has-submenu.open .submenu {
+            .nav-item.open .submenu {
                 max-height: 500px;
             }
 
-            .submenu-item {
-                margin: 0;
-            }
-
             .submenu-link {
-                display: flex;
-                align-items: center;
-                padding: 0.5rem 1rem 0.5rem 3rem;
-                color: var(--text-light);
+                display: block;
+                padding: 0.625rem 1rem 0.625rem 2.75rem;
+                color: var(--text-main);
                 text-decoration: none;
-                transition: all var(--transition-speed) ease;
-                border-radius: 0.25rem;
-                margin: 0 0.5rem;
+                transition: background-color var(--transition-speed) ease,
+                            color var(--transition-speed) ease;
+                font-size: 0.9rem;
             }
 
-            .submenu-link:hover, .submenu-link.active {
-                color: var(--white);
-                background-color: rgba(255, 255, 255, 0.1);
+            .submenu-link:hover {
+                background-color: var(--sidebar-hover);
             }
 
-            .submenu-text {
-                font-size: 0.85rem;
-                white-space: nowrap;
+            .submenu-link.active {
+                color: var(--primary);
+                background-color: var(--sidebar-active);
+                font-weight: 500;
             }
 
-            .sidebar-collapsed .submenu {
-                display: none;
-            }
-
-            /* Tooltips para menú colapsado */
-            .nav-tooltip {
-                position: absolute;
-                left: 80px;
-                top: 50%;
-                transform: translateY(-50%);
-                background-color: rgba(0, 0, 0, 0.8);
-                color: white;
-                padding: 0.3rem 0.6rem;
-                border-radius: 0.25rem;
-                font-size: 0.8rem;
-                white-space: nowrap;
-                pointer-events: none;
+            /* Overlay para sidebar */
+            .sidebar-overlay {
+                position: fixed;
+                top: 60px;
+                left: 0;
+                width: 100%;
+                height: calc(100% - 60px);
+                background-color: var(--overlay-bg);
+                z-index: 1010;
                 opacity: 0;
                 visibility: hidden;
-                transition: opacity 0.2s ease;
-                z-index: 1001;
+                transition: opacity var(--transition-speed) ease,
+                            visibility var(--transition-speed) ease;
             }
 
-            .sidebar-collapsed .nav-item:hover .nav-tooltip {
+            .sidebar-overlay.show {
                 opacity: 1;
                 visibility: visible;
             }
 
-            /* Dropdown del usuario */
-            .user-dropdown {
-                position: relative;
-                display: inline-block;
-            }
-            
-            .user-dropdown-menu {
-                position: absolute;
-                right: 0;
-                top: 100%;
-                min-width: 180px;
-                background-color: var(--white);
-                box-shadow: var(--shadow);
-                border-radius: 0.5rem;
-                overflow: hidden;
-                z-index: 1000;
-                display: none;
-            }
-            
-            .user-dropdown-menu.show {
-                display: block;
-            }
-            
-            .user-dropdown-item {
-                padding: 0.75rem 1rem;
-                display: flex;
-                align-items: center;
-                color: var(--text-main);
-                text-decoration: none;
-                transition: all 0.2s ease;
-            }
-            
-            .user-dropdown-item:hover {
-                background-color: rgba(67, 97, 238, 0.05);
-                color: var(--primary);
-            }
-            
-            .user-dropdown-item i {
-                margin-right: 0.75rem;
-                font-size: 1rem;
-                color: var(--text-muted);
-            }
-            
-            .user-dropdown-divider {
-                height: 1px;
-                background-color: var(--border-color);
-                margin: 0;
-            }
-
-            /* Overlay para sidebar en móviles */
-            .sidebar-overlay {
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background-color: rgba(0, 0, 0, 0.5);
-                z-index: 999;
-                display: none;
-                opacity: 0;
-                transition: opacity var(--transition-speed) ease;
-            }
-            
-            .sidebar-overlay.show {
-                display: block;
-                opacity: 1;
-            }
-
-            /* Estilos de la página de login */
-            .login-container {
-                min-height: 100vh;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                background-color: var(--body-bg);
+            /* Contenido principal */
+            .main-content {
+                flex: 1;
+                margin-top: 60px;
                 padding: 1.5rem;
-            }
-            
-            .login-card {
                 width: 100%;
-                max-width: 500px;
-                border-radius: 10px;
-                box-shadow: var(--shadow);
-                overflow: hidden;
-                background-color: var(--white);
-            }
-            
-            .login-header {
-                padding: 2rem;
-                background: linear-gradient(120deg, var(--dark) 0%, var(--primary) 100%);
-                color: white;
-                text-align: center;
-            }
-            
-            .login-logo {
-                font-size: 2rem;
-                font-weight: 700;
-                margin-bottom: 0.5rem;
-            }
-            
-            .login-subtitle {
-                font-size: 1rem;
-                opacity: 0.8;
-            }
-            
-            .login-body {
-                padding: 2rem;
-            }
-            
-            .login-form .form-group {
-                margin-bottom: 1.5rem;
-            }
-            
-            .login-form label {
-                display: block;
-                margin-bottom: 0.5rem;
-                color: var(--text-main);
-                font-weight: 500;
-            }
-            
-            .login-form input {
-                width: 100%;
-                padding: 0.75rem 1rem;
-                border: 1px solid var(--border-color);
-                border-radius: 5px;
-                font-size: 1rem;
-                transition: all 0.3s ease;
-            }
-            
-            .login-form input:focus {
-                border-color: var(--primary);
-                box-shadow: 0 0 0 2px rgba(67, 97, 238, 0.2);
-                outline: none;
-            }
-            
-            .login-form .form-check {
-                display: flex;
-                align-items: center;
-            }
-            
-            .login-form .form-check input {
-                width: auto;
-                margin-right: 0.5rem;
-            }
-            
-            .login-btn {
-                width: 100%;
-                padding: 0.75rem;
-                background-color: var(--primary);
-                color: white;
-                font-size: 1rem;
-                font-weight: 500;
-                border: none;
-                border-radius: 5px;
-                cursor: pointer;
-                transition: all 0.3s ease;
-            }
-            
-            .login-btn:hover {
-                background-color: #3854d1;
-            }
-            
-            .login-footer {
-                padding: 1rem 2rem;
-                text-align: center;
-                border-top: 1px solid var(--border-color);
-                color: var(--text-muted);
-                font-size: 0.875rem;
+                position: relative;
+                z-index: 1;
+                transition: background-color var(--transition-speed) ease;
             }
 
-            /* Responsividad */
-            @media (max-width: 992px) {
-                /* Botón de hamburguesa visible en móviles */
-                .mobile-menu-toggle {
-                    display: flex;
-                    margin-right: 0.5rem;
+            /* Responsive */
+            @media (min-width: 992px) {
+                .sidebar {
+                    width: 260px;
                 }
+            }
 
-                /* Título de página más pequeño en móvil */
-                .page-title-wrapper {
-                    display: flex;
-                    align-items: center;
-                }
-
-                .page-title {
-                    font-size: 1.1rem;
-                }
-
-                /* Ocultar sidebar por defecto en móviles */
-                #sidebar {
-                    width: 280px !important;
-                    transform: translateX(-100%);
-                    left: 0;
-                    box-shadow: 5px 0 15px rgba(0, 0, 0, 0.2);
-                }
-
-                /* Sidebar visible al activarse */
-                #sidebar.mobile-open {
-                    transform: translateX(0);
-                }
-
-                /* Ajustar contenido principal */
-                .main-content {
-                    margin-left: 0 !important;
-                    max-width: 100% !important;
-                    padding: 1rem;
-                }
-
-                /* Mostrar todos los elementos en móvil */
-                .sidebar-collapsed .menu-header,
-                .sidebar-collapsed .nav-text,
-                .sidebar-collapsed .logo-text,
-                .sidebar-collapsed .toggle-text,
-                .sidebar-collapsed .user-info,
-                .sidebar-collapsed .submenu-arrow {
-                    opacity: 1;
-                    display: block;
-                    width: auto;
-                }
-
-                .nav-text, .logo-text, .toggle-text, .user-info {
-                    opacity: 1 !important;
-                    display: block !important;
-                    width: auto !important;
-                }
-
-                /* Ajustar navbar superior */
-                .top-navbar {
-                    padding: 0.75rem 1rem;
-                }
-
-                /* Ocultar tooltips en móvil */
-                .nav-tooltip {
-                    display: none !important;
-                }
+            /* Transición para todos los elementos afectados por dark mode */
+            .card, 
+            .table, 
+            input, 
+            select, 
+            textarea, 
+            button,
+            .dropdown-menu,
+            .modal-content {
+                transition: background-color var(--transition-speed) ease,
+                            color var(--transition-speed) ease,
+                            border-color var(--transition-speed) ease;
+            }
+            
+            /* Asegurar que ningún elemento bloquee el header */
+            * {
+                pointer-events: auto;
+            }
+            
+            div, section, article, main, .content, .container {
+                position: relative;
+                z-index: 0;
             }
         </style>
 
@@ -730,232 +506,222 @@
         <?php if ($this->layout()->getTemplate() !== 'layout/login'): ?>
         <!-- Contenido normal del layout para páginas que no son login -->
         <div class="app-container">
-            <!-- Sidebar / Navbar lateral -->
-            <div id="sidebar" class="sidebar-expanded">
-                <div class="sidebar-header">
-                    <a href="<?= $this->url('application', ['action' => 'index']) ?>" class="logo-link">
-                        <i class="fas fa-chart-line logo-icon"></i>
-                        <span class="logo-text">Lodoro Analytics</span>
+            <!-- Header principal -->
+            <header class="main-header" style="z-index: 9999 !important; position: fixed !important;">
+                <div class="header-left">
+                    <button type="button" id="menuToggle" class="menu-toggle" 
+                            style="z-index: 10002 !important; position: relative !important; pointer-events: auto !important;"
+                            aria-label="Abrir menú">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <a href="<?= $this->url('application', ['action' => 'index']) ?>" class="app-logo">
+                        <i class="fas fa-chart-line"></i>
+                        <span>Lodoro Analytics</span>
                     </a>
                 </div>
-                
-                <ul class="nav-menu">
-                    <!-- SECCIÓN 1: ANÁLISIS DE VENTAS -->
-                    <li class="menu-header">Análisis</li>
-                    
-                    <li class="nav-item has-submenu">
-                        <a href="<?= $this->url('application', ['action' => 'dashboard']) ?>" class="nav-link">
-                            <i class="fas fa-chart-bar nav-icon"></i>
-                            <span class="nav-text">Análisis de Ventas</span>
-                            <i class="fas fa-angle-right submenu-arrow"></i>
-                        </a>
-                        <div class="nav-tooltip">Análisis de Ventas</div>
-                        <ul class="submenu">
-                            <li>
-                            <a href="<?= $this->url('application', ['action' => 'dashboard']) ?>" class="submenu-link">
-                                    <span class="submenu-text">Resumen de ventas</span>
-                                </a>
-                            </li>
-                            <li class="submenu-item">
-                                <a href="<?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_WALLMART']) ?>" class="submenu-link">
-                                    <span class="submenu-text">Walmart</span>
-                                </a>
-                            </li>
-                            <li class="submenu-item">
-                                <a href="<?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_RIPLEY']) ?>" class="submenu-link">
-                                    <span class="submenu-text">Ripley</span>
-                                </a>
-                            </li>
-                            <li class="submenu-item">
-                                <a href="<?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_FALABELLA']) ?>" class="submenu-link">
-                                    <span class="submenu-text">Falabella</span>
-                                </a>
-                            </li>
-                            <li class="submenu-item">
-                                <a href="<?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_MERCADO_LIBRE']) ?>" class="submenu-link">
-                                    <span class="submenu-text">Mercado Libre</span>
-                                </a>
-                            </li>
-                            <li class="submenu-item">
-                                <a href="<?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_PARIS']) ?>" class="submenu-link">
-                                    <span class="submenu-text">Paris</span>
-                                </a>
-                            </li>
-                            <li class="submenu-item">
-                                <a href="<?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_WOOCOMMERCE']) ?>" class="submenu-link">
-                                    <span class="submenu-text">WooCommerce</span>
-                                </a>
-                            </li>
-                        </ul>
-                    </li>
-                    
-                    <div class="menu-divider"></div>
-                    
-                    <!-- SECCIÓN 2: ÓRDENES Y PEDIDOS -->
-                    <li class="menu-header">Operaciones</li>
-                    
-                    <li class="nav-item has-submenu">
-                        <a href="#" class="nav-link">
-                            <i class="fas fa-shopping-cart nav-icon"></i>
-                            <span class="nav-text">Órdenes y Pedidos</span>
-                            <i class="fas fa-angle-right submenu-arrow"></i>
-                        </a>
-                        <div class="nav-tooltip">Órdenes y Pedidos</div>
-                        <ul class="submenu">
-                            <li class="submenu-item">
-                                <a href="<?= $this->url('application', ['action' => 'orders']) ?>" class="submenu-link">
-                                    <span class="submenu-text">Todas las órdenes</span>
-                                </a>
-                            </li>
-                            <li class="submenu-item">
-                                <a href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_WALLMART']) ?>" class="submenu-link">
-                                    <span class="submenu-text">Walmart</span>
-                                </a>
-                            </li>
-                            <li class="submenu-item">
-                                <a href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_RIPLEY']) ?>" class="submenu-link">
-                                    <span class="submenu-text">Ripley</span>
-                                </a>
-                            </li>
-                            <li class="submenu-item">
-                                <a href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_FALABELLA']) ?>" class="submenu-link">
-                                    <span class="submenu-text">Falabella</span>
-                                </a>
-                            </li>
-                            <li class="submenu-item">
-                                <a href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_MERCADO_LIBRE']) ?>" class="submenu-link">
-                                    <span class="submenu-text">Mercado Libre</span>
-                                </a>
-                            </li>
-                            <li class="submenu-item">
-                                <a href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_PARIS']) ?>" class="submenu-link">
-                                    <span class="submenu-text">Paris</span>
-                                </a>
-                            </li>
-                            <li class="submenu-item">
-                                <a href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_WOOCOMMERCE']) ?>" class="submenu-link">
-                                    <span class="submenu-text">WooCommerce</span>
-                                </a>
-                            </li>
-                        </ul>
-                    </li>
-                    
-                    <div class="menu-divider"></div>
-                    
-                    <!-- SECCIÓN 3: CONFIGURACIÓN E INTEGRACIONES -->
-                    <li class="menu-header">Sistema</li>
-                    
-                    <li class="nav-item">
-                        <a href="<?= $this->url('application', ['action' => 'marketplace-config']) ?>" class="nav-link">
-                            <i class="fas fa-plug nav-icon"></i>
-                            <span class="nav-text">Integraciones</span>
-                        </a>
-                        <div class="nav-tooltip">Integraciones</div>
-                    </li>
-                    
-                    <li class="nav-item">
-                        <a href="<?= $this->url('application', ['action' => 'system-config']) ?>" class="nav-link">
-                            <i class="fas fa-cog nav-icon"></i>
-                            <span class="nav-text">Configuración</span>
-                        </a>
-                        <div class="nav-tooltip">Configuración</div>
-                    </li>
-                </ul>
-                
-                <!-- Botón de expansión inferior -->
-                <div class="sidebar-bottom-toggle">
-                    <button class="toggle-btn-bottom" id="toggleBtnBottom" title="Expandir/Colapsar">
-                        <i class="fas fa-chevron-left"></i>
-                        <span class="toggle-text">Colapsar menú</span>
+                <div class="header-right">
+                    <button type="button" id="themeToggle" class="theme-toggle" 
+                            style="z-index: 10001 !important; position: relative !important; pointer-events: auto !important;"
+                            aria-label="Cambiar tema">
+                        <i class="fas fa-moon"></i>
+                        <i class="fas fa-sun"></i>
                     </button>
-                </div>
-                
-                <!-- Panel de usuario - Modificado para mostrar información de sesión -->
-                <div class="user-panel">
-                    <div class="user-avatar">
-                        <i class="fas fa-user"></i>
-                    </div>
-                    <div class="user-info">
-                        <?php if ($this->authenticationService()->hasIdentity()): ?>
-                            <?php 
-                            // Obtener datos del usuario desde el contenedor de sesión
-                            $userSession = new \Laminas\Session\Container('user');
-                            $username = $userSession->username ?? $this->authenticationService()->getIdentity();
-                            $role = $userSession->role ?? 'Usuario';
-                            ?>
-                            <div class="user-name"><?= $this->escapeHtml($username) ?></div>
-                            <div class="user-role"><?= $this->escapeHtml($role) ?></div>
-                        <?php else: ?>
-                            <div class="user-name">Invitado</div>
-                            <div class="user-role">Sin autenticar</div>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Overlay para sidebar en móviles -->
-            <div class="sidebar-overlay" id="sidebarOverlay"></div>
-            
-            <!-- Contenido principal -->
-            <div class="main-content">
-                <!-- Navbar superior - Modificado para incluir el botón de hamburguesa -->
-                <div class="top-navbar">
-                    <div class="page-title-wrapper">
-                        <!-- Botón de hamburguesa para móviles -->
-                        <button class="mobile-menu-toggle" id="mobileMenuToggle">
-                            <i class="fas fa-bars"></i>
-                        </button>
-                        <h1 class="page-title">
-                            <?= isset($this->title) ? $this->escapeHtml($this->title) : 'Dashboard' ?>
-                        </h1>
-                    </div>
-                    <div class="navbar-actions">
-                        <div class="navbar-icon user-dropdown" title="Perfil" id="userDropdownBtn">
-                            <i class="fas fa-user"></i>
-                            <div class="user-dropdown-menu" id="userDropdownMenu">
-                                <?php if ($this->authenticationService()->hasIdentity()): ?>
-                                    <a href="<?= $this->url('application', ['action' => 'profile']) ?>" class="user-dropdown-item">
-                                        <i class="fas fa-user-circle"></i> Mi Perfil
-                                    </a>
-                                    <a href="<?= $this->url('application', ['action' => 'account-settings']) ?>" class="user-dropdown-item">
-                                        <i class="fas fa-cog"></i> Ajustes de cuenta
-                                    </a>
-                                    <div class="user-dropdown-divider"></div>
-                                    <a href="<?= $this->url('logout') ?>" class="user-dropdown-item">
-                                        <i class="fas fa-sign-out-alt"></i> Cerrar sesión
-                                    </a>
-                                <?php else: ?>
-                                    <a href="<?= $this->url('login') ?>" class="user-dropdown-item">
-                                        <i class="fas fa-sign-in-alt"></i> Iniciar sesión
-                                    </a>
-                                <?php endif; ?>
+                    <div class="user-dropdown">
+                        <button type="button" id="userDropdownToggle" class="user-dropdown-toggle"
+                                style="z-index: 10001 !important; position: relative !important; pointer-events: auto !important;">
+                            <div class="user-avatar">
+                                <i class="fas fa-user"></i>
                             </div>
+                            <?php if ($this->authenticationService()->hasIdentity()): ?>
+                                <?php 
+                                // Obtener datos del usuario desde el contenedor de sesión
+                                $userSession = new \Laminas\Session\Container('user');
+                                $username = $userSession->username ?? $this->authenticationService()->getIdentity();
+                                ?>
+                                <span class="user-name"><?= $this->escapeHtml($username) ?></span>
+                            <?php else: ?>
+                                <span class="user-name">Invitado</span>
+                            <?php endif; ?>
+                            <i class="fas fa-chevron-down ms-1"></i>
+                        </button>
+                        <div id="userDropdownMenu" class="user-dropdown-menu">
+                            <?php if ($this->authenticationService()->hasIdentity()): ?>
+                                <a href="<?= $this->url('application', ['action' => 'profile']) ?>">
+                                    <i class="fas fa-user-circle"></i>
+                                    <span>Mi Perfil</span>
+                                </a>
+                                <div class="divider"></div>
+                                <a href="<?= $this->url('logout') ?>">
+                                    <i class="fas fa-sign-out-alt"></i>
+                                    <span>Cerrar sesión</span>
+                                </a>
+                            <?php else: ?>
+                                <a href="<?= $this->url('login') ?>">
+                                    <i class="fas fa-sign-in-alt"></i>
+                                    <span>Iniciar sesión</span>
+                                </a>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
-                
-                <!-- Contenido de la página -->
+            </header>
+            
+            <!-- Sidebar / Menú lateral -->
+            <aside id="sidebar" class="sidebar">
+                <div class="sidebar-header">
+                    <h3>Menú Principal</h3>
+                    <button type="button" id="sidebarClose" class="sidebar-close" aria-label="Cerrar menú">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <ul class="nav-menu">
+                    <!-- SECCIÓN 1: ANÁLISIS DE VENTAS -->
+                    <li class="nav-category">Análisis</li>
+                    
+                    <li class="nav-item">
+                        <a href="<?= $this->url('application', ['action' => 'dashboard']) ?>" class="nav-link <?= $this->url('application', ['action' => 'dashboard']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                            <i class="fas fa-tachometer-alt nav-icon"></i>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    
+                    <li class="nav-item" id="salesAnalysisItem">
+                        <a href="#" class="nav-link">
+                            <i class="fas fa-chart-bar nav-icon"></i>
+                            <span>Análisis de Ventas</span>
+                            <i class="fas fa-chevron-right nav-arrow"></i>
+                        </a>
+                        <ul class="submenu">
+                            <li>
+                                <a href="<?= $this->url('application', ['action' => 'dashboard']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'dashboard']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                                    Resumen de ventas
+                                </a>
+                            </li>
+                            <li>
+                                <a href="<?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_WALLMART']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_WALLMART']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                                    Walmart
+                                </a>
+                            </li>
+                            <li>
+                                <a href="<?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_RIPLEY']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_RIPLEY']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                                    Ripley
+                                </a>
+                            </li>
+                            <li>
+                                <a href="<?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_FALABELLA']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_FALABELLA']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                                    Falabella
+                                </a>
+                            </li>
+                            <li>
+                                <a href="<?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_MERCADO_LIBRE']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_MERCADO_LIBRE']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                                    Mercado Libre
+                                </a>
+                            </li>
+                            <li>
+                                <a href="<?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_PARIS']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_PARIS']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                                    Paris
+                                </a>
+                            </li>
+                            <li>
+                                <a href="<?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_WOOCOMMERCE']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_WOOCOMMERCE']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                                    WooCommerce
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                    
+                    <!-- SECCIÓN 2: ÓRDENES Y PEDIDOS -->
+                    <li class="nav-category">Operaciones</li>
+                    
+                    <li class="nav-item" id="ordersItem">
+                        <a href="#" class="nav-link">
+                            <i class="fas fa-shopping-cart nav-icon"></i>
+                            <span>Órdenes y Pedidos</span>
+                            <i class="fas fa-chevron-right nav-arrow"></i>
+                        </a>
+                        <ul class="submenu">
+                            <li>
+                                <a href="<?= $this->url('application', ['action' => 'orders']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'orders']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                                    Todas las órdenes
+                                </a>
+                            </li>
+                            <li>
+                                <a href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_WALLMART']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_WALLMART']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                                    Walmart
+                                </a>
+                            </li>
+                            <li>
+                                <a href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_RIPLEY']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_RIPLEY']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                                    Ripley
+                                </a>
+                            </li>
+                            <li>
+                                <a href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_FALABELLA']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_FALABELLA']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                                    Falabella
+                                </a>
+                            </li>
+                            <li>
+                                <a href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_MERCADO_LIBRE']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_MERCADO_LIBRE']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                                    Mercado Libre
+                                </a>
+                            </li>
+                            <li>
+                                <a href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_PARIS']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_PARIS']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                                    Paris
+                                </a>
+                            </li>
+                            <li>
+                                <a href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_WOOCOMMERCE']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_WOOCOMMERCE']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                                    WooCommerce
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                    
+                    <!-- SECCIÓN 3: INTEGRACIONES -->
+                    <li class="nav-category">Sistema</li>
+                    
+                    <li class="nav-item">
+                        <a href="<?= $this->url('application', ['action' => 'marketplace-config']) ?>" class="nav-link <?= $this->url('application', ['action' => 'marketplace-config']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                            <i class="fas fa-plug nav-icon"></i>
+                            <span>Integraciones</span>
+                        </a>
+                    </li>
+                </ul>
+            </aside>
+            
+            <!-- Overlay para sidebar -->
+            <div id="sidebarOverlay" class="sidebar-overlay"></div>
+            
+            <!-- Contenido principal -->
+            <main class="main-content">
                 <?= $this->content ?>
-            </div>
+            </main>
         </div>
         <?php else: ?>
         <!-- Layout para la página de login -->
         <?= $this->content ?>
         <?php endif; ?>
 
-        <?= $this->inlineScript()->prependFile($this->basePath('js/bootstrap.min.js')) ?>
+        <?= $this->inlineScript()
+            ->prependFile($this->basePath('js/bootstrap.min.js')) 
+        ?>
+        
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
 
-        <!-- Script para la funcionalidad del navbar -->
+        <!-- Script para la funcionalidad del navbar - CORREGIDO -->
         <script>
             document.addEventListener('DOMContentLoaded', function() {
-                // Referencias a elementos del DOM
+                // Elementos del DOM
+                const menuToggle = document.getElementById('menuToggle');
                 const sidebar = document.getElementById('sidebar');
-                const toggleBtnBottom = document.getElementById('toggleBtnBottom');
                 const sidebarOverlay = document.getElementById('sidebarOverlay');
-                const mobileMenuToggle = document.getElementById('mobileMenuToggle');
-                const userDropdownBtn = document.getElementById('userDropdownBtn');
+                const sidebarClose = document.getElementById('sidebarClose');
+                const themeToggle = document.getElementById('themeToggle');
+                const userDropdownToggle = document.getElementById('userDropdownToggle');
                 const userDropdownMenu = document.getElementById('userDropdownMenu');
+                const salesAnalysisItem = document.getElementById('salesAnalysisItem');
+                const ordersItem = document.getElementById('ordersItem');
                 
                 // Verificar si estamos en la página de login
                 const isLoginPage = document.querySelector('.login-container') !== null;
@@ -963,214 +729,196 @@
                 // Si estamos en la página de login, no ejecutamos el código del sidebar
                 if (isLoginPage) return;
                 
-                // Verificar existencia de elementos
-                if (!sidebar) {
+                // Debug para verificar existencia de elementos
+                console.log('Elementos encontrados:', {
+                    menuToggle: !!menuToggle,
+                    sidebar: !!sidebar,
+                    sidebarOverlay: !!sidebarOverlay,
+                    sidebarClose: !!sidebarClose
+                });
+                
+                // Verificar existencia de elementos críticos
+                if (!sidebar || !menuToggle) {
                     console.error("Elementos críticos del sidebar no encontrados");
                     return;
                 }
                 
-                // Detectar si es dispositivo móvil
-                const isMobile = window.innerWidth < 992;
+                // SOLUCIÓN FORZADA: Asegurar que los elementos sean clickeables
+                menuToggle.style.zIndex = '10002';
+                menuToggle.style.position = 'relative';
+                menuToggle.style.pointerEvents = 'auto';
+                menuToggle.style.cursor = 'pointer';
                 
-                // Función para alternar el estado del sidebar según el dispositivo
-                function toggleSidebar() {
-                    if (isMobile) {
-                        // En móviles, el botón inferior también debe cerrar el menú
-                        sidebar.classList.remove('mobile-open');
-                        sidebarOverlay.classList.remove('show');
-                        document.body.style.overflow = '';
-                        
-                        // Restaurar el icono de hamburguesa
-                        const hamburgerIcon = mobileMenuToggle.querySelector('i');
-                        if (hamburgerIcon) {
-                            hamburgerIcon.className = 'fas fa-bars';
-                        }
+                // Inicializar tema
+                initTheme();
+                
+                // Función para alternar la visibilidad del sidebar
+                function toggleSidebar(e) {
+                    console.log('toggleSidebar llamado');
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    sidebar.classList.toggle('show');
+                    sidebarOverlay.classList.toggle('show');
+                    
+                    // Evitar scroll cuando el sidebar está abierto en móviles
+                    if (sidebar.classList.contains('show')) {
+                        document.body.style.overflow = 'hidden';
                     } else {
-                        // Comportamiento normal en escritorio
-                        if (sidebar.classList.contains('sidebar-collapsed')) {
-                            // Expandir
-                            sidebar.classList.remove('sidebar-collapsed');
-                            sidebar.classList.add('sidebar-expanded');
-                            
-                            // Actualizar ícono y texto
-                            const toggleIcon = toggleBtnBottom.querySelector('i');
-                            if (toggleIcon) toggleIcon.className = 'fas fa-chevron-left';
-                            
-                            const toggleText = toggleBtnBottom.querySelector('.toggle-text');
-                            if (toggleText) toggleText.textContent = 'Colapsar menú';
-                        } else {
-                            // Colapsar
-                            sidebar.classList.remove('sidebar-expanded');
-                            sidebar.classList.add('sidebar-collapsed');
-                            
-                            // Actualizar ícono y texto
-                            const toggleIcon = toggleBtnBottom.querySelector('i');
-                            if (toggleIcon) toggleIcon.className = 'fas fa-chevron-right';
-                            
-                            const toggleText = toggleBtnBottom.querySelector('.toggle-text');
-                            if (toggleText) toggleText.textContent = 'Expandir menú';
-                            
-                            // Cerrar submenús abiertos
-                            document.querySelectorAll('.has-submenu.open').forEach(item => {
-                                item.classList.remove('open');
-                            });
-                        }
-                    }
-                }
-                
-                // Función para abrir/cerrar el menú en móviles
-                function toggleMobileMenu() {
-                    // Solo ejecutar en móvil
-                    if (isMobile) {
-                        // Alternar la clase mobile-open para mostrar/ocultar el menú
-                        sidebar.classList.toggle('mobile-open');
-                        
-                        // Alternar la visibilidad del overlay
-                        sidebarOverlay.classList.toggle('show');
-                        
-                        // Cambiar el icono del botón hamburguesa según el estado del menú
-                        const hamburgerIcon = mobileMenuToggle.querySelector('i');
-                        if (hamburgerIcon) {
-                            if (sidebar.classList.contains('mobile-open')) {
-                                // Cambiar a icono X cuando el menú está abierto
-                                hamburgerIcon.className = 'fas fa-times';
-                            } else {
-                                // Volver al icono de hamburguesa cuando el menú está cerrado
-                                hamburgerIcon.className = 'fas fa-bars';
-                            }
-                        }
-                        
-                        // Bloquear/desbloquear el scroll del body
-                        document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
-                    }
-                }
-                
-                // Asignar eventos
-                if (toggleBtnBottom) {
-                    toggleBtnBottom.addEventListener('click', toggleSidebar);
-                }
-                
-                if (mobileMenuToggle) {
-                    mobileMenuToggle.addEventListener('click', toggleMobileMenu);
-                }
-                
-                // Cerrar sidebar con overlay en dispositivos móviles
-                if (sidebarOverlay) {
-                    sidebarOverlay.addEventListener('click', function() {
-                        // Cerrar el menú
-                        sidebar.classList.remove('mobile-open');
-                        sidebarOverlay.classList.remove('show');
                         document.body.style.overflow = '';
+                    }
+                }
+                
+                // Función para cerrar el sidebar
+                function closeSidebar() {
+                    sidebar.classList.remove('show');
+                    sidebarOverlay.classList.remove('show');
+                    document.body.style.overflow = '';
+                }
+                
+                // Función para alternar un elemento con submenú
+                function toggleSubmenu(navItem) {
+                    // Cerrar otros submenús si están abiertos
+                    const openItems = document.querySelectorAll('.nav-item.open');
+                    openItems.forEach(item => {
+                        if (item !== navItem) {
+                            item.classList.remove('open');
+                        }
+                    });
+                    
+                    // Alternar el estado del submenú actual
+                    navItem.classList.toggle('open');
+                }
+                
+                // Función para inicializar el tema
+                function initTheme() {
+                    // Verificar si hay un tema guardado en localStorage
+                    const savedTheme = localStorage.getItem('theme');
+                    
+                    if (savedTheme) {
+                        document.documentElement.setAttribute('data-theme', savedTheme);
+                    } else {
+                        // Verificar preferencia del sistema
+                        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                        const themeToSet = prefersDark ? 'dark' : 'light';
                         
-                        // Restaurar el icono de hamburguesa
-                        const hamburgerIcon = mobileMenuToggle.querySelector('i');
-                        if (hamburgerIcon) {
-                            hamburgerIcon.className = 'fas fa-bars';
-                        }
-                    });
-                }
-                
-                // Manejo de submenús
-                const submenuItems = document.querySelectorAll('.has-submenu');
-                
-                submenuItems.forEach(item => {
-                    const link = item.querySelector('.nav-link');
-                    
-                    if (link) {
-                        link.addEventListener('click', function(e) {
-                            // Si estamos en modo colapsado en escritorio, no abriremos submenús
-                            if (!isMobile && sidebar.classList.contains('sidebar-collapsed')) {
-                                // Permitir que el enlace funcione normalmente
-                                return;
-                            }
-                            
-                            // Si es un elemento con submenú, prevenir navegación al hacer clic en el enlace principal
-                            e.preventDefault();
-                            
-                            // Cerrar otros submenús abiertos
-                            submenuItems.forEach(otherItem => {
-                                if (otherItem !== item && otherItem.classList.contains('open')) {
-                                    otherItem.classList.remove('open');
-                                }
-                            });
-                            
-                            // Alternar estado del submenú actual
-                            item.classList.toggle('open');
-                        });
-                    }
-                });
-                
-                // Marcar activo según URL actual
-                function setActiveMenuBasedOnUrl() {
-                    const currentPath = window.location.pathname;
-                    
-                    // Primero intentamos encontrar una coincidencia exacta en los submenús
-                    let found = false;
-                    
-                    document.querySelectorAll('.submenu-link').forEach(link => {
-                        const href = link.getAttribute('href');
-                        if (href && href !== '#' && currentPath.includes(href)) {
-                            // Marcar este subenlace como activo
-                            link.classList.add('active');
-                            
-                            // Abrir el submenú padre
-                            const parentMenu = link.closest('.has-submenu');
-                            if (parentMenu) {
-                                parentMenu.classList.add('open');
-                                parentMenu.querySelector('.nav-link').classList.add('active');
-                            }
-                            
-                            found = true;
-                        }
-                    });
-                    
-                    // Si no encontramos coincidencia en los submenús, buscamos en los menús principales
-                    if (!found) {
-                        document.querySelectorAll('.nav-link').forEach(link => {
-                            const href = link.getAttribute('href');
-                            if (href && href !== '#' && currentPath.includes(href)) {
-                                link.classList.add('active');
-                                
-                                // Si tiene submenú, lo expandimos
-                                const parentItem = link.closest('.has-submenu');
-                                if (parentItem) {
-                                    parentItem.classList.add('open');
-                                }
-                            }
-                        });
+                        document.documentElement.setAttribute('data-theme', themeToSet);
+                        localStorage.setItem('theme', themeToSet);
                     }
                 }
                 
-                // Ejecutar al cargar
-                setActiveMenuBasedOnUrl();
-                
-                // Dropdown del usuario
-                if (userDropdownBtn) {
-                    userDropdownBtn.addEventListener('click', function(e) {
-                        e.stopPropagation();
-                        if (userDropdownMenu) {
-                            userDropdownMenu.classList.toggle('show');
-                        }
-                    });
+                // Función para alternar el tema
+                function toggleTheme() {
+                    const currentTheme = document.documentElement.getAttribute('data-theme');
+                    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
                     
-                    // Cerrar el dropdown al hacer clic fuera de él
+                    document.documentElement.setAttribute('data-theme', newTheme);
+                    localStorage.setItem('theme', newTheme);
+                }
+                
+                // Función para alternar el menú desplegable del usuario
+                function toggleUserDropdown(e) {
+                    e.stopPropagation();
+                    userDropdownMenu.classList.toggle('show');
+                }
+                
+                // Cerrar el menú desplegable al hacer clic en cualquier otro lugar
+                function closeDropdowns(event) {
+                    if (userDropdownMenu && userDropdownMenu.classList.contains('show') && 
+                        !userDropdownToggle.contains(event.target)) {
+                        userDropdownMenu.classList.remove('show');
+                    }
+                }
+                
+                // AGREGAR EVENTS DE MÚLTIPLES FORMAS PARA ASEGURAR QUE FUNCIONEN
+                if (menuToggle) {
+                    // Usar capture true para interceptar el evento
+                    menuToggle.addEventListener('click', toggleSidebar, true);
+                    menuToggle.addEventListener('touchstart', toggleSidebar, { passive: false });
+                    
+                    // Fallback: escuchar en el documento
                     document.addEventListener('click', function(e) {
-                        if (userDropdownMenu && userDropdownMenu.classList.contains('show') && !userDropdownBtn.contains(e.target)) {
-                            userDropdownMenu.classList.remove('show');
+                        if (e.target.id === 'menuToggle' || e.target.closest('#menuToggle')) {
+                            console.log('Click detectado en menuToggle (fallback)');
+                            toggleSidebar(e);
                         }
-                    });
+                    }, true);
                 }
                 
-                // Detectar cambios de tamaño para ajustar la visualización
-                window.addEventListener('resize', function() {
-                    const newIsMobile = window.innerWidth < 992;
-                    
-                    // Si cambia entre móvil y escritorio o viceversa
-                    if (newIsMobile !== isMobile) {
-                        // Recargar la página para reiniciar todo el estado
-                        location.reload();
+                if (sidebarClose) {
+                    sidebarClose.addEventListener('click', closeSidebar);
+                }
+                
+                if (sidebarOverlay) {
+                    sidebarOverlay.addEventListener('click', closeSidebar);
+                }
+                
+                if (themeToggle) {
+                    themeToggle.addEventListener('click', toggleTheme);
+                }
+                
+                if (userDropdownToggle) {
+                    userDropdownToggle.addEventListener('click', toggleUserDropdown);
+                }
+                
+                document.addEventListener('click', closeDropdowns);
+                
+                // Agregar eventos a elementos con submenús
+                if (salesAnalysisItem) {
+                    const salesAnalysisLink = salesAnalysisItem.querySelector('.nav-link');
+                    if (salesAnalysisLink) {
+                        salesAnalysisLink.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            toggleSubmenu(salesAnalysisItem);
+                        });
+                    }
+                }
+                
+                if (ordersItem) {
+                    const ordersLink = ordersItem.querySelector('.nav-link');
+                    if (ordersLink) {
+                        ordersLink.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            toggleSubmenu(ordersItem);
+                        });
+                    }
+                }
+                setTimeout(() => {
+                    const menuToggle = document.getElementById('menuToggle');
+                    if (menuToggle) {
+                        menuToggle.onclick = function(e) {
+                            console.log('Click forzado');
+                            document.getElementById('sidebar').classList.toggle('show');
+                            document.getElementById('sidebarOverlay').classList.toggle('show');
+                        };
+                    }
+                }, 1000);
+                
+                // Inicializar submenús activos
+                const activeSubmenuItems = document.querySelectorAll('.submenu-link.active');
+                activeSubmenuItems.forEach(item => {
+                    const parentItem = item.closest('.nav-item');
+                    if (parentItem) {
+                        parentItem.classList.add('open');
                     }
                 });
+                
+                // Detectar cambios en el esquema de colores del sistema
+                const colorSchemeMedia = window.matchMedia('(prefers-color-scheme: dark)');
+                colorSchemeMedia.addEventListener('change', function(e) {
+                    // Solo cambiar automáticamente si el usuario no ha establecido manualmente un tema
+                    const userSetTheme = localStorage.getItem('theme');
+                    if (!userSetTheme) {
+                        const newTheme = e.matches ? 'dark' : 'light';
+                        document.documentElement.setAttribute('data-theme', newTheme);
+                    }
+                });
+                
+                // Debug adicional para verificar clics
+                document.addEventListener('mousedown', function(e) {
+                    console.log('Mousedown en:', e.target);
+                    console.log('Z-index del elemento:', window.getComputedStyle(e.target).zIndex);
+                }, true);
             });
         </script>
     </body>

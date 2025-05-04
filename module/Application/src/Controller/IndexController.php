@@ -78,7 +78,7 @@ public function dashboardAction()
     // Obtener lista de tablas
     $sql = "SELECT table_name, engine, table_rows, create_time, update_time 
             FROM information_schema.tables 
-            WHERE table_schema = 'dbpgzmb4lvvly0'";
+            WHERE table_schema = 'db5skbdigd2nxo'";
     $statement = $this->dbAdapter->createStatement($sql);
     $result = $statement->execute();
 
@@ -395,7 +395,6 @@ public function dashboardAction()
         return $response;
     }
 
-
 /**
  * Acción para mostrar el detalle de una tabla con paginación.
  * Se espera recibir el parámetro 'table' en la URL.
@@ -418,7 +417,7 @@ public function detailAction()
     $page  = (int) $this->params()->fromQuery('page', 1);
     $limit = (int) $this->params()->fromQuery('limit', 150);
     // Limitar a máximo 150 registros
-    $limit = min($limit, 150);
+    $limit = min($limit, 50);
     $offset = ($page - 1) * $limit;
 
     // Verificar exportación a CSV
@@ -489,20 +488,10 @@ public function detailAction()
     
     $totalPages = ceil($total / $limit);
     
-    // Variables para Dashboard/KPIs - inicializar con valores predeterminados
-    $ventaBrutaMensual = 0;
-    $impuestoBrutoMensual = 0;
-    $totalTransaccionesMes = 0;
-    $totalRegistros = 0;
-    $totalVentas = 0;
-    $valorCancelado = 0;
-    $transaccionesCanceladas = 0;
+    // Inicializar arrays para gráficos
     $ventasAnualesArray = [];
     $topProductosArray = [];
-    
-    // Si estamos viendo una tabla que contiene datos de ventas, cargar KPIs
-    $isMarketplaceTable = false;
-    
+        
     // Comprobar si la tabla actual es un marketplace (MKP_)
     if (!empty($data) && (
         stripos($table, 'mkp_') !== false || 
@@ -512,8 +501,8 @@ public function detailAction()
         stripos($table, 'wallmart') !== false ||
         stripos($table, 'mercado_libre') !== false
     )) {
-        $isMarketplaceTable = true;
-        $actualTableName = $table;  // Nombre real de la tabla que estamos viendo
+        $actualTableName = $table;  // Tabla real que estamos viendo
+        error_log("Detectada tabla de marketplace: $actualTableName");
         
         try {
             // Verificar las columnas de la tabla para adaptar las consultas
@@ -529,14 +518,14 @@ public function detailAction()
                 $columnName = $column['Field'];
                 $allColumns[] = $columnName;
                 
-                // Mapeamos los nombres reales de las columnas
-                if (stripos($columnName, 'precio_base') !== false || stripos($columnName, 'precio_sin') !== false || stripos($columnName, 'base_imponible') !== false) {
+                // Mapeamos los nombres según patrones comunes
+                if (stripos($columnName, 'precio_base') !== false || stripos($columnName, 'precio_sin') !== false || stripos($columnName, 'base_imponible') !== false || stripos($columnName, 'monto_liquidacion') !== false) {
                     $columnMap['precio_base'] = $columnName;
                 }
-                elseif (stripos($columnName, 'impuesto') !== false || stripos($columnName, 'iva') !== false || stripos($columnName, 'tax') !== false) {
+                elseif (stripos($columnName, 'impuesto') !== false || stripos($columnName, 'iva') !== false || stripos($columnName, 'tax') !== false || stripos($columnName, 'monto_impuesto_boleta') !== false) {
                     $columnMap['impuesto'] = $columnName;
                 }
-                elseif (stripos($columnName, 'monto_total') !== false || stripos($columnName, 'total_boleta') !== false || stripos($columnName, 'precio_con') !== false || stripos($columnName, 'precio_despues_descuento') !== false) {
+                elseif (stripos($columnName, 'monto_total') !== false || stripos($columnName, 'total_boleta') !== false || stripos($columnName, 'precio_con') !== false || stripos($columnName, 'precio_despues_descuento') !== false || stripos($columnName, 'monto_total_boleta') !== false) {
                     $columnMap['monto_total'] = $columnName;
                 }
                 elseif (stripos($columnName, 'fecha_crea') !== false || stripos($columnName, 'date_created') !== false || stripos($columnName, 'creation_date') !== false) {
@@ -545,337 +534,252 @@ public function detailAction()
                 elseif (stripos($columnName, 'estado') !== false || stripos($columnName, 'status') !== false || stripos($columnName, 'state') !== false) {
                     $columnMap['estado'] = $columnName;
                 }
-                elseif (stripos($columnName, 'numero_boleta') !== false || stripos($columnName, 'num_boleta') !== false || stripos($columnName, 'orden_id') !== false || stripos($columnName, 'order_id') !== false || stripos($columnName, 'id_factura') !== false || stripos($columnName, 'pedido_id') !== false) {
+                elseif (stripos($columnName, 'numero_boleta') !== false || stripos($columnName, 'num_boleta') !== false || stripos($columnName, 'orden_id') !== false || stripos($columnName, 'order_id') !== false || stripos($columnName, 'id_factura') !== false || stripos($columnName, 'pedido_id') !== false || stripos($columnName, 'numero_suborden') !== false) {
                     $columnMap['numero_boleta'] = $columnName;
                 }
-                elseif (stripos($columnName, 'producto') !== false || stripos($columnName, 'product') !== false || stripos($columnName, 'item') !== false || stripos($columnName, 'sku') !== false || stripos($columnName, 'descripcion') !== false) {
+                elseif (stripos($columnName, 'producto') !== false || stripos($columnName, 'product') !== false || stripos($columnName, 'item') !== false || stripos($columnName, 'sku') !== false || stripos($columnName, 'descripcion') !== false || stripos($columnName, 'nombre_producto') !== false) {
                     $columnMap['producto'] = $columnName;
-                }
-                elseif (stripos($columnName, 'monto_liquidacion') !== false || stripos($columnName, 'liquidacion') !== false) {
-                    $columnMap['monto_liquidacion'] = $columnName;
-                }
-                elseif (stripos($columnName, 'monto_impuesto_boleta') !== false || stripos($columnName, 'impuesto_boleta') !== false) {
-                    $columnMap['monto_impuesto_boleta'] = $columnName;
                 }
             }
             
-            // Log de columnas encontradas para depuración
+            // Log para depuración
             error_log("Columnas encontradas en $actualTableName: " . implode(", ", $allColumns));
             error_log("Mapeo de columnas: " . json_encode($columnMap));
             
-            // Establecer nombres de columna (o usar valores predeterminados si no se encuentran)
-            $colPrecioBase = $columnMap['precio_base'] ?? 'precio_sin_impuesto';
-            $colImpuesto = $columnMap['impuesto'] ?? 'impuesto';
-            $colMontoTotal = $columnMap['monto_total'] ?? 'precio_despues_descuento';
+            // Nombres de columna correctos para esta tabla específica
+            // Usar el nombre real encontrado o caer en un valor predeterminado
+            $colPrecioBase = $columnMap['precio_base'] ?? 'precio_base';
+            $colImpuesto = $columnMap['impuesto'] ?? 'monto_impuesto_boleta';
+            $colMontoTotal = $columnMap['monto_total'] ?? 'monto_total_boleta';
             $colFechaCreacion = $columnMap['fecha_creacion'] ?? 'fecha_creacion';
             $colEstado = $columnMap['estado'] ?? 'estado';
-            $colNumeroBoletaDesambiguado = $columnMap['numero_boleta'] ?? 'id';
+            $colNumeroBoletaDesambiguado = $columnMap['numero_boleta'] ?? 'numero_boleta';
             $colProducto = $columnMap['producto'] ?? 'nombre_producto';
-            $colMontoLiquidacion = $columnMap['monto_liquidacion'] ?? 'monto_liquidacion';
-            $colMontoImpuestoBoleta = $columnMap['monto_impuesto_boleta'] ?? 'monto_impuesto_boleta';
             
-            // Mes y año actuales para filtrar datos
-            $mesActual = (int)date('n');  // Número de mes (1-12) con conversión explícita a entero
-            $anioActual = (int)date('Y'); // Año actual con conversión explícita a entero
-            
-            // Condición para filtrar registros cancelados (usado en múltiples consultas)
-            $condicionNoCancelado = "LOWER(`$colEstado`) NOT LIKE '%cancel%' 
-                AND LOWER(`$colEstado`) NOT LIKE '%anulad%'
-                AND LOWER(`$colEstado`) NOT LIKE '%rechaz%'
-                AND LOWER(`$colEstado`) NOT LIKE '%delet%'";
-                
-            $condicionSiCancelado = "LOWER(`$colEstado`) LIKE '%cancel%' 
-                OR LOWER(`$colEstado`) LIKE '%anulad%'
-                OR LOWER(`$colEstado`) LIKE '%rechaz%'
-                OR LOWER(`$colEstado`) LIKE '%delet%'";
-                
-            // Condición para el mes actual
-            $condicionMesActual = "MONTH(`$colFechaCreacion`) = $mesActual AND YEAR(`$colFechaCreacion`) = $anioActual";
-            
-            // CONSULTA 1: Ventas totales (todo el historial) - con unicidad de boletas
-            try {
-                $sqlVentasTotales = $sqlVentasTotales = "SELECT 
-                COUNT(DISTINCT `$colNumeroBoletaDesambiguado`) AS registros_totales,
-                SUM(`$colMontoTotal`) AS monto_total_ventas
-            FROM `$actualTableName`
-            WHERE $condicionNoCancelado
-              AND MONTH(fecha_creacion) = MONTH(CURDATE())
-              AND YEAR(fecha_creacion) = YEAR(CURDATE())";
-            
-                
-                $statementVentasTotales = $this->dbAdapter->createStatement($sqlVentasTotales);
-                $resultVentasTotales = $statementVentasTotales->execute()->current();
-                
-                if ($resultVentasTotales) {
-                    $totalRegistros = (int)($resultVentasTotales['registros_totales'] ?? 0);
-                    $totalVentas = (float)($resultVentasTotales['monto_total_ventas'] ?? 0);
-                }
-            } catch (\Exception $e) {
-                error_log("Error en consulta de ventas totales: " . $e->getMessage());
-                
-                // Consulta alternativa sin DISTINCT si hay error
-                try {
-                    $sqlVentasTotalesAlt = "SELECT 
-                        COUNT(*) AS registros_totales,
-                        SUM(`$colMontoTotal`) AS monto_total_ventas
-                    FROM `$actualTableName`
-                    WHERE $condicionNoCancelado";
-                    
-                    $statementVentasTotalesAlt = $this->dbAdapter->createStatement($sqlVentasTotalesAlt);
-                    $resultVentasTotalesAlt = $statementVentasTotalesAlt->execute()->current();
-                    
-                    if ($resultVentasTotalesAlt) {
-                        $totalRegistros = (int)($resultVentasTotalesAlt['registros_totales'] ?? 0);
-                        $totalVentas = (float)($resultVentasTotalesAlt['monto_total_ventas'] ?? 0);
-                    }
-                } catch (\Exception $e2) {
-                    error_log("Error en consulta alternativa de ventas totales: " . $e2->getMessage());
+            // Si no hay columna de número de boleta, usar uno alternativo o ID
+            if (!isset($columnMap['numero_boleta'])) {
+                if (in_array('numero_suborden', $allColumns)) {
+                    $colNumeroBoletaDesambiguado = 'numero_suborden';
+                    error_log("Usando número de suborden como identificador de boleta");
+                } elseif (in_array('id', $allColumns)) {
+                    $colNumeroBoletaDesambiguado = 'id';
+                    error_log("Usando 'id' como identificador de boleta");
                 }
             }
             
-            // CONSULTA 2: Ventas del mes actual - con unicidad de boletas
+            // Condición para filtrar registros cancelados (buscar patrones comunes)
+            $condicionNoCancelado = "(`$colEstado` NOT LIKE '%cancel%' 
+                AND `$colEstado` NOT LIKE '%anulad%'
+                AND `$colEstado` NOT LIKE '%rechaz%'
+                AND `$colEstado` NOT LIKE '%delet%')";
+                
+            // ======== CONSULTA 4: Ventas por mes (ÚLTIMOS 12 MESES) - con unicidad ========
             try {
-                $sqlVentasMes = "SELECT 
-                COUNT(DISTINCT numero_boleta) AS registros_mes,
-                SUM(precio_base) AS monto_mes,
-                SUM(monto_impuesto_boleta) AS impuesto_mes
-            FROM MKP_PARIS
-            WHERE MONTH(fecha_creacion) = MONTH(CURDATE())
-              AND YEAR(fecha_creacion) = YEAR(CURDATE())
-              AND estado != 'Cancelado'";
-            
+                // Calculamos la fecha de hace 12 meses 
+                $fechaInicio = date('Y-m-d', strtotime('-11 months'));
+                $fechaInicioArray = explode('-', $fechaInicio);
+                $anioInicio = (int)$fechaInicioArray[0];
+                $mesInicio = (int)$fechaInicioArray[1];
                 
-                $statementVentasMes = $this->dbAdapter->createStatement($sqlVentasMes);
-                $resultVentasMes = $statementVentasMes->execute()->current();
-                
-                if ($resultVentasMes) {
-                    $totalTransaccionesMes = (int)($resultVentasMes['registros_mes'] ?? 0);
-                    $ventaBrutaMensual = (float)($resultVentasMes['monto_mes'] ?? 0);
-                    $impuestoBrutoMensual = (float)($resultVentasMes['impuesto_mes'] ?? 0);
-                }
-            } catch (\Exception $e) {
-                error_log("Error en consulta de ventas mes: " . $e->getMessage());
-                
-                // Consulta alternativa sin DISTINCT si hay error
-                try {
-                    $sqlVentasMesAlt = "SELECT 
-                        COUNT(*) AS registros_mes,
-                        SUM(`$colMontoTotal`) AS monto_mes,
-                        SUM(`$colImpuesto`) AS impuesto_mes
-                    FROM `$actualTableName`
-                    WHERE $condicionMesActual
-                    AND $condicionNoCancelado";
-                    
-                    $statementVentasMesAlt = $this->dbAdapter->createStatement($sqlVentasMesAlt);
-                    $resultVentasMesAlt = $statementVentasMesAlt->execute()->current();
-                    
-                    if ($resultVentasMesAlt) {
-                        $totalTransaccionesMes = (int)($resultVentasMesAlt['registros_mes'] ?? 0);
-                        $ventaBrutaMensual = (float)($resultVentasMesAlt['monto_mes'] ?? 0);
-                        $impuestoBrutoMensual = (float)($resultVentasMesAlt['impuesto_mes'] ?? 0);
-                    }
-                } catch (\Exception $e2) {
-                    error_log("Error en consulta alternativa de ventas mes: " . $e2->getMessage());
-                }
-            }
-            
-            // CONSULTA 3: Ventas canceladas del mes actual - con unicidad de boletas
-            try {
-                $sqlCanceladas = "SELECT 
-                    COUNT(DISTINCT `$colNumeroBoletaDesambiguado`) AS registros_cancelados,
-                    SUM(`$colMontoTotal`) AS monto_cancelado
-                FROM `$actualTableName`
-                WHERE $condicionMesActual
-                AND ($condicionSiCancelado)";
-                
-                $statementCanceladas = $this->dbAdapter->createStatement($sqlCanceladas);
-                $resultCanceladas = $statementCanceladas->execute()->current();
-                
-                if ($resultCanceladas) {
-                    $transaccionesCanceladas = (int)($resultCanceladas['registros_cancelados'] ?? 0);
-                    $valorCancelado = (float)($resultCanceladas['monto_cancelado'] ?? 0);
-                }
-            } catch (\Exception $e) {
-                error_log("Error en consulta de canceladas: " . $e->getMessage());
-                
-                // Consulta alternativa sin DISTINCT si hay error
-                try {
-                    $sqlCanceladasAlt = "SELECT 
-                        COUNT(*) AS registros_cancelados,
-                        SUM(`$colMontoTotal`) AS monto_cancelado
-                    FROM `$actualTableName`
-                    WHERE $condicionMesActual
-                    AND ($condicionSiCancelado)";
-                    
-                    $statementCanceladasAlt = $this->dbAdapter->createStatement($sqlCanceladasAlt);
-                    $resultCanceladasAlt = $statementCanceladasAlt->execute()->current();
-                    
-                    if ($resultCanceladasAlt) {
-                        $transaccionesCanceladas = (int)($resultCanceladasAlt['registros_cancelados'] ?? 0);
-                        $valorCancelado = (float)($resultCanceladasAlt['monto_cancelado'] ?? 0);
-                    }
-                } catch (\Exception $e2) {
-                    error_log("Error en consulta alternativa de canceladas: " . $e2->getMessage());
-                }
-            }
-            
-            // CONSULTA 4: Ventas por mes del año actual (para gráfico anual) - con unicidad de boletas
-            try {
-                $sqlVentasPorMes = "SELECT 
-                    mes_anio,
-                    nombre_mes,
-                    SUM(total_boleta) AS ventas,
-                    SUM(cantidad_boletas) AS cantidad
+                $sqlVentasPorMes = "
+                SELECT 
+                    DATE_FORMAT(fecha_creacion, '%Y-%m') AS mes_anio,
+                    DATE_FORMAT(fecha_creacion, '%M %Y') AS nombre_mes,
+                    YEAR(fecha_creacion) AS anio,
+                    MONTH(fecha_creacion) AS mes,
+                    COUNT(*) AS cantidad,
+                    SUM(monto_total) AS ventas
                 FROM (
-                    SELECT
-                        DATE_FORMAT(`$colFechaCreacion`, '%Y-%m') AS mes_anio,
-                        DATE_FORMAT(`$colFechaCreacion`, '%M %Y') AS nombre_mes,
-                        estado,
-                        COUNT(*) AS cantidad_boletas,
-                        SUM(`$colMontoTotal`) AS total_boleta
-                    FROM (
-                        SELECT
-                            `$colNumeroBoletaDesambiguado` AS numero_boleta,
-                            `$colEstado` AS estado,
-                            MAX(`$colFechaCreacion`) AS fecha_creacion,
-                            MAX(`$colMontoTotal`) AS monto_total_boleta
-                        FROM `$actualTableName`
-                        WHERE YEAR(`$colFechaCreacion`) = $anioActual
-                        GROUP BY numero_boleta, estado
-                    ) AS boletas_unicas
-                    GROUP BY mes_anio, nombre_mes, estado
-                ) AS ventas_mensuales
-                WHERE $condicionNoCancelado
-                GROUP BY mes_anio, nombre_mes
-                ORDER BY mes_anio ASC";
+                    SELECT 
+                        `$colNumeroBoletaDesambiguado` AS numero_boleta,
+                        MIN(`$colFechaCreacion`) AS fecha_creacion,
+                        MAX(`$colMontoTotal`) AS monto_total
+                    FROM `$actualTableName`
+                    WHERE $condicionNoCancelado
+                    AND `$colFechaCreacion` >= '$fechaInicio'
+                    GROUP BY `$colNumeroBoletaDesambiguado`
+                ) AS boletas_unicas
+                GROUP BY mes_anio, nombre_mes, anio, mes
+                ORDER BY anio ASC, mes ASC
+                ";
                 
+                error_log("Ejecutando consulta de ventas por mes (últimos 12 meses): $sqlVentasPorMes");
                 $statementVentasPorMes = $this->dbAdapter->createStatement($sqlVentasPorMes);
                 $resultVentasPorMes = $statementVentasPorMes->execute();
                 
-                // Generar array con todos los meses del año actual
+                // Generar array con los últimos 12 meses
                 $ventasAnualesArray = [];
-                $mesesDelAnio = [];
+                $mesesUltimosDoce = [];
                 
-                // Crear el arreglo de meses completo del año - asegurando que todos los valores son enteros
-                for ($mes = 1; $mes <= 12; $mes++) {
-                    $timestamp = mktime(0, 0, 0, (int)$mes, 1, $anioActual);
-                    $nombreMes = date('F Y', $timestamp); // Nombre de mes en inglés con año
+                // Crear array para todos los meses de los últimos 12 meses
+                for ($i = 0; $i < 12; $i++) {
+                    $fechaMes = date('Y-m-d', strtotime("-$i months"));
+                    $timestamp = strtotime($fechaMes);
+                    $nombreMes = date('F Y', $timestamp);
                     $mesAnio = date('Y-m', $timestamp);
-                    $mesesDelAnio[$mesAnio] = [
+                    $mesesUltimosDoce[$mesAnio] = [
                         'mes' => $nombreMes,
                         'ventas' => 0,
                         'cantidad' => 0
                     ];
                 }
                 
-                // Rellenar con datos reales donde existan
+                // Rellenar con datos reales
                 if ($resultVentasPorMes->count() > 0) {
                     foreach ($resultVentasPorMes as $row) {
-                        $mesAnio = date('Y-m', strtotime($row['mes_anio']));
-                        $mesesDelAnio[$mesAnio] = [
-                            'mes' => $row['nombre_mes'],
-                            'ventas' => (float)($row['ventas'] ?? 0),
-                            'cantidad' => (int)($row['cantidad'] ?? 0)
-                        ];
-                    }
-                }
-                
-                // Convertir a array simple para JSON
-                foreach ($mesesDelAnio as $mesData) {
-                    $ventasAnualesArray[] = $mesData;
-                }
-                
-                // Solo incluir hasta el mes actual (opcional) - asegurando que $mesActual es entero
-                $ventasAnualesArray = array_slice($ventasAnualesArray, 0, (int)$mesActual);
-                
-            } catch (\Exception $e) {
-                error_log("Error en consulta de ventas por mes: " . $e->getMessage());
-                
-                // Consulta alternativa más simple si hay error
-                try {
-                    $sqlVentasPorMesAlt = "SELECT 
-                        DATE_FORMAT(`$colFechaCreacion`, '%Y-%m') AS mes_anio,
-                        DATE_FORMAT(`$colFechaCreacion`, '%M %Y') AS nombre_mes,
-                        COUNT(DISTINCT `$colNumeroBoletaDesambiguado`) AS cantidad,
-                        SUM(`$colMontoTotal`) AS ventas
-                    FROM `$actualTableName`
-                    WHERE $condicionNoCancelado
-                    AND YEAR(`$colFechaCreacion`) = $anioActual
-                    GROUP BY mes_anio, nombre_mes
-                    ORDER BY mes_anio ASC";
-                    
-                    $statementVentasPorMesAlt = $this->dbAdapter->createStatement($sqlVentasPorMesAlt);
-                    $resultVentasPorMesAlt = $statementVentasPorMesAlt->execute();
-                    
-                    // Generar array con todos los meses del año actual
-                    $ventasAnualesArray = [];
-                    $mesesDelAnio = [];
-                    
-                    // Crear el arreglo de meses completo del año - asegurando que todos los valores son enteros
-                    for ($mes = 1; $mes <= 12; $mes++) {
-                        $timestamp = mktime(0, 0, 0, (int)$mes, 1, $anioActual);
-                        $nombreMes = date('F Y', $timestamp); // Nombre de mes en inglés con año
-                        $mesAnio = date('Y-m', $timestamp);
-                        $mesesDelAnio[$mesAnio] = [
-                            'mes' => $nombreMes,
-                            'ventas' => 0,
-                            'cantidad' => 0
-                        ];
-                    }
-                    
-                    // Rellenar con datos reales donde existan
-                    if ($resultVentasPorMesAlt->count() > 0) {
-                        foreach ($resultVentasPorMesAlt as $row) {
-                            $mesAnio = date('Y-m', strtotime($row['mes_anio']));
-                            $mesesDelAnio[$mesAnio] = [
+                        $mesAnio = $row['mes_anio'];
+                        if (isset($mesesUltimosDoce[$mesAnio])) {
+                            $mesesUltimosDoce[$mesAnio] = [
                                 'mes' => $row['nombre_mes'],
                                 'ventas' => (float)($row['ventas'] ?? 0),
                                 'cantidad' => (int)($row['cantidad'] ?? 0)
                             ];
                         }
                     }
+                }
+                
+                // Convertir a array indexado y ordenar por fecha
+                // Invertimos el orden para mostrar desde el mes más antiguo al más reciente
+                $mesesOrdenados = [];
+                foreach ($mesesUltimosDoce as $mesAnio => $mesData) {
+                    $partes = explode('-', $mesAnio);
+                    $anio = (int)$partes[0];
+                    $mes = (int)$partes[1];
+                    $mesesOrdenados[$anio * 100 + $mes] = $mesData;
+                }
+                
+                ksort($mesesOrdenados);
+                
+                // Ahora creamos el array final
+                foreach ($mesesOrdenados as $mesData) {
+                    $ventasAnualesArray[] = $mesData;
+                }
+                
+                error_log("Ventas de últimos 12 meses generadas: " . count($ventasAnualesArray) . " meses");
+            } catch (\Exception $e) {
+                error_log("Error en consulta de ventas por mes: " . $e->getMessage());
+                
+                // Intento alternativo sin unicidad
+                try {
+                    $fechaInicio = date('Y-m-d', strtotime('-11 months'));
                     
-                    // Convertir a array simple para JSON
-                    foreach ($mesesDelAnio as $mesData) {
-                        $ventasAnualesArray[] = $mesData;
+                    $sqlVentasPorMesAlt = "
+                    SELECT 
+                        DATE_FORMAT(`$colFechaCreacion`, '%Y-%m') AS mes_anio,
+                        DATE_FORMAT(`$colFechaCreacion`, '%M %Y') AS nombre_mes,
+                        YEAR(`$colFechaCreacion`) AS anio,
+                        MONTH(`$colFechaCreacion`) AS mes,
+                        COUNT(*) AS cantidad,
+                        SUM(`$colMontoTotal`) AS ventas
+                    FROM `$actualTableName`
+                    WHERE $condicionNoCancelado
+                    AND `$colFechaCreacion` >= '$fechaInicio'
+                    GROUP BY mes_anio, nombre_mes, anio, mes
+                    ORDER BY anio ASC, mes ASC
+                    ";
+                    
+                    error_log("Ejecutando consulta alternativa: $sqlVentasPorMesAlt");
+                    $statementVentasPorMesAlt = $this->dbAdapter->createStatement($sqlVentasPorMesAlt);
+                    $resultVentasPorMesAlt = $statementVentasPorMesAlt->execute();
+                    
+                    // Preparamos array para los últimos 12 meses
+                    $mesesUltimosDoce = [];
+                    for ($i = 0; $i < 12; $i++) {
+                        $fechaMes = date('Y-m-d', strtotime("-$i months"));
+                        $timestamp = strtotime($fechaMes);
+                        $nombreMes = date('F Y', $timestamp);
+                        $mesAnio = date('Y-m', $timestamp);
+                        $mesesUltimosDoce[$mesAnio] = [
+                            'mes' => $nombreMes,
+                            'ventas' => 0,
+                            'cantidad' => 0
+                        ];
                     }
                     
-                    // Solo incluir hasta el mes actual (opcional) - asegurando que $mesActual es entero
-                    $ventasAnualesArray = array_slice($ventasAnualesArray, 0, (int)$mesActual);
+                    // Rellenar con datos reales
+                    if ($resultVentasPorMesAlt->count() > 0) {
+                        foreach ($resultVentasPorMesAlt as $row) {
+                            $mesAnio = $row['mes_anio'];
+                            if (isset($mesesUltimosDoce[$mesAnio])) {
+                                $mesesUltimosDoce[$mesAnio] = [
+                                    'mes' => $row['nombre_mes'],
+                                    'ventas' => (float)($row['ventas'] ?? 0),
+                                    'cantidad' => (int)($row['cantidad'] ?? 0)
+                                ];
+                            }
+                        }
+                    }
                     
+                    // Ordenar y convertir a array
+                    $mesesOrdenados = [];
+                    foreach ($mesesUltimosDoce as $mesAnio => $mesData) {
+                        $partes = explode('-', $mesAnio);
+                        $anio = (int)$partes[0];
+                        $mes = (int)$partes[1];
+                        $mesesOrdenados[$anio * 100 + $mes] = $mesData;
+                    }
+                    
+                    ksort($mesesOrdenados);
+                    $ventasAnualesArray = array_values($mesesOrdenados);
+                    
+                    error_log("Ventas de últimos 12 meses alternativas: " . count($ventasAnualesArray) . " meses");
                 } catch (\Exception $e2) {
                     error_log("Error en consulta alternativa de ventas por mes: " . $e2->getMessage());
+                    
+                    // Generar datos de ejemplo como fallback - CON CONVERSIÓN EXPLÍCITA A ENTERO
+                    $ventasAnualesArray = [];
+                    for ($i = 11; $i >= 0; $i--) {
+                        $fechaMes = date('Y-m-d', strtotime("-$i months"));
+                        $timestamp = strtotime($fechaMes);
+                        $nombreMes = date('F Y', $timestamp);
+                        $ventasAnualesArray[] = [
+                            'mes' => $nombreMes,
+                            'ventas' => 0,
+                            'cantidad' => 0
+                        ];
+                    }
+                    error_log("Generados " . count($ventasAnualesArray) . " meses con datos vacíos");
                 }
             }
             
-            // CONSULTA 5: Top 10 productos del mes actual - con unicidad de boletas
+            // ======== CONSULTA 5: Top 10 productos (con unicidad) del MES ACTUAL ========
             try {
-                $sqlTopProductos = "SELECT 
+                // Mes y año actuales
+                $mesActual = (int)date('n');  // Número de mes (1-12)
+                $anioActual = (int)date('Y'); // Año actual
+                
+                // Condición para el mes actual
+                $condicionMesActual = "MONTH(`$colFechaCreacion`) = " . $mesActual . " AND YEAR(`$colFechaCreacion`) = " . $anioActual;
+                
+                $sqlTopProductos = "
+                SELECT 
                     producto,
-                    SUM(cantidad) AS cantidad,
-                    SUM(ventas) AS ventas
+                    COUNT(*) AS cantidad,
+                    SUM(monto_total) AS ventas
                 FROM (
-                    SELECT
+                    SELECT 
+                        `$colNumeroBoletaDesambiguado` AS numero_boleta,
                         `$colProducto` AS producto,
-                        COUNT(DISTINCT `$colNumeroBoletaDesambiguado`) AS cantidad,
-                        SUM(`$colMontoTotal`) AS ventas
+                        MAX(`$colMontoTotal`) AS monto_total
                     FROM `$actualTableName`
                     WHERE $condicionMesActual
                     AND $condicionNoCancelado
                     AND `$colProducto` IS NOT NULL
                     AND `$colProducto` != ''
-                    GROUP BY producto
+                    GROUP BY `$colNumeroBoletaDesambiguado`, `$colProducto`
                 ) AS productos_unicos
                 GROUP BY producto
                 ORDER BY ventas DESC
-                LIMIT 10";
+                LIMIT 10
+                ";
                 
+                error_log("Ejecutando consulta de top productos: $sqlTopProductos");
                 $statementTopProductos = $this->dbAdapter->createStatement($sqlTopProductos);
                 $resultTopProductos = $statementTopProductos->execute();
                 
                 if ($resultTopProductos->count() > 0) {
                     foreach ($resultTopProductos as $row) {
-                        // Extraer nombre del producto (limitar a 50 caracteres)
+                        // Extraer nombre del producto (limitado a 50 caracteres)
                         $nombreProducto = $row['producto'] ?? 'Producto sin nombre';
                         if (strlen($nombreProducto) > 50) {
                             $nombreProducto = substr($nombreProducto, 0, 47) . '...';
@@ -887,68 +791,28 @@ public function detailAction()
                             'cantidad' => (int)($row['cantidad'] ?? 0)
                         ];
                     }
+                    error_log("Top productos generados: " . count($topProductosArray));
                 } else {
-                    // Si no hay productos este mes, buscar de cualquier fecha
-                    $sqlTopProductosHistorico = "SELECT 
-                        producto,
-                        SUM(cantidad) AS cantidad,
-                        SUM(ventas) AS ventas
-                    FROM (
-                        SELECT
-                            `$colProducto` AS producto,
-                            COUNT(DISTINCT `$colNumeroBoletaDesambiguado`) AS cantidad,
-                            SUM(`$colMontoTotal`) AS ventas
-                        FROM `$actualTableName`
-                        WHERE $condicionNoCancelado
-                        AND `$colProducto` IS NOT NULL
-                        AND `$colProducto` != ''
-                        GROUP BY producto
-                    ) AS productos_unicos_historicos
-                    GROUP BY producto
-                    ORDER BY ventas DESC
-                    LIMIT 10";
-                    
-                    $statementTopProductosHistorico = $this->dbAdapter->createStatement($sqlTopProductosHistorico);
-                    $resultTopProductosHistorico = $statementTopProductosHistorico->execute();
-                    
-                    if ($resultTopProductosHistorico->count() > 0) {
-                        foreach ($resultTopProductosHistorico as $row) {
-                            $nombreProducto = $row['producto'] ?? 'Producto sin nombre';
-                            if (strlen($nombreProducto) > 50) {
-                                $nombreProducto = substr($nombreProducto, 0, 47) . '...';
-                            }
-                            
-                            $topProductosArray[] = [
-                                'nombre' => $nombreProducto,
-                                'ventas' => (float)($row['ventas'] ?? 0),
-                                'cantidad' => (int)($row['cantidad'] ?? 0)
-                            ];
-                        }
-                    }
-                }
-            } catch (\Exception $e) {
-                error_log("Error en consulta de top productos: " . $e->getMessage());
-                
-                // Consulta alternativa sin subconsultas
-                try {
-                    $sqlTopProductosAlt = "SELECT 
+                    // Si no hay productos este mes, buscar productos de toda la historia
+                    $sqlTopProductosAlt = "
+                    SELECT 
                         `$colProducto` AS producto,
-                        COUNT(DISTINCT `$colNumeroBoletaDesambiguado`) AS cantidad,
+                        COUNT(*) AS cantidad,
                         SUM(`$colMontoTotal`) AS ventas
                     FROM `$actualTableName`
-                    WHERE $condicionMesActual
-                    AND $condicionNoCancelado
+                    WHERE $condicionNoCancelado
                     AND `$colProducto` IS NOT NULL
                     AND `$colProducto` != ''
                     GROUP BY producto
                     ORDER BY ventas DESC
-                    LIMIT 10";
+                    LIMIT 10
+                    ";
                     
+                    error_log("Ejecutando consulta alternativa: $sqlTopProductosAlt");
                     $statementTopProductosAlt = $this->dbAdapter->createStatement($sqlTopProductosAlt);
                     $resultTopProductosAlt = $statementTopProductosAlt->execute();
                     
                     if ($resultTopProductosAlt->count() > 0) {
-                        $topProductosArray = []; // Limpiamos por si acaso
                         foreach ($resultTopProductosAlt as $row) {
                             $nombreProducto = $row['producto'] ?? 'Producto sin nombre';
                             if (strlen($nombreProducto) > 50) {
@@ -961,23 +825,58 @@ public function detailAction()
                                 'cantidad' => (int)($row['cantidad'] ?? 0)
                             ];
                         }
+                        error_log("Top productos históricos generados: " . count($topProductosArray));
                     }
-                } catch (\Exception $e2) {
-                    error_log("Error en consulta alternativa de top productos: " . $e2->getMessage());
+                }
+            } catch (\Exception $e) {
+                error_log("Error en consulta de top productos: " . $e->getMessage());
+                
+                // Generar productos de ejemplo si no hay datos
+                if (empty($topProductosArray)) {
+                    for ($i = 1; $i <= 5; $i++) {
+                        $topProductosArray[] = [
+                            'nombre' => "Producto Ejemplo $i",
+                            'ventas' => 0,
+                            'cantidad' => 0
+                        ];
+                    }
+                    error_log("Generados 5 productos de ejemplo");
                 }
             }
             
         } catch (\Exception $e) {
-            // Log del error para depuración
+            // Log del error principal
             error_log("Error en consultas de KPIs: " . $e->getMessage());
             error_log("Rastreo: " . $e->getTraceAsString());
+            
+            // Crear datos de ejemplo para los últimos 12 meses
+            $ventasAnualesArray = [];
+            for ($i = 11; $i >= 0; $i--) {
+                $fechaMes = date('Y-m-d', strtotime("-$i months"));
+                $timestamp = strtotime($fechaMes);
+                $nombreMes = date('F Y', $timestamp);
+                $ventasAnualesArray[] = [
+                    'mes' => $nombreMes,
+                    'ventas' => 0,
+                    'cantidad' => 0
+                ];
+            }
+            
+            for ($i = 1; $i <= 5; $i++) {
+                $topProductosArray[] = [
+                    'nombre' => "Producto Ejemplo $i",
+                    'ventas' => 0,
+                    'cantidad' => 0
+                ];
+            }
         }
     }
     
-    // Codificar los arrays para pasar a la vista (con manejo de errores)
-    $jsonVentasAnuales = json_encode($ventasAnualesArray) ?: '[]';
-    $jsonTopProductos = json_encode($topProductosArray) ?: '[]';
+    // Sanitizar y codificar JSON
+    $jsonVentasAnuales = json_encode($ventasAnualesArray, JSON_NUMERIC_CHECK) ?: '[]';
+    $jsonTopProductos = json_encode($topProductosArray, JSON_NUMERIC_CHECK) ?: '[]';
     
+    // Pasar todo a la vista
     return new ViewModel([
         'table'                   => $table,
         'data'                    => $data,
@@ -987,18 +886,10 @@ public function detailAction()
         'total'                   => $total,
         'search'                  => $search,
         'filters'                 => $filters,
-        'ventaBrutaMensual'       => $ventaBrutaMensual,
-        'impuestoBrutoMensual'    => $impuestoBrutoMensual,
-        'totalTransaccionesMes'   => $totalTransaccionesMes,
-        'totalVentas'             => $totalVentas,
-        'totalRegistros'          => $totalRegistros,
-        'valorCancelado'          => $valorCancelado,
-        'transaccionesCanceladas' => $transaccionesCanceladas,
         'jsonVentasAnuales'       => $jsonVentasAnuales,
         'jsonTopProductos'        => $jsonTopProductos
     ]);
 }
-
 
     /**
      * Método para exportar a CSV
@@ -1257,234 +1148,144 @@ public function detailAction()
         return $response;
     }
 
-    /**
-     * NUEVOS MÉTODOS PARA GESTIÓN DE ÓRDENES Y PEDIDOS
-     */
-    
-    /**
-     * Acción principal para visualizar todas las órdenes de todos los marketplaces
-     */
-    public function ordersAction()
-    {
-        // Verificar autenticación
-        $redirect = $this->checkAuth();
-        if ($redirect !== null) {
-            return $redirect;
-        }
-        
-        // Obtenemos estadísticas resumidas por marketplace y estado
-        $statsSql = "SELECT 
-                        COUNT(*) as total,
-                        SUM(CASE WHEN estado = 'Nueva' THEN 1 ELSE 0 END) as nuevas,
-                        SUM(CASE WHEN estado = 'En Proceso' THEN 1 ELSE 0 END) as en_proceso,
-                        SUM(CASE WHEN estado = 'Enviada' THEN 1 ELSE 0 END) as enviadas,
-                        SUM(CASE WHEN estado = 'Entregada' THEN 1 ELSE 0 END) as entregadas,
-                        SUM(CASE WHEN estado = 'Pendiente de Pago' THEN 1 ELSE 0 END) as pendiente_pago,
-                        SUM(CASE WHEN estado = 'Cancelada' THEN 1 ELSE 0 END) as canceladas,
-                        SUM(CASE WHEN estado = 'Devuelta' THEN 1 ELSE 0 END) as devueltas
-                    FROM (
-                        SELECT estado FROM Orders_WALLMART
-                        UNION ALL SELECT estado FROM Orders_RIPLEY
-                        UNION ALL SELECT estado FROM Orders_FALABELLA
-                        UNION ALL SELECT estado FROM Orders_MERCADO_LIBRE
-                        UNION ALL SELECT estado FROM Orders_PARIS
-                        UNION ALL SELECT estado FROM Orders_WOOCOMMERCE
-                    ) as all_orders";
-        
-        // Ejecutar la consulta de estadísticas
-        $statsStatement = $this->dbAdapter->createStatement($statsSql);
-        $statsResult = $statsStatement->execute();
-        $stats = $statsResult->current() ?: [
-            'total' => 0,
-            'nuevas' => 0,
-            'en_proceso' => 0,
-            'enviadas' => 0,
-            'entregadas' => 0,
-            'pendiente_pago' => 0,
-            'canceladas' => 0,
-            'devueltas' => 0
-        ];
-        
-        // Parámetros de paginación
-        $page = (int) $this->params()->fromQuery('page', 1);
-        $limit = (int) $this->params()->fromQuery('limit', 30);
-        $offset = ($page - 1) * $limit;
-        
-        // Obtener filtros
-        $search = $this->params()->fromQuery('search', '');
-        $statusFilter = $this->params()->fromQuery('status', '');
-        $transportistaFilter = $this->params()->fromQuery('transportista', '');
-        $startDate = $this->params()->fromQuery('startDate', '');
-        $endDate = $this->params()->fromQuery('endDate', '');
-        
-        // Construir condiciones WHERE basadas en filtros
-        $whereConditions = [];
-        $whereParams = [];
-        
-        if (!empty($search)) {
-            $whereConditions[] = "(id LIKE ? OR cliente LIKE ? OR telefono LIKE ? OR direccion LIKE ?)";
-            $whereParams[] = '%' . $search . '%';
-            $whereParams[] = '%' . $search . '%';
-            $whereParams[] = '%' . $search . '%';
-            $whereParams[] = '%' . $search . '%';
-        }
-        
-        if (!empty($statusFilter)) {
-            $whereConditions[] = "estado = ?";
-            $whereParams[] = $statusFilter;
-        }
-        
-        if (!empty($transportistaFilter)) {
-            $whereConditions[] = "transportista = ?";
-            $whereParams[] = $transportistaFilter;
-        }
-        
-        if (!empty($startDate)) {
-            $whereConditions[] = "fecha_creacion >= ?";
-            $whereParams[] = $startDate . ' 00:00:00';
-        }
-        
-        if (!empty($endDate)) {
-            $whereConditions[] = "fecha_creacion <= ?";
-            $whereParams[] = $endDate . ' 23:59:59';
-        }
-        
-        // Construir la cláusula WHERE final
-        $whereClause = !empty($whereConditions) ? " WHERE " . implode(" AND ", $whereConditions) : "";
-        
-        // Consultar todas las órdenes (uniendo todas las tablas de órdenes)
-        // NOTA: Esto asume que todas las tablas de órdenes tienen la misma estructura
-        $ordersSql = "SELECT 
-                        id, 
-                        'TODOS' as marketplace_original, 
-                        fecha_creacion, 
-                        fecha_entrega, 
-                        cliente, 
-                        telefono, 
-                        direccion, 
-                        productos, 
-                        total, 
-                        estado, 
-                        transportista, 
-                        num_seguimiento
-                    FROM (
-                        SELECT 
-                            id, 
-                            'WALLMART' as marketplace, 
-                            fecha_creacion, 
-                            fecha_entrega, 
-                            cliente, 
-                            telefono, 
-                            direccion, 
-                            productos, 
-                            total, 
-                            estado, 
-                            transportista, 
-                            num_seguimiento 
-                        FROM Orders_WALLMART
-                        UNION ALL 
-                        SELECT 
-                            id, 
-                            'RIPLEY' as marketplace, 
-                            fecha_creacion, 
-                            fecha_entrega, 
-                            cliente, 
-                            telefono, 
-                            direccion, 
-                            productos, 
-                            total, 
-                            estado, 
-                            transportista, 
-                            num_seguimiento 
-                        FROM Orders_RIPLEY
-                        UNION ALL 
-                        SELECT 
-                            id, 
-                            'FALABELLA' as marketplace, 
-                            fecha_creacion, 
-                            fecha_entrega, 
-                            cliente, 
-                            telefono, 
-                            direccion, 
-                            productos, 
-                            total, 
-                            estado, 
-                            transportista, 
-                            num_seguimiento 
-                        FROM Orders_FALABELLA
-                        UNION ALL 
-                        SELECT 
-                            id, 
-                            'MERCADO_LIBRE' as marketplace, 
-                            fecha_creacion, 
-                            fecha_entrega, 
-                            cliente, 
-                            telefono, 
-                            direccion, 
-                            productos, 
-                            total, 
-                            estado, 
-                            transportista, 
-                            num_seguimiento 
-                        FROM Orders_MERCADO_LIBRE
-                        UNION ALL 
-                        SELECT 
-                            id, 
-                            'PARIS' as marketplace, 
-                            fecha_creacion, 
-                            fecha_entrega, 
-                            cliente, 
-                            telefono, 
-                            direccion, 
-                            productos, 
-                            total, 
-                            estado, 
-                            transportista, 
-                            num_seguimiento 
-                        FROM Orders_PARIS
-                        UNION ALL 
-                        SELECT 
-                            id, 
-                            'WOOCOMMERCE' as marketplace, 
-                            fecha_creacion, 
-                            fecha_entrega, 
-                            cliente, 
-                            telefono, 
-                            direccion, 
-                            productos, 
-                            total, 
-                            estado, 
-                            transportista, 
-                            num_seguimiento 
-                        FROM Orders_WOOCOMMERCE
-                    ) as all_orders" . $whereClause . 
-                    " ORDER BY fecha_creacion DESC 
-                     LIMIT $limit OFFSET $offset";
-        
-        // Ejecutar la consulta de órdenes
-        $ordersStatement = $this->dbAdapter->createStatement($ordersSql);
-        $ordersResult = $ordersStatement->execute($whereParams);
-        
-        // Formatear resultados
-        $orders = [];
-        foreach ($ordersResult as $row) {
-            $orders[] = $row;
-        }
-        
-        // Devolver la vista con los datos
-        return new ViewModel([
-            'table' => 'all',
-            'orders' => $orders,
-            'stats' => $stats,
-            'page' => $page,
-            'limit' => $limit,
-            'search' => $search,
-            'statusFilter' => $statusFilter,
-            'transportistaFilter' => $transportistaFilter,
-            'startDate' => $startDate,
-            'endDate' => $endDate
-        ]);
+
+
+/**
+ * Acción principal para visualizar todas las órdenes de todos los marketplaces
+ */
+public function ordersAction()
+{
+    $redirect = $this->checkAuth();
+    if ($redirect !== null) {
+        return $redirect;
     }
+
+    $statsSql = "SELECT 
+                    COUNT(*) as total,
+                    SUM(CASE WHEN estado = 'Nueva' THEN 1 ELSE 0 END) as nuevas,
+                    SUM(CASE WHEN estado = 'En Proceso' THEN 1 ELSE 0 END) as en_proceso,
+                    SUM(CASE WHEN estado = 'Enviada' THEN 1 ELSE 0 END) as enviadas,
+                    SUM(CASE WHEN estado = 'Entregada' THEN 1 ELSE 0 END) as entregadas,
+                    SUM(CASE WHEN estado = 'Pendiente de Pago' THEN 1 ELSE 0 END) as pendiente_pago,
+                    SUM(CASE WHEN estado = 'Cancelada' THEN 1 ELSE 0 END) as canceladas,
+                    SUM(CASE WHEN estado = 'Devuelta' THEN 1 ELSE 0 END) as devueltas
+                FROM (
+                    SELECT estado FROM Orders_WALLMART
+                    UNION ALL SELECT estado FROM Orders_RIPLEY
+                    UNION ALL SELECT estado FROM Orders_FALABELLA
+                    UNION ALL SELECT estado FROM Orders_MERCADO_LIBRE
+                    UNION ALL SELECT estado FROM Orders_PARIS
+                    UNION ALL SELECT estado FROM Orders_WOOCOMMERCE
+                ) as all_orders";
+
+    $statsStatement = $this->dbAdapter->createStatement($statsSql);
+    $statsResult = $statsStatement->execute();
+    $stats = $statsResult->current() ?: [
+        'total' => 0,
+        'nuevas' => 0,
+        'en_proceso' => 0,
+        'enviadas' => 0,
+        'entregadas' => 0,
+        'pendiente_pago' => 0,
+        'canceladas' => 0,
+        'devueltas' => 0
+    ];
+
+    $page = (int) $this->params()->fromQuery('page', 1);
+    $limit = (int) $this->params()->fromQuery('limit', 30);
+    $offset = ($page - 1) * $limit;
+
+    $search = $this->params()->fromQuery('search', '');
+    $statusFilter = $this->params()->fromQuery('status', '');
+    $transportistaFilter = $this->params()->fromQuery('transportista', '');
+    $startDate = $this->params()->fromQuery('startDate', '');
+    $endDate = $this->params()->fromQuery('endDate', '');
+
+    $whereConditions = [];
+    $whereParams = [];
+
+    if (!empty($search)) {
+        $whereConditions[] = "(suborder_number LIKE ? OR cliente LIKE ? OR telefono LIKE ? OR direccion LIKE ?)";
+        $whereParams[] = "%$search%";
+        $whereParams[] = "%$search%";
+        $whereParams[] = "%$search%";
+        $whereParams[] = "%$search%";
+    }
+    if (!empty($statusFilter)) {
+        $whereConditions[] = "estado = ?";
+        $whereParams[] = $statusFilter;
+    }
+    if (!empty($transportistaFilter)) {
+        $whereConditions[] = "transportista = ?";
+        $whereParams[] = $transportistaFilter;
+    }
+    if (!empty($startDate)) {
+        $whereConditions[] = "fecha_creacion >= ?";
+        $whereParams[] = "$startDate 00:00:00";
+    }
+    if (!empty($endDate)) {
+        $whereConditions[] = "fecha_creacion <= ?";
+        $whereParams[] = "$endDate 23:59:59";
+    }
+
+    $whereClause = !empty($whereConditions) ? " WHERE " . implode(" AND ", $whereConditions) : "";
+
+    $ordersSql = "SELECT 
+            suborder_number AS id,
+            marketplace,
+            fecha_creacion,
+            fecha_entrega,
+            delivery_option,
+            printed,
+            cliente,
+            telefono,
+            direccion,
+            productos,
+            total,
+            estado,
+            transportista,
+            num_seguimiento
+        FROM (
+            SELECT suborder_number, 'WALLMART' as marketplace, fecha_creacion, fecha_entrega, delivery_option, printed, cliente, telefono, direccion, productos, total, estado, transportista, num_seguimiento FROM Orders_WALLMART
+            UNION ALL 
+            SELECT suborder_number, 'RIPLEY', fecha_creacion, fecha_entrega, delivery_option, printed, cliente, telefono, direccion, productos, total, estado, transportista, num_seguimiento FROM Orders_RIPLEY
+            UNION ALL 
+            SELECT suborder_number, 'FALABELLA', fecha_creacion, fecha_entrega, delivery_option, printed, cliente, telefono, direccion, productos, total, estado, transportista, num_seguimiento FROM Orders_FALABELLA
+            UNION ALL 
+            SELECT suborder_number, 'MERCADO_LIBRE', fecha_creacion, fecha_entrega, delivery_option, printed, cliente, telefono, direccion, productos, total, estado, transportista, num_seguimiento FROM Orders_MERCADO_LIBRE
+            UNION ALL 
+            SELECT suborder_number, 'PARIS', fecha_creacion, fecha_entrega, delivery_option, printed, cliente, telefono, direccion, productos, total, estado, transportista, num_seguimiento FROM Orders_PARIS
+            UNION ALL 
+            SELECT suborder_number, 'WOOCOMMERCE', fecha_creacion, fecha_entrega, delivery_option, printed, cliente, telefono, direccion, productos, total, estado, transportista, num_seguimiento FROM Orders_WOOCOMMERCE
+        ) as all_orders" .
+        $whereClause .
+        " ORDER BY fecha_creacion DESC
+          LIMIT $limit OFFSET $offset";
+
+    $ordersStatement = $this->dbAdapter->createStatement($ordersSql);
+    $ordersResult = $ordersStatement->execute($whereParams);
+
+    $orders = [];
+    foreach ($ordersResult as $row) {
+        $orders[] = $row;
+    }
+
+    return new ViewModel([
+        'table' => 'all',
+        'orders' => $orders,
+        'stats' => $stats,
+        'page' => $page,
+        'limit' => $limit,
+        'search' => $search,
+        'statusFilter' => $statusFilter,
+        'transportistaFilter' => $transportistaFilter,
+        'startDate' => $startDate,
+        'endDate' => $endDate
+    ]);
+}
+
+    
+    
     
     /**
      * Acción para visualizar las órdenes de un marketplace específico
@@ -1643,45 +1444,36 @@ public function detailAction()
         ];
     }
     
-    /**
-     * Acción para ver los detalles completos de una orden específica
-     */
     public function orderDetailAction()
     {
-        // Verificar autenticación
         $redirect = $this->checkAuth();
         if ($redirect !== null) {
             return $redirect;
         }
-        
-        // Obtener ID de orden y tabla (marketplace) desde los parámetros
+    
         $orderId = $this->params()->fromRoute('id', null);
         $table = $this->params()->fromRoute('table', null);
-        
+    
         if (!$orderId || !$table) {
             return $this->redirect()->toRoute('application', ['action' => 'orders']);
         }
-        
-        // Validar la tabla
+    
         if (strpos($table, 'Orders_') !== 0) {
             return $this->redirect()->toRoute('application', ['action' => 'orders']);
         }
-        
-        // Consultar los detalles de la orden
-        $sql = "SELECT * FROM `$table` WHERE id = ?";
+    
+        $sql = "SELECT * FROM `$table` WHERE suborder_number = ?";
         $statement = $this->dbAdapter->createStatement($sql);
         $result = $statement->execute([$orderId]);
         $order = $result->current();
-        
+    
         if (!$order) {
-            // Si no se encuentra la orden, redirigir
             return $this->redirect()->toRoute('application', ['action' => 'orders-detail', 'table' => $table]);
         }
-        
-        // Consultar productos de la orden (esto requiere una tabla de detalles de orden)
+    
         $productsSql = "SELECT * FROM `{$table}_Items` WHERE order_id = ?";
         $productsStatement = $this->dbAdapter->createStatement($productsSql);
-        
+    
         try {
             $productsResult = $productsStatement->execute([$orderId]);
             $products = [];
@@ -1689,7 +1481,6 @@ public function detailAction()
                 $products[] = $product;
             }
         } catch (\Exception $e) {
-            // Si no hay tabla de detalles, crear productos de muestra
             $products = [];
             $productStrings = explode(',', $order['productos'] ?? '');
             foreach ($productStrings as $i => $productString) {
@@ -1705,13 +1496,11 @@ public function detailAction()
                 }
             }
         }
-        
-        // Calcular totales
+    
         $subtotal = array_sum(array_column($products, 'subtotal'));
         $envio = isset($order['costo_envio']) ? $order['costo_envio'] : 3990;
         $total = $subtotal + $envio;
-        
-        // Devolver la vista con todos los datos
+    
         return new ViewModel([
             'order' => $order,
             'products' => $products,
@@ -1721,6 +1510,7 @@ public function detailAction()
             'table' => $table
         ]);
     }
+    
     
     /**
      * Acción para procesar cambios de estado de órdenes
