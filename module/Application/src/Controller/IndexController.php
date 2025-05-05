@@ -2237,7 +2237,59 @@ public function ordersAction()
         return $response;
     }
 
-
+/**
+ * Acción para marcar orden como impresa
+ */
+public function markAsPrintedAction()
+{
+    // Verificar autenticación
+    $redirect = $this->checkAuth();
+    if ($redirect !== null) {
+        return $redirect;
+    }
+    
+    // Obtener datos de la solicitud
+    $data = json_decode(file_get_contents('php://input'), true);
+    $orderId = $data['orderId'] ?? null;
+    $table = $data['table'] ?? null;
+    
+    if (!$orderId || !$table) {
+        return $this->jsonResponse(['success' => false, 'message' => 'Faltan parámetros requeridos']);
+    }
+    
+    // Validar tabla
+    if (strpos($table, 'Orders_') !== 0) {
+        return $this->jsonResponse(['success' => false, 'message' => 'Tabla inválida']);
+    }
+    
+    try {
+        // Actualizar estado de impresión
+        $sql = "UPDATE `$table` SET printed = 1 WHERE id = ?";
+        $statement = $this->dbAdapter->createStatement($sql);
+        $result = $statement->execute([$orderId]);
+        
+        // Registrar historial
+        try {
+            $historySql = "INSERT INTO order_status_history (order_id, table_name, status, notes, created_at) 
+                          VALUES (?, ?, 'printed', 'Marcado como impreso', NOW())";
+            $historyStatement = $this->dbAdapter->createStatement($historySql);
+            $historyResult = $historyStatement->execute([$orderId, $table]);
+        } catch (\Exception $e) {
+            // Continuar si la tabla de historial no existe
+        }
+        
+        return $this->jsonResponse([
+            'success' => true, 
+            'message' => 'Estado de impresión actualizado correctamente'
+        ]);
+        
+    } catch (\Exception $e) {
+        return $this->jsonResponse([
+            'success' => false, 
+            'message' => 'Error al actualizar estado: ' . $e->getMessage()
+        ]);
+    }
+}
 
 
 /**

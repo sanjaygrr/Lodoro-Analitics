@@ -26,6 +26,19 @@ return [
                     AuthenticationMiddleware::class,
                 ],
             ],
+            'dashboard' => [
+                'type' => Segment::class,
+                'options' => [
+                    'route'    => '/dashboard[/:action]',
+                    'defaults' => [
+                        'controller' => \Application\Controller\IndexController::class, // Usar namespace completo
+                        'action'     => 'dashboard',
+                    ],
+                ],
+                'middleware' => [
+                    AuthenticationMiddleware::class,
+                ],
+            ],
             'liquidation-status' => [
                 'type' => Segment::class,
                 'options' => [
@@ -107,6 +120,21 @@ return [
             ],
         ],
     ],
+
+    'mark-as-printed' => [
+        'type' => Literal::class,
+        'options' => [
+            'route'    => '/application/mark-as-printed',
+            'defaults' => [
+                'controller' => Controller\IndexController::class,
+                'action'     => 'mark-as-printed',
+            ],
+        ],
+        'middleware' => [
+            AuthenticationMiddleware::class,
+        ],
+    ],
+
     'controllers' => [
         'factories' => [
             Controller\IndexController::class => IndexControllerFactory::class,
