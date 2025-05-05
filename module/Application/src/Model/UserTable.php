@@ -5,7 +5,6 @@ namespace Application\Model;
 
 use RuntimeException;
 use Laminas\Db\TableGateway\TableGatewayInterface;
-use Laminas\Crypt\Password\Bcrypt;
 
 class UserTable
 {
@@ -56,8 +55,7 @@ class UserTable
 
         if ($id === 0) {
             // Hash the password for new users
-            $bcrypt = new Bcrypt();
-            $data['password'] = $bcrypt->create($user->password);
+            $data['password'] = password_hash($user->password, PASSWORD_DEFAULT);
             $this->tableGateway->insert($data);
             return;
         }
@@ -71,8 +69,7 @@ class UserTable
 
         // Only update password if it's provided
         if (!empty($user->password)) {
-            $bcrypt = new Bcrypt();
-            $data['password'] = $bcrypt->create($user->password);
+            $data['password'] = password_hash($user->password, PASSWORD_DEFAULT);
         }
 
         $this->tableGateway->update($data, ['id' => $id]);
@@ -86,8 +83,7 @@ class UserTable
             return false;
         }
         
-        $bcrypt = new Bcrypt();
-        return $bcrypt->verify($password, $user->password) && $user->active;
+        return password_verify($password, $user->password) && $user->active;
     }
 
     public function deleteUser($id)

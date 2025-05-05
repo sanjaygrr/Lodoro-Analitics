@@ -13,6 +13,52 @@ use Application\Middleware\AuthenticationMiddleware;
 return [
     'router' => [
         'routes' => [
+                'upload-liquidation' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/upload-liquidation',
+                    'defaults' => [
+                        'controller' => Controller\IndexController::class,
+                        'action'     => 'upload-liquidation',
+                    ],
+                ],
+                'middleware' => [
+                    AuthenticationMiddleware::class,
+                ],
+            ],
+            'liquidation-status' => [
+                'type' => Segment::class,
+                'options' => [
+                    'route'    => '/liquidation-status/[:id]',
+                    'defaults' => [
+                        'controller' => Controller\IndexController::class,
+                        'action'     => 'liquidation-status',
+                    ],
+                ],
+            ],
+
+            'get-liquidation-status' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/application/get-liquidation-status',
+                    'defaults' => [
+                        'controller' => Controller\IndexController::class,
+                        'action'     => 'get-liquidation-status',
+                    ],
+                ],
+            ],
+
+            'upload-liquidation' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/upload-liquidation',
+                    'defaults' => [
+                        'controller' => Controller\IndexController::class,
+                        'action'     => 'upload-liquidation',
+                    ],
+                ],
+            ],
+
             'home' => [
                 'type'    => Literal::class,
                 'options' => [
@@ -22,7 +68,6 @@ return [
                         'action'     => 'index',
                     ],
                 ],
-                // Asegúrate de que tenga el middleware
                 'middleware' => [
                     AuthenticationMiddleware::class,
                 ],
@@ -36,12 +81,10 @@ return [
                         'action'     => 'index',
                     ],
                 ],
-                // Asegúrate de que tenga el middleware
                 'middleware' => [
                     AuthenticationMiddleware::class,
                 ],
             ],
-            // Rutas para autenticación (estas NO deben tener middleware)
             'login' => [
                 'type' => Literal::class,
                 'options' => [
@@ -62,19 +105,6 @@ return [
                     ],
                 ],
             ],
-            'dashboard' => [
-                'type' => Segment::class,
-                'options' => [
-                    'route'    => '/dashboard[/:action]',
-                    'defaults' => [
-                        'controller' => Controller\IndexController::class,
-                        'action'     => 'dashboard',
-                    ],
-                ],
-                'middleware' => [
-                    AuthenticationMiddleware::class,
-                ],
-            ],
         ],
     ],
     'controllers' => [
@@ -83,6 +113,7 @@ return [
             Controller\AuthController::class => Controller\Factory\AuthControllerFactory::class,
         ],
     ],
+    // AGREGAR ESTA SECCIÓN
     'service_manager' => [
         'factories' => [
             Model\UserTable::class => Model\Factory\UserTableFactory::class,

@@ -6,9 +6,9 @@ namespace Application\Controller;
 use Laminas\Mvc\Controller\AbstractActionController;
 use Laminas\View\Model\ViewModel;
 use Laminas\Authentication\AuthenticationService;
-use Laminas\Authentication\Result;
 use Laminas\Session\Container;
 use Application\Form\LoginForm;
+use Application\Model\UserTable;
 
 class AuthController extends AbstractActionController
 {
@@ -18,11 +18,17 @@ class AuthController extends AbstractActionController
     private $authService;
 
     /**
-     * Constructor que recibe el servicio de autenticación
+     * @var UserTable
      */
-    public function __construct(AuthenticationService $authService)
+    private $userTable;
+
+    /**
+     * Constructor que recibe los servicios necesarios
+     */
+    public function __construct(AuthenticationService $authService, UserTable $userTable)
     {
         $this->authService = $authService;
+        $this->userTable = $userTable;
     }
 
     /**
@@ -32,7 +38,6 @@ class AuthController extends AbstractActionController
     {
         // Verificar si el usuario ya está autenticado
         if ($this->authService->hasIdentity()) {
-            // Si ya está autenticado, redireccionar al dashboard
             return $this->redirect()->toRoute('dashboard');
         }
 
@@ -40,7 +45,6 @@ class AuthController extends AbstractActionController
         $request = $this->getRequest();
         $error = null;
 
-        // Verificar si hay una URL de redirección guardada en la sesión
         $sessionContainer = new Container('Redirect');
         $redirectUrl = $sessionContainer->redirectUrl ?? null;
 
@@ -50,54 +54,38 @@ class AuthController extends AbstractActionController
             if ($form->isValid()) {
                 $formData = $form->getData();
                 
-                // Obtener los datos del formulario
                 $username = $formData['username'];
                 $password = $formData['password'];
                 
-                // Imprimir las credenciales recibidas para depuración (quitar en producción)
-                error_log("Intento de login - Usuario: $username, Contraseña: [OCULTA]");
-                
-                // IMPORTANTE: Esta es una autenticación muy simple para demostración
-                // Se aceptará cualquier usuario/contraseña para fines de prueba
-                // En producción, debes usar tu propio sistema de autenticación
-                
-                // Simular autenticación exitosa
-                $isAuthenticated = true;
-                
-                if ($isAuthenticated) {
+                // Verificar credenciales contra la base de datos
+                if ($this->userTable->verifyCredentials($username, $password)) {
+                    // Obtener los datos del usuario
+                    $user = $this->userTable->getUserByUsername($username);
+                    
                     // Autenticación exitosa
-                    // Guardar la identidad del usuario
                     $this->authService->getStorage()->write($username);
                     
                     // Guardar datos adicionales en la sesión
                     $userSession = new Container('user');
                     $userSession->username = $username;
-                    $userSession->role = 'Administrador';
+                    $userSession->role = $user->role;
+                    $userSession->email = $user->email;
                     
-                    error_log("Autenticación exitosa para usuario: $username");
-                    
-                    // Redireccionar a la URL guardada o al dashboard
+                    // Redireccionar
                     if ($redirectUrl) {
-                        // Limpiar la URL guardada
                         $sessionContainer->redirectUrl = null;
-                        error_log("Redirigiendo a URL guardada: $redirectUrl");
                         return $this->redirect()->toUrl($redirectUrl);
                     } else {
-                        error_log("Redirigiendo al dashboard");
                         return $this->redirect()->toRoute('dashboard');
                     }
                 } else {
-                    // Autenticación fallida (esto no se ejecutará con la configuración actual)
                     $error = 'Nombre de usuario o contraseña incorrectos';
-                    error_log("Autenticación fallida para usuario: $username");
                 }
             } else {
                 $error = 'Por favor, complete todos los campos correctamente';
-                error_log("Formulario inválido en intento de login");
             }
         }
 
-        // Preparar la vista con el formulario de login y mensaje de error
         return new ViewModel([
             'form' => $form,
             'error' => $error,
@@ -111,8 +99,6 @@ class AuthController extends AbstractActionController
     {
         // Si el usuario está autenticado, cerrar sesión
         if ($this->authService->hasIdentity()) {
-            error_log("Cerrando sesión para usuario: " . $this->authService->getIdentity());
-            
             // Limpiar la identidad (cerrar sesión)
             $this->authService->clearIdentity();
             
@@ -122,8 +108,6 @@ class AuthController extends AbstractActionController
             
             $redirectSession = new Container('Redirect');
             $redirectSession->getManager()->getStorage()->clear('Redirect');
-        } else {
-            error_log("Intento de logout sin sesión activa");
         }
         
         // Redirigir al login

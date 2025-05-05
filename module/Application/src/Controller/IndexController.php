@@ -394,7 +394,6 @@ public function dashboardAction()
         
         return $response;
     }
-
 /**
  * Acción para mostrar el detalle de una tabla con paginación.
  * Se espera recibir el parámetro 'table' en la URL.
@@ -876,6 +875,20 @@ public function detailAction()
     $jsonVentasAnuales = json_encode($ventasAnualesArray, JSON_NUMERIC_CHECK) ?: '[]';
     $jsonTopProductos = json_encode($topProductosArray, JSON_NUMERIC_CHECK) ?: '[]';
     
+    // Inicializar variables KPI
+    $ventaBrutaMensual = 0;
+    $impuestoBrutoMensual = 0;  
+    $totalTransaccionesMes = 0;
+    $valorCancelado = 0;
+    $transaccionesCanceladas = 0;
+    $totalVentas = 0;
+    $totalRegistros = $total;
+    
+    // Obtener mensajes de la query string
+    $message = $this->params()->fromQuery('message');
+    $messageType = $this->params()->fromQuery('type', 'info');
+    $processedRows = $this->params()->fromQuery('processed');
+    
     // Pasar todo a la vista
     return new ViewModel([
         'table'                   => $table,
@@ -887,9 +900,21 @@ public function detailAction()
         'search'                  => $search,
         'filters'                 => $filters,
         'jsonVentasAnuales'       => $jsonVentasAnuales,
-        'jsonTopProductos'        => $jsonTopProductos
+        'jsonTopProductos'        => $jsonTopProductos,
+        'ventaBrutaMensual'       => $ventaBrutaMensual,
+        'impuestoBrutoMensual'    => $impuestoBrutoMensual,
+        'totalTransaccionesMes'   => $totalTransaccionesMes,
+        'valorCancelado'         => $valorCancelado,
+        'transaccionesCanceladas' => $transaccionesCanceladas,
+        'totalVentas'            => $totalVentas,
+        'totalRegistros'         => $totalRegistros,
+        // Agregar mensajes
+        'message'                => $message,
+        'messageType'            => $messageType,
+        'processedRows'          => $processedRows
     ]);
 }
+
 
     /**
      * Método para exportar a CSV
@@ -1049,6 +1074,143 @@ public function detailAction()
             'configs' => $configsArray,
             'message' => $message,
             'messageType' => $messageType
+        ]);
+    }
+
+
+    public function uploadLiquidationAction()
+    {
+        // Verificar autenticación
+        $redirect = $this->checkAuth();
+        if ($redirect !== null) {
+            return $redirect;
+        }
+        
+        if (!$this->getRequest()->isPost()) {
+            return $this->redirect()->toRoute('application', ['action' => 'detail', 'table' => 'liquidaciones_paris']);
+        }
+        
+        try {
+            $files = $this->getRequest()->getFiles();
+            
+            if (!isset($files['liquidationFile']) || $files['liquidationFile']['error'] !== UPLOAD_ERR_OK) {
+                throw new \Exception('Error al subir el archivo');
+            }
+            
+            $file = $files['liquidationFile'];
+            $originalName = $file['name'];
+            
+            // Guardar archivo temporal para procesamiento posterior
+            $uploadDir = 'data/uploads/liquidations/';
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0777, true);
+            }
+            
+            $fileName = uniqid() . '_' . $originalName;
+            $filePath = $uploadDir . $fileName;
+            
+            if (!move_uploaded_file($file['tmp_name'], $filePath)) {
+                throw new \Exception('Error al guardar el archivo temporal');
+            }
+            
+            // Crear registro de trabajo para procesamiento en segundo plano
+            $sql = "INSERT INTO liquidaciones_jobs (
+                        status, 
+                        marketplace, 
+                        filename, 
+                        original_filename, 
+                        created_at, 
+                        user_id
+                    ) VALUES (?, ?, ?, ?, NOW(), ?)";
+            
+            $statement = $this->dbAdapter->createStatement($sql);
+            $statement->execute([
+                'pending',
+                'PARIS',
+                $fileName,
+                $originalName,
+                $this->authService->getIdentity() ?? 'system'
+            ]);
+            
+            $jobId = $this->dbAdapter->getDriver()->getLastGeneratedValue();
+            
+            // Iniciar procesamiento en segundo plano
+            $this->processLiquidationAsync($jobId, $filePath);
+            
+            // Redirigir a página de estado
+            return $this->redirect()->toRoute('application', [
+                'action' => 'liquidation-status', 
+                'id' => $jobId
+            ]);
+            
+        } catch (\Exception $e) {
+            error_log('Error al subir liquidación: ' . $e->getMessage());
+            
+            return $this->redirect()->toRoute('application', [
+                'action' => 'detail', 
+                'table' => 'liquidaciones_paris'
+            ], [
+                'query' => [
+                    'message' => 'Error al subir liquidación: ' . $e->getMessage(),
+                    'messageType' => 'error'
+                ]
+            ]);
+        }
+    }
+    
+    // Método para procesar de forma asíncrona
+    private function processLiquidationAsync($jobId, $filePath)
+    {
+        // Crear comando para ejecutar en segundo plano
+        $command = "php " . getcwd() . "/process-liquidation.php $jobId $filePath > /dev/null 2>&1 &";
+        
+        if (substr(php_uname(), 0, 7) == "Windows"){
+            pclose(popen("start /B " . $command, "r")); 
+        } else {
+            exec($command);
+        }
+    }
+    
+    public function getLiquidationStatusAction()
+{
+    $jobId = $this->params()->fromQuery('id');
+    
+    $sql = "SELECT status, progress, error_message FROM liquidaciones_jobs WHERE id = ?";
+    $statement = $this->dbAdapter->createStatement($sql);
+    $result = $statement->execute([$jobId]);
+    $job = $result->current();
+    
+    if (!$job) {
+        return $this->jsonResponse(['error' => 'Job not found']);
+    }
+    
+    return $this->jsonResponse([
+        'status' => $job['status'],
+        'progress' => $job['progress'] ?? 0,
+        'error_message' => $job['error_message']
+    ]);
+}
+    // Página de estado
+    public function liquidationStatusAction()
+    {
+        $jobId = $this->params()->fromRoute('id');
+        
+        if (!$jobId) {
+            return $this->redirect()->toRoute('application', ['action' => 'detail', 'table' => 'liquidaciones_paris']);
+        }
+        
+        $sql = "SELECT * FROM liquidaciones_jobs WHERE id = ?";
+        $statement = $this->dbAdapter->createStatement($sql);
+        $result = $statement->execute([$jobId]);
+        $job = $result->current();
+        
+        if (!$job) {
+            return $this->redirect()->toRoute('application', ['action' => 'detail', 'table' => 'liquidaciones_paris']);
+        }
+        
+        return new ViewModel([
+            'job' => $job,
+            'jobId' => $jobId
         ]);
     }
 
@@ -2074,176 +2236,230 @@ public function ordersAction()
         
         return $response;
     }
+
+
+
+
+/**
+ * Generar lista de empaque (Packing List) para órdenes
+ * @param array $orderIds IDs de las órdenes
+ * @param string $table Tabla de órdenes (marketplace)
+ * @return Response
+ */
+private function generatePackingList(array $orderIds, string $table = null)
+{
+    // Determinar la tabla a usar
+    $tables = [];
+    if ($table && $table !== 'all') {
+        $tables[] = $table;
+        $marketplace = str_replace('Orders_', '', $table);
+    } else {
+        $marketplace = "Todos";
+        $tables = [
+            'Orders_WALLMART',
+            'Orders_RIPLEY',
+            'Orders_FALABELLA',
+            'Orders_MERCADO_LIBRE',
+            'Orders_PARIS',
+            'Orders_WOOCOMMERCE'
+        ];
+    }
     
-    /**
-     * Generar lista de empaque (Packing List) para órdenes
-     * @param array $orderIds IDs de las órdenes
-     * @param string $table Tabla de órdenes (marketplace)
-     * @return Response
-     */
-    private function generatePackingList(array $orderIds, string $table = null)
-    {
-        // Determinar la tabla a usar
-        $tables = [];
-        if ($table && $table !== 'all') {
-            $tables[] = $table;
-            $marketplace = str_replace('Orders_', '', $table);
-        } else {
-            $marketplace = "Todos";
-            $tables = [
-                'Orders_WALLMART',
-                'Orders_RIPLEY',
-                'Orders_FALABELLA',
-                'Orders_MERCADO_LIBRE',
-                'Orders_PARIS',
-                'Orders_WOOCOMMERCE'
-            ];
-        }
+    // Recolectar datos de productos con sus clientes
+    $productos = [];
+    
+    foreach ($tables as $currentTable) {
+        $tableMarketplace = str_replace('Orders_', '', $currentTable);
         
-        // Inicializar el generador de código de barras
-        $generator = new BarcodeGeneratorPNG();
+        // Obtener los datos de las órdenes en esta tabla
+        $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
         
-        // Recopilar órdenes y productos
-        $allOrders = [];
-        $allProducts = [];
-        
-        foreach ($tables as $currentTable) {
-            $tableMarketplace = str_replace('Orders_', '', $currentTable);
+        // Consulta para obtener items de la tabla específica
+        $itemsTable = $currentTable . "_Items";
+        try {
+            $sqlItems = "
+                SELECT 
+                    i.sku, i.name, i.itemSize, i.orderId, i.subOrderNumber, o.customer_name
+                FROM `$itemsTable` i
+                JOIN `$currentTable` o ON i.orderId = o.id
+                WHERE o.id IN ($placeholders)
+                ORDER BY i.name
+            ";
+            $stmt = $this->dbAdapter->createStatement($sqlItems);
+            $items = $stmt->execute($orderIds);
             
-            // Obtener los datos de las órdenes en esta tabla
-            $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
-            $sql = "SELECT * FROM `$currentTable` WHERE id IN ($placeholders)";
-            $statement = $this->dbAdapter->createStatement($sql);
-            $result = $statement->execute($orderIds);
+            // Procesar cada item individualmente
+            foreach ($items as $item) {
+                $productos[] = [
+                    'sku' => $item['sku'] ?? 'Sin SKU',
+                    'nombre' => $item['name'] ?? 'Sin nombre',
+                    'subOrderNumber' => $item['subOrderNumber'] ?? '',
+                    'customer_name' => $item['customer_name'] ?? 'N/A',
+                    'marketplace' => $tableMarketplace
+                ];
+            }
+        } catch (\Exception $e) {
+            // Si no hay tabla de items, procesar productos de la columna productos
+            $sqlOrders = "SELECT id, customer_name, suborder_number, productos 
+                         FROM `$currentTable` WHERE id IN ($placeholders)";
+            $stmt = $this->dbAdapter->createStatement($sqlOrders);
+            $orders = $stmt->execute($orderIds);
             
-            // Procesar cada orden
-            foreach ($result as $order) {
-                $order['marketplace'] = $tableMarketplace;
-                $allOrders[] = $order;
-                
-                // Consultar productos de la orden
-                $itemsTable = $currentTable . "_Items";
-                try {
-                    $productsStatement = $this->dbAdapter->createStatement("SELECT * FROM `$itemsTable` WHERE order_id = ?");
-                    $productsResult = $productsStatement->execute([(string)$order['id']]);
-                    
-                    $orderProducts = [];
-                    foreach ($productsResult as $product) {
-                        $orderProducts[] = $product;
-                    }
-                } catch (\Exception $e) {
-                    // Si no hay tabla de items, usar datos básicos
-                    $orderProducts = [];
-                    $productStrings = explode(',', $order['productos'] ?? '');
+            foreach ($orders as $order) {
+                if (isset($order['productos'])) {
+                    $productStrings = explode(',', $order['productos']);
                     foreach ($productStrings as $i => $productString) {
                         if (!empty(trim($productString))) {
-                            $orderProducts[] = [
-                                'id' => $i + 1,
+                            $productos[] = [
                                 'sku' => 'SKU-' . str_pad((string)($i + 1), 6, '0', STR_PAD_LEFT),
-                                'name' => trim($productString),
-                                'price' => ($order['total'] ?? 0) / count(array_filter($productStrings)),
-                                'quantity' => 1
+                                'nombre' => trim($productString),
+                                'subOrderNumber' => $order['suborder_number'] ?? '',
+                                'customer_name' => $order['customer_name'] ?? 'N/A',
+                                'marketplace' => $tableMarketplace
                             ];
                         }
                     }
                 }
-                
-                // Agregar productos a la lista global
-                foreach ($orderProducts as $product) {
-                    $sku = $product['sku'] ?? $product['SKU'] ?? $product['codigo_sku'] ?? 'N/A';
-                    $name = $product['name'] ?? $product['nombre'] ?? $product['nombre_producto'] ?? 'Sin nombre';
-                    $quantity = $product['quantity'] ?? $product['cantidad'] ?? 1;
-                    
-                    if (!isset($allProducts[$sku])) {
-                        $allProducts[$sku] = [
-                            'sku' => $sku,
-                            'nombre' => $name,
-                            'cantidad' => 0,
-                            'pedidos' => []
-                        ];
-                    }
-                    
-                    $allProducts[$sku]['cantidad'] += $quantity;
-                    $allProducts[$sku]['pedidos'][] = (string)$order['id'];
-                }
             }
         }
-        
-        if (empty($allProducts) || empty($allOrders)) {
-            throw new \Exception("No se encontraron productos u órdenes con los IDs seleccionados.");
-        }
-        
-        // Generar HTML para el documento
-        ob_start();
-        ?>
-        <style>
-            body { font-family: DejaVu Sans, sans-serif; font-size: 12px; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-            th, td { border: 1px solid #000; padding: 6px; text-align: left; }
-            th { background-color: #f0f0f0; }
-            .title { font-size: 20px; font-weight: bold; margin-bottom: 15px; }
-            .subtitle { font-size: 16px; font-weight: bold; margin: 20px 0 10px 0; }
-            .page-break { page-break-after: always; }
-            .total-row { font-weight: bold; background-color: #f0f0f0; }
-        </style>
+    }
+    
+    if (empty($productos)) {
+        throw new \Exception("No se encontraron productos para las órdenes seleccionadas.");
+    }
+    
+    // Generar HTML para el documento
+    ob_start();
+    ?>
+    <style>
+        body { font-family: DejaVu Sans, sans-serif; font-size: 12px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+        th, td { border: 1px solid #000; padding: 6px; text-align: left; }
+        th { background-color: #eee; }
+        .title { font-size: 20px; font-weight: bold; margin-bottom: 10px; }
+        .subtitle { margin: 10px 0; font-weight: bold; }
+    </style>
 
-        <div class="title">Lista de Empaque - <?= $marketplace ?> | LODORO</div>
-        <div>Fecha de generación: <?= date("Y-m-d H:i:s") ?></div>
+    <div class="title">Picking List - <?= $marketplace ?> | LODORO</div>
+    <div>PICKING LIST GENERADO EL: <?= date("Y-m-d H:i:s") ?> |</div>
+    <br>
+
+    <table>
+        <thead>
+            <tr>
+                <th>CLIENTE</th>
+                <th>SUBORDEN</th>
+                <th>PRODUCTO</th>
+                <th>SKU</th>
+                <th>CANTIDAD</th>
+                <th>MARKETPLACE</th>
+            </tr>
+        </thead>
+        <tbody>
+        <?php foreach ($productos as $producto): ?>
+            <tr>
+                <td><?= htmlspecialchars($producto['customer_name'] ?? 'N/A') ?></td>
+                <td><?= htmlspecialchars($producto['subOrderNumber'] ?? 'N/A') ?></td>
+                <td><?= htmlspecialchars($producto['nombre'] ?? 'Sin nombre') ?></td>
+                <td><?= htmlspecialchars($producto['sku'] ?? 'Sin SKU') ?></td>
+                <td>1</td>
+                <td><?= htmlspecialchars($producto['marketplace'] ?? 'N/A') ?></td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+
+    <div><strong>TOTAL PRODUCTOS:</strong> <?= count($productos) ?></div>
+    <?php
+    $html = ob_get_clean();
+    
+    // Crear PDF con DOMPDF
+    $options = new Options();
+    $options->set('isHtml5ParserEnabled', true);
+    $options->set('isRemoteEnabled', true);
+    
+    $dompdf = new Dompdf($options);
+    $dompdf->loadHtml($html, 'UTF-8');
+    $dompdf->setPaper('A4', 'portrait');
+    $dompdf->render();
+    
+    $pdfContent = $dompdf->output();
+    
+    // Crear respuesta HTTP
+    $response = new Response();
+    $response->setContent($pdfContent);
+    
+    // Configurar cabeceras
+    $headers = $response->getHeaders();
+    $headers->addHeaderLine('Content-Type', 'application/pdf');
+    $headers->addHeaderLine('Content-Disposition', 'inline; filename="PickingList_' . date('Y-m-d_His') . '.pdf"');
+    $headers->addHeaderLine('Content-Length', strlen($pdfContent));
+    $headers->addHeaderLine('Cache-Control', 'must-revalidate, post-check=0, pre-check=0');
+    $headers->addHeaderLine('Pragma', 'public');
+    $headers->addHeaderLine('Expires', '0');
+    
+    return $response;
+}
+
+/**
+ * Generar lista de picking para órdenes
+ * @param array $orderIds IDs de las órdenes
+ * @param string $table Tabla de órdenes (marketplace)
+ * @return Response
+ */
+private function generatePickingList(array $orderIds, string $table = null)
+{
+    // Determinar la tabla a usar
+    $tables = [];
+    if ($table && $table !== 'all') {
+        $tables[] = $table;
+        $marketplace = str_replace('Orders_', '', $table);
+    } else {
+        $marketplace = "TODOS";
+        $tables = [
+            'Orders_WALLMART',
+            'Orders_RIPLEY',
+            'Orders_FALABELLA',
+            'Orders_MERCADO_LIBRE',
+            'Orders_PARIS',
+            'Orders_WOOCOMMERCE'
+        ];
+    }
+    
+    // Inicializar el generador de código de barras
+    $generator = new BarcodeGeneratorPNG();
+    $html = '';
+    
+    foreach ($tables as $currentTable) {
+        $tableMarketplace = str_replace('Orders_', '', $currentTable);
         
-        <div class="subtitle">Resumen de Productos</div>
-        <table>
-            <thead>
-                <tr>
-                    <th>SKU</th>
-                    <th>Producto</th>
-                    <th>Cantidad Total</th>
-                    <th>N° Órdenes</th>
-                </tr>
-            </thead>
-            <tbody>
-            <?php 
-            $totalItems = 0;
-            foreach ($allProducts as $product): 
-                $totalItems += $product['cantidad'];
-            ?>
-                <tr>
-                    <td><?= htmlspecialchars($product['sku']) ?></td>
-                    <td><?= htmlspecialchars($product['nombre']) ?></td>
-                    <td><?= $product['cantidad'] ?></td>
-                    <td><?= count(array_unique($product['pedidos'])) ?></td>
-                </tr>
-            <?php endforeach; ?>
-                <tr class="total-row">
-                    <td colspan="2">TOTAL</td>
-                    <td><?= $totalItems ?></td>
-                    <td><?= count($allOrders) ?></td>
-                </tr>
-            </tbody>
-        </table>
+        // Obtener los datos de las órdenes en esta tabla
+        $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
+        // USAR id en lugar de suborder_number
+        $sql = "SELECT * FROM `$currentTable` WHERE id IN ($placeholders)";
+        $statement = $this->dbAdapter->createStatement($sql);
+        $result = $statement->execute($orderIds);
         
-        <div class="subtitle">Detalle por Orden</div>
-        <?php foreach ($allOrders as $index => $order): 
-            // Generar código de barras para el ID de la orden
-            $barcode = base64_encode($generator->getBarcode((string)$order['id'], $generator::TYPE_CODE_128));
-            
-            // Consultar productos de la orden
-            $itemsTable = str_replace('Orders_', 'Orders_', $order['marketplace']) . "_Items";
+        foreach ($result as $index => $order) {
+            // Obtener items de la orden
+            $itemsTable = $currentTable . "_Items";
             try {
-                $productsStatement = $this->dbAdapter->createStatement("SELECT * FROM `$itemsTable` WHERE order_id = ?");
-                $productsResult = $productsStatement->execute([(string)$order['id']]);
+                // También usar id en lugar de suborder_number
+                $productsSql = "SELECT * FROM `$itemsTable` WHERE order_id = ?";
+                $productsStatement = $this->dbAdapter->createStatement($productsSql);
+                $productsResult = $productsStatement->execute([$order['id']]);
                 
-                $orderProducts = [];
+                $items = [];
                 foreach ($productsResult as $product) {
-                    $orderProducts[] = $product;
+                    $items[] = $product;
                 }
             } catch (\Exception $e) {
                 // Si no hay tabla de items, usar datos básicos
-                $orderProducts = [];
+                $items = [];
                 $productStrings = explode(',', $order['productos'] ?? '');
                 foreach ($productStrings as $i => $productString) {
                     if (!empty(trim($productString))) {
-                        $orderProducts[] = [
-                            'id' => $i + 1,
+                        $items[] = [
                             'sku' => 'SKU-' . str_pad((string)($i + 1), 6, '0', STR_PAD_LEFT),
                             'name' => trim($productString),
                             'price' => ($order['total'] ?? 0) / max(1, count(array_filter($productStrings))),
@@ -2252,286 +2468,131 @@ public function ordersAction()
                     }
                 }
             }
-        ?>
-        
-        <div <?= $index < count($allOrders) - 1 ? 'class="page-break"' : '' ?>>
-            <div style="margin-bottom: 10px; border-bottom: 1px solid #000; padding-bottom: 10px;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <strong>Orden #:</strong> <?= htmlspecialchars((string)$order['id']) ?><br>
-                        <strong>Cliente:</strong> <?= htmlspecialchars($order['cliente'] ?? 'N/A') ?><br>
-                        <strong>Marketplace:</strong> <?= htmlspecialchars($order['marketplace']) ?><br>
-                        <strong>Fecha:</strong> <?= $order['fecha_creacion'] ?? date('Y-m-d') ?>
-                    </div>
-                    <div>
-                        <img src="data:image/png;base64,<?= $barcode ?>" style="height: 60px; max-width: 200px;"><br>
-                        <div style="text-align: center;"><?= htmlspecialchars((string)$order['id']) ?></div>
-                    </div>
+            
+            // Generar código de barras para la orden - usar id o suborder_number
+            $barcodeValue = $order['suborder_number'] ?? $order['id'];
+            $barcode = base64_encode($generator->getBarcode($barcodeValue, $generator::TYPE_CODE_128));
+            
+            // Usar customer_name y cliente según disponibilidad
+            $customerName = $order['customer_name'] ?? $order['cliente'] ?? 'N/A';
+            
+            $html .= '<div style="page-break-after: always;">';
+            $html .= '
+            <html>
+            <head>
+                <style>
+                    body { font-family: DejaVu Sans, sans-serif; font-size: 12px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                    td, th { border: 1px solid #000; padding: 5px; }
+                    .barcode { margin: 15px 0; }
+                    .header { font-size: 18px; font-weight: bold; margin-bottom: 5px; text-align: left; }
+                </style>
+            </head>
+            <body>
+                <div class="header">Packing List - '.$tableMarketplace.' | LODORO</div>
+                <div style="text-align: left;">GENERADO: '.date('d-m-Y H:i:s').'</div>
+
+                <div class="barcode">
+                    <img src="data:image/png;base64,'.$barcode.'" style="height: 60px; width: 43%; max-width: 400px;"><br>
+                    '.$barcodeValue.'
                 </div>
-            </div>
-            
-            <table>
-                <thead>
+
+                <table>
                     <tr>
-                        <th>SKU</th>
-                        <th>Producto</th>
-                        <th>Cantidad</th>
-                        <th>Precio</th>
-                        <th>Subtotal</th>
+                        <td><b>Cliente:</b><br>'.$customerName.'</td>
+                        <td><b>Fecha Pedido:</b><br>'.$order['fecha_creacion'].'</td>
                     </tr>
-                </thead>
-                <tbody>
-                <?php 
-                $orderTotal = 0;
-                foreach ($orderProducts as $product): 
-                    $price = $product['price'] ?? $product['precio'] ?? $product['precio_unitario'] ?? 0;
-                    $quantity = $product['quantity'] ?? $product['cantidad'] ?? 1;
-                    $subtotal = $price * $quantity;
-                    $orderTotal += $subtotal;
-                    $productName = $product['name'] ?? $product['nombre'] ?? $product['nombre_producto'] ?? 'Sin nombre';
-                    $sku = $product['sku'] ?? $product['SKU'] ?? $product['codigo_sku'] ?? 'N/A';
-                ?>
                     <tr>
-                        <td><?= htmlspecialchars($sku) ?></td>
-                        <td><?= htmlspecialchars($productName) ?></td>
-                        <td><?= $quantity ?></td>
-                        <td>$<?= number_format($price, 0, ',', '.') ?></td>
-                        <td>$<?= number_format($subtotal, 0, ',', '.') ?></td>
+                        <td><b>Dirección:</b><br>'.$order['direccion'].'</td>
+                        <td><b>N° Orden:</b><br>'.$order['id'].'</td>
                     </tr>
-                <?php endforeach; ?>
-                    <tr class="total-row">
-                        <td colspan="4" align="right">Total:</td>
-                        <td>$<?= number_format($orderTotal, 0, ',', '.') ?></td>
-                    </tr>
-                </tbody>
-            </table>
-            
-            <div style="margin-top: 20px;">
-                <strong>Dirección de Entrega:</strong><br>
-                <?= htmlspecialchars($order['direccion'] ?? 'No disponible') ?>
-            </div>
-            
-            <div style="margin-top: 20px;">
-                <table width="100%" border="0">
                     <tr>
-                        <td width="50%" style="border: none;">
-                            <div style="border-top: 1px solid #000; margin-top: 50px; padding-top: 5px; text-align: center;">
-                                Firma de Preparación
-                            </div>
-                        </td>
-                        <td width="50%" style="border: none;">
-                            <div style="border-top: 1px solid #000; margin-top: 50px; padding-top: 5px; text-align: center;">
-                                Firma de Verificación
-                            </div>
-                        </td>
+                        <td><b>Entregas Del Día:</b><br>'.date('d-m-Y').'</td>
+                        <td><b>Suborden:</b><br>'.$order['suborder_number'].'</td>
                     </tr>
                 </table>
-            </div>
-        </div>
-        <?php endforeach; ?>
-        <?php
-        $html = ob_get_clean();
-        
-        // Crear PDF con DOMPDF
-        $options = new Options();
-        $options->set('isHtml5ParserEnabled', true);
-        $options->set('isRemoteEnabled', true);
-        
-        $dompdf = new Dompdf($options);
-        $dompdf->loadHtml($html, 'UTF-8');
-        $dompdf->setPaper('A4', 'portrait');
-        $dompdf->render();
-        
-        $pdfContent = $dompdf->output();
-        
-        // Crear respuesta HTTP
-        $response = new Response();
-        $response->setContent($pdfContent);
-        
-        // Configurar cabeceras
-        $headers = $response->getHeaders();
-        $headers->addHeaderLine('Content-Type', 'application/pdf');
-        $headers->addHeaderLine('Content-Disposition', 'inline; filename="PackingList_' . date('Y-m-d') . '.pdf"');
-        $headers->addHeaderLine('Content-Length', strlen($pdfContent));
-        $headers->addHeaderLine('Cache-Control', 'must-revalidate, post-check=0, pre-check=0');
-        $headers->addHeaderLine('Pragma', 'public');
-        $headers->addHeaderLine('Expires', '0');
-        
-        return $response;
-    }
-    
-    /**
-     * Generar lista de picking para órdenes
-     * @param array $orderIds IDs de las órdenes
-     * @param string $table Tabla de órdenes (marketplace)
-     * @return Response
-     */
-    private function generatePickingList(array $orderIds, string $table = null)
-    {
-        // Determinar la tabla a usar
-        $tables = [];
-        if ($table && $table !== 'all') {
-            $tables[] = $table;
-            $marketplace = str_replace('Orders_', '', $table);
-        } else {
-            $marketplace = "Todos";
-            $tables = [
-                'Orders_WALLMART',
-                'Orders_RIPLEY',
-                'Orders_FALABELLA',
-                'Orders_MERCADO_LIBRE',
-                'Orders_PARIS',
-                'Orders_WOOCOMMERCE'
-            ];
-        }
-        
-        // Recolectar datos de productos con sus clientes
-        $allProducts = [];
-        
-        foreach ($tables as $currentTable) {
-            $tableMarketplace = str_replace('Orders_', '', $currentTable);
-            
-            // Obtener los datos de las órdenes en esta tabla
-            $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
-            $sql = "SELECT * FROM `$currentTable` WHERE id IN ($placeholders)";
-            $statement = $this->dbAdapter->createStatement($sql);
-            $result = $statement->execute($orderIds);
-            
-            // Almacenar información de productos y sus clientes
-            foreach ($result as $row) {
-                $clienteInfo = [
-                    'id' => (string)$row['id'],
-                    'nombre' => $row['cliente'] ?? 'N/A',
-                    'marketplace' => $tableMarketplace,
-                    'suborden' => $row['suborder_number'] ?? (string)$row['id'],
-                    'direccion' => $row['direccion'] ?? 'No disponible'
-                ];
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>CLIENTE</th>
+                            <th>SUBORDEN</th>
+                            <th>PRODUCTO</th>
+                            <th>SKU</th>
+                            <th>CANTIDAD</th>
+                            <th>MARKETPLACE</th>
+                        </tr>
+                    </thead>
+                    <tbody>';
+
+            foreach ($items as $item) {
+                $itemName = $item['name'] ?? $item['nombre'] ?? $item['nombre_producto'] ?? 'Sin nombre';
+                $itemSku = $item['sku'] ?? $item['SKU'] ?? $item['codigo_sku'] ?? 'N/A';
+                $itemQuantity = $item['quantity'] ?? $item['cantidad'] ?? 1;
                 
-                // Intentar obtener productos de la orden
-                $itemsTable = $currentTable . "_Items";
-                try {
-                    $productsStatement = $this->dbAdapter->createStatement("SELECT * FROM `$itemsTable` WHERE order_id = ?");
-                    $productsResult = $productsStatement->execute([(string)$row['id']]);
-                    
-                    // Agregar productos a la lista global
-                    foreach ($productsResult as $product) {
-                        $sku = $product['sku'] ?? $product['SKU'] ?? $product['codigo_sku'] ?? 'N/A';
-                        $name = $product['name'] ?? $product['nombre'] ?? $product['nombre_producto'] ?? 'Sin nombre';
-                        $quantity = $product['quantity'] ?? $product['cantidad'] ?? 1;
-                        
-                        if (!isset($allProducts[$sku])) {
-                            $allProducts[$sku] = [
-                                'sku' => $sku,
-                                'nombre' => $name,
-                                'cantidad' => 0,
-                                'clientes' => []
-                            ];
-                        }
-                        
-                        $allProducts[$sku]['cantidad'] += $quantity;
-                        $allProducts[$sku]['clientes'][] = $clienteInfo;
-                    }
-                } catch (\Exception $e) {
-                    // Si no hay tabla de items, usar datos básicos de la orden
-                    $productStrings = explode(',', $row['productos'] ?? '');
-                    foreach ($productStrings as $i => $productString) {
-                        if (!empty(trim($productString))) {
-                            $mockSku = 'SKU-' . str_pad((string)($i + 1), 6, '0', STR_PAD_LEFT);
-                            
-                            if (!isset($allProducts[$mockSku])) {
-                                $allProducts[$mockSku] = [
-                                    'sku' => $mockSku,
-                                    'nombre' => trim($productString),
-                                    'cantidad' => 0,
-                                    'clientes' => []
-                                ];
-                            }
-                            
-                            $allProducts[$mockSku]['cantidad'] += 1;
-                            $allProducts[$mockSku]['clientes'][] = $clienteInfo;
-                        }
-                    }
-                }
+                $html .= '
+                    <tr>
+                        <td>'.$customerName.'</td>
+                        <td>'.$order['suborder_number'].'</td>
+                        <td>'.$itemName.'</td>
+                        <td>'.$itemSku.'</td>
+                        <td>'.$itemQuantity.'</td>
+                        <td>'.$tableMarketplace.'</td>
+                    </tr>';
             }
+            
+            $totalProductos = count($items);
+            
+            $html .= '
+                    <tr>
+                        <td colspan="4"><b>TOTAL PRODUCTOS</b></td>
+                        <td><b>'.$totalProductos.'</b></td>
+                        <td><b>'.$tableMarketplace.'</b></td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <div style="text-align: center; margin-top: 20px;">Página '.($index + 1).' de '.count($orderIds).'</div>
+            </body>
+            </html>
+            ';
+            $html .= '</div>';
         }
-        
-        if (empty($allProducts)) {
-            throw new \Exception("No se encontraron productos para las órdenes seleccionadas.");
-        }
-        
-        // Generar HTML para el documento picking
-        ob_start();
-?>
-<style>
-    body { font-family: DejaVu Sans, sans-serif; font-size: 12px; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-    th, td { border: 1px solid #000; padding: 6px; text-align: left; }
-    th { background-color: #f0f0f0; }
-    .title { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
-</style>
-
-<div class="title">PICKING LIST GENERADO: <?= date("Y-m-d H:i:s") ?></div>
-
-<table>
-    <thead>
-        <tr>
-            <th>CLIENTE</th>
-            <th>SUBORDEN</th>
-            <th>PRODUCTO</th>
-            <th>SKU</th>
-            <th>CANTIDAD</th>
-            <th>MARKETPLACE</th>
-        </tr>
-    </thead>
-    <tbody>
-    <?php foreach ($allProducts as $product): ?>
-        <?php foreach ($product['clientes'] as $cliente): ?>
-            <tr>
-                <td><?= htmlspecialchars($cliente['nombre']) ?></td>
-                <td><?= htmlspecialchars($cliente['suborden']) ?></td>
-                <td><?= htmlspecialchars($product['nombre']) ?></td>
-                <td><?= htmlspecialchars($product['sku']) ?></td>
-                <td>1</td>
-                <td><?= htmlspecialchars($cliente['marketplace']) ?></td>
-            </tr>
-        <?php endforeach; ?>
-    <?php endforeach; ?>
-    </tbody>
-</table>
-
-<div><strong>TOTAL PRODUCTOS:</strong> <?= array_sum(array_column($allProducts, 'cantidad')) ?></div>
-<?php
-$html = ob_get_clean();
-
-        
-        // Crear PDF con DOMPDF
-        $options = new Options();
-        $options->set('isHtml5ParserEnabled', true);
-        $options->set('isRemoteEnabled', true);
-        
-        $dompdf = new Dompdf($options);
-        $dompdf->loadHtml($html, 'UTF-8');
-        $dompdf->setPaper('A4', 'portrait');
-        $dompdf->render();
-        
-        $pdfContent = $dompdf->output();
-        
-        // Crear respuesta HTTP
-        $response = new Response();
-        $response->setContent($pdfContent);
-        
-        // Configurar cabeceras
-        $headers = $response->getHeaders();
-        $headers->addHeaderLine('Content-Type', 'application/pdf');
-        $headers->addHeaderLine('Content-Disposition', 'inline; filename="PickingList_' . date('Y-m-d') . '.pdf"');
-        $headers->addHeaderLine('Content-Length', strlen($pdfContent));
-        $headers->addHeaderLine('Cache-Control', 'must-revalidate, post-check=0, pre-check=0');
-        $headers->addHeaderLine('Pragma', 'public');
-        $headers->addHeaderLine('Expires', '0');
-        
-        return $response;
     }
     
+    if (empty($html)) {
+        throw new \Exception("No se encontraron órdenes con los IDs seleccionados.");
+    }
+    
+    // Crear PDF con DOMPDF
+    $options = new Options();
+    $options->set('isHtml5ParserEnabled', true);
+    $options->set('isRemoteEnabled', true);
+    
+    $dompdf = new Dompdf($options);
+    $dompdf->loadHtml($html, 'UTF-8');
+    $dompdf->setPaper('A4', 'portrait');
+    $dompdf->render();
+    
+    $pdfContent = $dompdf->output();
+    
+    // Crear respuesta HTTP
+    $response = new Response();
+    $response->setContent($pdfContent);
+    
+    // Configurar cabeceras
+    $headers = $response->getHeaders();
+    $headers->addHeaderLine('Content-Type', 'application/pdf');
+    $headers->addHeaderLine('Content-Disposition', 'inline; filename="PickingList_' . date('Y-m-d') . '.pdf"');
+    $headers->addHeaderLine('Content-Length', strlen($pdfContent));
+    $headers->addHeaderLine('Cache-Control', 'must-revalidate, post-check=0, pre-check=0');
+    $headers->addHeaderLine('Pragma', 'public');
+    $headers->addHeaderLine('Expires', '0');
+    
+    return $response;
+}
+
+
     /**
      * Generar boleta/factura para órdenes
      * @param array $orderIds IDs de las órdenes
