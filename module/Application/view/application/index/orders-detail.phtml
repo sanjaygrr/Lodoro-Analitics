@@ -233,11 +233,7 @@ if (!empty($orders)) {
                                                         <?= $this->escapeHtml($order['productos'] ?? 'N/A') ?>
                                                     <?php endif; ?>
                                                 </span>
-                                                <button type="button" class="btn btn-sm btn-outline-info py-0 px-1" 
-                                                        onclick="showProductDetails('<?= $this->escapeJs($order['id']) ?>')"
-                                                        title="Ver productos">
-                                                    <i class="fas fa-eye"></i>
-                                                </button>
+ 
                                             </div>
                                         </td>
                                         <td><?= isset($order['total']) ? '$' . number_format($order['total'], 0, ',', '.') : 'N/A' ?></td>
@@ -269,11 +265,10 @@ if (!empty($orders)) {
                                         <td><?= $this->escapeHtml($order['fecha_creacion'] ?? '') ?></td>
                                         <td>
                                             <div class="d-flex gap-1">
-                                                <a href="<?= $this->url('application', ['action' => 'order-detail', 'id' => $order['id'], 'table' => $table ?? '']) ?>" 
-                                                   class="btn btn-sm btn-outline-primary" title="Ver detalle">
+                                            <a href="<?= $this->url('order-detail', ['id' => $order['suborder_number'], 'table' => $table]) ?>" 
+                                                class="btn btn-sm btn-outline-primary" title="Ver detalle">
                                                     <i class="fas fa-eye"></i>
-                                                </a>
-                                                
+                                            </a>
                                                 <?php if ($printed === '0' || $printed === 'no'): ?>
                                                 <button type="button" class="btn btn-sm btn-outline-secondary print-single-label" 
                                                         data-id="<?= $this->escapeHtml($order['id']) ?>" 

@@ -13,6 +13,40 @@ use Application\Middleware\AuthenticationMiddleware;
 return [
     'router' => [
         'routes' => [
+
+            'search-ean' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/application/search-ean',
+                    'defaults' => [
+                        'controller' => Controller\IndexController::class,
+                        'action'     => 'search-ean',
+                    ],
+                ],
+            ],
+            'mark-product-processed' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/application/mark-product-processed',
+                    'defaults' => [
+                        'controller' => Controller\IndexController::class,
+                        'action'     => 'mark-product-processed',
+                    ],
+                ],
+            ],
+
+            'order-detail' => [
+                'type' => Segment::class,
+                'options' => [
+                    'route'    => '/order-detail/:id/:table',
+                    'defaults' => [
+                        'controller' => Controller\IndexController::class,
+                        'action'     => 'order-detail',
+                    ],
+                ],
+            ],
+
+
                 'upload-liquidation' => [
                 'type' => Literal::class,
                 'options' => [

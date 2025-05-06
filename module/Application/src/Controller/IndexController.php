@@ -1311,143 +1311,6 @@ public function detailAction()
     }
 
 
-
-/**
- * Acción principal para visualizar todas las órdenes de todos los marketplaces
- */
-public function ordersAction()
-{
-    $redirect = $this->checkAuth();
-    if ($redirect !== null) {
-        return $redirect;
-    }
-
-    $statsSql = "SELECT 
-                    COUNT(*) as total,
-                    SUM(CASE WHEN estado = 'Nueva' THEN 1 ELSE 0 END) as nuevas,
-                    SUM(CASE WHEN estado = 'En Proceso' THEN 1 ELSE 0 END) as en_proceso,
-                    SUM(CASE WHEN estado = 'Enviada' THEN 1 ELSE 0 END) as enviadas,
-                    SUM(CASE WHEN estado = 'Entregada' THEN 1 ELSE 0 END) as entregadas,
-                    SUM(CASE WHEN estado = 'Pendiente de Pago' THEN 1 ELSE 0 END) as pendiente_pago,
-                    SUM(CASE WHEN estado = 'Cancelada' THEN 1 ELSE 0 END) as canceladas,
-                    SUM(CASE WHEN estado = 'Devuelta' THEN 1 ELSE 0 END) as devueltas
-                FROM (
-                    SELECT estado FROM Orders_WALLMART
-                    UNION ALL SELECT estado FROM Orders_RIPLEY
-                    UNION ALL SELECT estado FROM Orders_FALABELLA
-                    UNION ALL SELECT estado FROM Orders_MERCADO_LIBRE
-                    UNION ALL SELECT estado FROM Orders_PARIS
-                    UNION ALL SELECT estado FROM Orders_WOOCOMMERCE
-                ) as all_orders";
-
-    $statsStatement = $this->dbAdapter->createStatement($statsSql);
-    $statsResult = $statsStatement->execute();
-    $stats = $statsResult->current() ?: [
-        'total' => 0,
-        'nuevas' => 0,
-        'en_proceso' => 0,
-        'enviadas' => 0,
-        'entregadas' => 0,
-        'pendiente_pago' => 0,
-        'canceladas' => 0,
-        'devueltas' => 0
-    ];
-
-    $page = (int) $this->params()->fromQuery('page', 1);
-    $limit = (int) $this->params()->fromQuery('limit', 30);
-    $offset = ($page - 1) * $limit;
-
-    $search = $this->params()->fromQuery('search', '');
-    $statusFilter = $this->params()->fromQuery('status', '');
-    $transportistaFilter = $this->params()->fromQuery('transportista', '');
-    $startDate = $this->params()->fromQuery('startDate', '');
-    $endDate = $this->params()->fromQuery('endDate', '');
-
-    $whereConditions = [];
-    $whereParams = [];
-
-    if (!empty($search)) {
-        $whereConditions[] = "(suborder_number LIKE ? OR cliente LIKE ? OR telefono LIKE ? OR direccion LIKE ?)";
-        $whereParams[] = "%$search%";
-        $whereParams[] = "%$search%";
-        $whereParams[] = "%$search%";
-        $whereParams[] = "%$search%";
-    }
-    if (!empty($statusFilter)) {
-        $whereConditions[] = "estado = ?";
-        $whereParams[] = $statusFilter;
-    }
-    if (!empty($transportistaFilter)) {
-        $whereConditions[] = "transportista = ?";
-        $whereParams[] = $transportistaFilter;
-    }
-    if (!empty($startDate)) {
-        $whereConditions[] = "fecha_creacion >= ?";
-        $whereParams[] = "$startDate 00:00:00";
-    }
-    if (!empty($endDate)) {
-        $whereConditions[] = "fecha_creacion <= ?";
-        $whereParams[] = "$endDate 23:59:59";
-    }
-
-    $whereClause = !empty($whereConditions) ? " WHERE " . implode(" AND ", $whereConditions) : "";
-
-    $ordersSql = "SELECT 
-            suborder_number AS id,
-            marketplace,
-            fecha_creacion,
-            fecha_entrega,
-            delivery_option,
-            printed,
-            cliente,
-            telefono,
-            direccion,
-            productos,
-            total,
-            estado,
-            transportista,
-            num_seguimiento
-        FROM (
-            SELECT suborder_number, 'WALLMART' as marketplace, fecha_creacion, fecha_entrega, delivery_option, printed, cliente, telefono, direccion, productos, total, estado, transportista, num_seguimiento FROM Orders_WALLMART
-            UNION ALL 
-            SELECT suborder_number, 'RIPLEY', fecha_creacion, fecha_entrega, delivery_option, printed, cliente, telefono, direccion, productos, total, estado, transportista, num_seguimiento FROM Orders_RIPLEY
-            UNION ALL 
-            SELECT suborder_number, 'FALABELLA', fecha_creacion, fecha_entrega, delivery_option, printed, cliente, telefono, direccion, productos, total, estado, transportista, num_seguimiento FROM Orders_FALABELLA
-            UNION ALL 
-            SELECT suborder_number, 'MERCADO_LIBRE', fecha_creacion, fecha_entrega, delivery_option, printed, cliente, telefono, direccion, productos, total, estado, transportista, num_seguimiento FROM Orders_MERCADO_LIBRE
-            UNION ALL 
-            SELECT suborder_number, 'PARIS', fecha_creacion, fecha_entrega, delivery_option, printed, cliente, telefono, direccion, productos, total, estado, transportista, num_seguimiento FROM Orders_PARIS
-            UNION ALL 
-            SELECT suborder_number, 'WOOCOMMERCE', fecha_creacion, fecha_entrega, delivery_option, printed, cliente, telefono, direccion, productos, total, estado, transportista, num_seguimiento FROM Orders_WOOCOMMERCE
-        ) as all_orders" .
-        $whereClause .
-        " ORDER BY fecha_creacion DESC
-          LIMIT $limit OFFSET $offset";
-
-    $ordersStatement = $this->dbAdapter->createStatement($ordersSql);
-    $ordersResult = $ordersStatement->execute($whereParams);
-
-    $orders = [];
-    foreach ($ordersResult as $row) {
-        $orders[] = $row;
-    }
-
-    return new ViewModel([
-        'table' => 'all',
-        'orders' => $orders,
-        'stats' => $stats,
-        'page' => $page,
-        'limit' => $limit,
-        'search' => $search,
-        'statusFilter' => $statusFilter,
-        'transportistaFilter' => $transportistaFilter,
-        'startDate' => $startDate,
-        'endDate' => $endDate
-    ]);
-}
-
-    
-    
     
     /**
      * Acción para visualizar las órdenes de un marketplace específico
@@ -1606,144 +1469,969 @@ public function ordersAction()
         ];
     }
     
-    public function orderDetailAction()
-    {
-        $redirect = $this->checkAuth();
-        if ($redirect !== null) {
-            return $redirect;
+
+    public function testRoutesAction()
+{
+    $router = $this->getEvent()->getRouter();
+    $routes = $router->getRoutes();
+    
+    echo "<pre>";
+    foreach ($routes as $name => $route) {
+        echo "Ruta: $name\n";
+        if ($route instanceof \Laminas\Router\Http\Segment) {
+            echo "  Tipo: Segment\n";
+            echo "  Ruta: " . $route->getOptions()['route'] . "\n";
         }
+        echo "\n";
+    }
+    echo "</pre>";
     
-        $orderId = $this->params()->fromRoute('id', null);
-        $table = $this->params()->fromRoute('table', null);
-    
-        if (!$orderId || !$table) {
-            return $this->redirect()->toRoute('application', ['action' => 'orders']);
-        }
-    
-        if (strpos($table, 'Orders_') !== 0) {
-            return $this->redirect()->toRoute('application', ['action' => 'orders']);
-        }
-    
-        $sql = "SELECT * FROM `$table` WHERE suborder_number = ?";
-        $statement = $this->dbAdapter->createStatement($sql);
-        $result = $statement->execute([$orderId]);
-        $order = $result->current();
-    
+    die();
+}
+
+
+public function orderDetailAction()
+{
+    $orderId = $this->params()->fromRoute('id', null);
+    $table = $this->params()->fromRoute('table', null);
+
+    if (!$orderId || !$table) {
+        return $this->redirect()->toRoute('application', ['action' => 'orders-detail']);
+    }
+
+    if (strpos($table, 'Orders_') !== 0) {
+        return $this->redirect()->toRoute('application', ['action' => 'orders-detail']);
+    }
+
+    try {
+        // Obtener datos básicos de la orden de la tabla Orders_
+        $orderSql = "SELECT * FROM `$table` WHERE suborder_number = ?";
+        $orderStatement = $this->dbAdapter->createStatement($orderSql);
+        $orderResult = $orderStatement->execute([$orderId]);
+        $order = $orderResult->current();
+
         if (!$order) {
-            return $this->redirect()->toRoute('application', ['action' => 'orders-detail', 'table' => $table]);
+            return $this->redirect()->toRoute('application', [
+                'action' => 'orders-detail', 
+                'table' => $table
+            ]);
         }
+
+        // Obtener detalles adicionales de la tabla MKP_PARIS
+        $marketplace = str_replace('Orders_', '', $table);
+        $mkpTable = 'MKP_' . $marketplace;
+        
+        $mkpSql = "SELECT * FROM `$mkpTable` WHERE numero_suborden = ?";
+        $mkpStatement = $this->dbAdapter->createStatement($mkpSql);
+        $mkpResult = $mkpStatement->execute([$orderId]);
+        $mkpData = $mkpResult->current();
+
+        // Combinar datos
+        $orderDetail = array_merge((array)$order, (array)$mkpData);
+
+        // Procesar productos
+        $products = $this->processOrderProducts($order, $mkpData);
+
+        // Cálculos financieros
+        $subtotal = 0;
+        foreach ($products as $product) {
+            $subtotal += $product['subtotal'];
+        }
+        
+        $impuesto = $orderDetail['monto_impuesto_boleta'] ?? 0;
+        $total = $orderDetail['monto_total_boleta'] ?? 0;
+        $envio = $orderDetail['costo'] ?? 0;
+
+        // Información de entrega
+        $deliveryInfo = [
+            'transportista' => $orderDetail['transportista'] ?? 'Sin asignar',
+            'numero_seguimiento' => $orderDetail['num_seguimiento'] ?? '',
+            'fecha_entrega' => $orderDetail['fecha_entrega'] ?? '',
+        ];
+
+        // Información de cliente
+        $clientInfo = [
+            'nombre' => $orderDetail['nombre_cliente'] ?? $orderDetail['cliente'] ?? 'N/A',
+            'rut' => $orderDetail['rut_cliente'] ?? 'N/A',
+            'telefono' => $orderDetail['telefono_cliente'] ?? $orderDetail['telefono'] ?? 'N/A',
+            'direccion' => $orderDetail['direccion'] ?? 'N/A'
+        ];
+
+        return new ViewModel([
+            'order' => $orderDetail,
+            'products' => $products,
+            'subtotal' => $subtotal,
+            'impuesto' => $impuesto,
+            'envio' => $envio,
+            'total' => $total,
+            'deliveryInfo' => $deliveryInfo,
+            'clientInfo' => $clientInfo,
+            'table' => $table,
+            'marketplace' => $marketplace
+        ]);
+
+    } catch (\Exception $e) {
+        // Log del error
+        error_log("Error en orderDetailAction: " . $e->getMessage());
+        return $this->redirect()->toRoute('application', [
+            'action' => 'orders', 
+            'error' => 'database'
+        ]);
+    }
+}
+
+
+private function processOrderProducts($order, $mkpData)
+{
+    $products = [];
     
-        $productsSql = "SELECT * FROM `{$table}_Items` WHERE order_id = ?";
-        $productsStatement = $this->dbAdapter->createStatement($productsSql);
+    // Obtener SKU directamente de la tabla Orders
+    $orderSku = $order['sku'] ?? null;
     
-        try {
-            $productsResult = $productsStatement->execute([$orderId]);
-            $products = [];
-            foreach ($productsResult as $product) {
-                $products[] = $product;
-            }
-        } catch (\Exception $e) {
-            $products = [];
-            $productStrings = explode(',', $order['productos'] ?? '');
+    // Si tenemos un SKU y un producto
+    if ($orderSku && !empty($order['productos'])) {
+        // No dividir el SKU, mantenerlo como está para mostrarlo en una sola línea
+        $productName = $order['productos'];
+        
+        $products[] = [
+            'id' => 1,
+            'nombre' => $productName,
+            'sku' => $orderSku, // Mantener el SKU original con la coma
+            'cantidad' => 1,
+            'precio_unitario' => $order['total'] ?? 0,
+            'subtotal' => $order['total'] ?? 0,
+            'procesado' => $order['procesado'] ?? 0
+        ];
+        
+        // Si ya hemos procesado el producto, retornamos
+        if (!empty($products)) {
+            return $products;
+        }
+    }
+    
+    // Código de respaldo por si lo anterior no funciona
+    // Primero verificar si productos está en formato JSON
+    if (!empty($order['productos']) && is_string($order['productos'])) {
+        // Intentar decodificar JSON
+        $jsonProducts = json_decode($order['productos'], true);
+        
+        if (json_last_error() === JSON_ERROR_NONE && is_array($jsonProducts)) {
+            // Ya tenemos productos en formato JSON
+            $products = $jsonProducts;
+        } else {
+            // Si no es JSON, procesar como cadena de productos
+            $productStrings = explode(',', $order['productos']);
             foreach ($productStrings as $i => $productString) {
-                if (!empty(trim($productString))) {
+                $productString = trim($productString);
+                if (!empty($productString)) {
                     $products[] = [
                         'id' => $i + 1,
-                        'nombre' => trim($productString),
-                        'sku' => 'SKU-' . str_pad((string)($i + 1), 6, '0', STR_PAD_LEFT),
+                        'nombre' => $productString,
+                        'sku' => $orderSku ?? 'SKU-' . str_pad((string)($i + 1), 6, '0', STR_PAD_LEFT),
                         'cantidad' => 1,
-                        'precio_unitario' => ($order['total'] ?? 0) / count(array_filter($productStrings)),
-                        'subtotal' => ($order['total'] ?? 0) / count(array_filter($productStrings))
+                        'precio_unitario' => $order['precio_base'] ?? $order['total'] ?? 0,
+                        'subtotal' => $order['precio_base'] ?? $order['total'] ?? 0,
+                        'procesado' => $order['procesado'] ?? 0
                     ];
                 }
             }
         }
-    
-        $subtotal = array_sum(array_column($products, 'subtotal'));
-        $envio = isset($order['costo_envio']) ? $order['costo_envio'] : 3990;
-        $total = $subtotal + $envio;
-    
-        return new ViewModel([
-            'order' => $order,
-            'products' => $products,
-            'subtotal' => $subtotal,
-            'envio' => $envio,
-            'total' => $total,
-            'table' => $table
-        ]);
     }
     
+    // Si no hay productos o el array está vacío, usar datos de MKP
+    if (empty($products) && $mkpData) {
+        $products[] = [
+            'id' => 1,
+            'nombre' => $mkpData['productos'] ?? $order['productos'] ?? 'Sin nombre',
+            'sku' => $mkpData['sku'] ?? $orderSku ?? 'N/A',
+            'cantidad' => 1,
+            'precio_unitario' => $mkpData['precio_base'] ?? $order['total'] ?? 0,
+            'subtotal' => $mkpData['precio_base'] ?? $order['total'] ?? 0,
+            'procesado' => $order['procesado'] ?? 0
+        ];
+    }
     
-    /**
-     * Acción para procesar cambios de estado de órdenes
-     */
-    public function updateOrderStatusAction()
-    {
-        // Verificar autenticación
-        $redirect = $this->checkAuth();
-        if ($redirect !== null) {
-            return $redirect;
+    // Si después de todo no hay productos, crear uno genérico
+    if (empty($products)) {
+        $products[] = [
+            'id' => 1,
+            'nombre' => $order['productos'] ?? 'Producto sin nombre',
+            'sku' => $orderSku ?? 'N/A',
+            'cantidad' => 1,
+            'precio_unitario' => $order['total'] ?? 0,
+            'subtotal' => $order['total'] ?? 0,
+            'procesado' => $order['procesado'] ?? 0
+        ];
+    }
+    
+    return $products;
+}
+
+/**
+ * Acción para buscar un producto por código EAN mejorada con mejor manejo de coincidencias
+ * REEMPLAZAR la función searchEanAction() existente con esta versión
+ */
+public function searchEanAction()
+{
+    // Configurar cabeceras para respuesta JSON
+    $response = $this->getResponse();
+    $response->getHeaders()->addHeaderLine('Content-Type', 'application/json');
+    
+    // Permitir solo peticiones AJAX con método POST
+    $request = $this->getRequest();
+    if (!$request->isXmlHttpRequest() || !$request->isPost()) {
+        $response->setContent(json_encode([
+            'success' => false,
+            'message' => 'Método no permitido'
+        ]));
+        return $response;
+    }
+    
+    // Obtener parámetros JSON del cuerpo de la petición
+    $data = json_decode($request->getContent(), true);
+    $ean = $data['ean'] ?? '';
+    $orderId = $data['orderId'] ?? '';
+    $table = $data['table'] ?? '';
+    
+    if (empty($ean)) {
+        $response->setContent(json_encode([
+            'success' => false,
+            'message' => 'EAN no especificado'
+        ]));
+        return $response;
+    }
+    
+    // Limpiar el código EAN de posibles espacios o caracteres no deseados
+    $ean = trim($ean);
+    
+    // Registrar la búsqueda para fines de depuración
+    error_log("Buscando EAN: " . $ean . " para orden: " . $orderId . " en tabla: " . $table);
+    
+    try {
+        // Obtener detalles de la orden incluyendo productos
+        $orderProducts = $this->getOrderProducts($orderId, $table);
+        
+        // Buscar el producto en la base de datos
+        $product = $this->findProductByEan($ean);
+        
+        // Si no se encuentra, intentar con variaciones del EAN
+        if (!$product) {
+            error_log("Producto no encontrado con EAN exacto, intentando alternativas...");
+            $product = $this->findProductWithAlternativeMethods($ean);
         }
         
-        if (!$this->getRequest()->isPost()) {
-            return $this->jsonResponse(['success' => false, 'message' => 'Se requiere método POST']);
-        }
-        
-        $orderId = $this->params()->fromPost('orderId', null);
-        $table = $this->params()->fromPost('table', null);
-        $newStatus = $this->params()->fromPost('newStatus', null);
-        $notes = $this->params()->fromPost('notes', '');
-        $notifyCustomer = (bool) $this->params()->fromPost('notifyCustomer', false);
-        
-        if (!$orderId || !$table || !$newStatus) {
-            return $this->jsonResponse(['success' => false, 'message' => 'Faltan parámetros requeridos']);
-        }
-        
-        // Validar tabla
-        if (strpos($table, 'Orders_') !== 0) {
-            return $this->jsonResponse(['success' => false, 'message' => 'Tabla inválida']);
-        }
-        
-        // Validar estado
-        $validStates = ['Nueva', 'En Proceso', 'Enviada', 'Entregada', 'Pendiente de Pago', 'Cancelada', 'Devuelta'];
-        if (!in_array($newStatus, $validStates)) {
-            return $this->jsonResponse(['success' => false, 'message' => 'Estado inválido']);
-        }
-        
-        try {
-            // Actualizar estado de la orden
-            $sql = "UPDATE `$table` SET estado = ?, updated_at = NOW() WHERE id = ?";
-            $statement = $this->dbAdapter->createStatement($sql);
-            $result = $statement->execute([$newStatus, $orderId]);
+        // Si se encontró el producto
+        if ($product) {
+            error_log("Producto encontrado: " . json_encode($product));
             
-            // Registrar el cambio en el historial
-            $historySql = "INSERT INTO order_status_history (order_id, table_name, status, notes, created_at) 
-                          VALUES (?, ?, ?, ?, NOW())";
-            $historyStatement = $this->dbAdapter->createStatement($historySql);
-            $historyResult = $historyStatement->execute([$orderId, $table, $newStatus, $notes]);
+            // Verificar si este producto pertenece a la orden
+            $belongsToOrder = false;
+            $matchInfo = null;
             
-            // Si se debe notificar al cliente
-            if ($notifyCustomer) {
-                // Aquí iría la lógica para enviar un email al cliente
-                // Por ahora solo registramos la intención
-                $notifySql = "INSERT INTO order_notifications (order_id, table_name, notification_type, status, created_at) 
-                             VALUES (?, ?, 'email', ?, NOW())";
-                $notifyStatement = $this->dbAdapter->createStatement($notifySql);
-                $notifyResult = $notifyStatement->execute([$orderId, $table, $newStatus]);
+            if (!empty($orderProducts)) {
+                // Buscar coincidencias exactas o parciales
+                $matchInfo = $this->findProductMatchInOrder($product, $orderProducts);
+                $belongsToOrder = $matchInfo['found'];
             }
             
-            return $this->jsonResponse([
-                'success' => true, 
-                'message' => 'Estado actualizado correctamente',
-                'newStatus' => $newStatus
-            ]);
-        } catch (\Exception $e) {
-            return $this->jsonResponse([
-                'success' => false, 
-                'message' => 'Error al actualizar estado: ' . $e->getMessage()
-            ]);
+            // Construir respuesta
+            $response->setContent(json_encode([
+                'success' => true,
+                'found' => true,
+                'sku' => $product['code'],
+                'ean' => $ean,
+                'productName' => $product['product_name'] . ' - ' . $product['description'],
+                'productId' => $product['product_id'],
+                'inOrder' => $belongsToOrder,
+                'matchType' => $belongsToOrder ? $matchInfo['matchType'] : 'none',
+                'orderSku' => $belongsToOrder ? $matchInfo['orderSku'] : null,
+                'suggestions' => $belongsToOrder ? null : $this->getSimilarProducts($product)
+            ]));
+            return $response;
+        }
+        
+        // Si llegamos aquí, el producto no se encontró
+        error_log("No se encontró ningún producto con EAN: " . $ean);
+        $response->setContent(json_encode([
+            'success' => true,
+            'found' => false,
+            'message' => 'No se encontró ningún producto con el EAN: ' . $ean
+        ]));
+        return $response;
+    } catch (\Exception $e) {
+        error_log('Error al buscar EAN: ' . $e->getMessage());
+        
+        $response->setContent(json_encode([
+            'success' => false,
+            'message' => 'Error al buscar el producto: ' . $e->getMessage()
+        ]));
+        return $response;
+    }
+}
+
+/**
+ * Obtiene los productos de una orden específica
+ * AÑADIR como método privado en el controlador
+ */
+private function getOrderProducts($orderId, $table)
+{
+    if (empty($orderId) || empty($table)) {
+        return [];
+    }
+    
+    try {
+        // Obtener los productos de la orden
+        $orderSql = "SELECT id, suborder_number, productos, sku FROM {$table} WHERE id = ? OR suborder_number = ?";
+        $orderStatement = $this->dbAdapter->createStatement($orderSql);
+        $orderResult = $orderStatement->execute([$orderId, $orderId]);
+        
+        if ($orderResult->count() === 0) {
+            error_log("Orden no encontrada: {$orderId} en tabla {$table}");
+            return [];
+        }
+        
+        $orderData = $orderResult->current();
+        $productos = [];
+        
+        // Intentar procesar productos según el formato
+        if (!empty($orderData['productos'])) {
+            $productosStr = $orderData['productos'];
+            
+            // Intentar como JSON primero
+            $decoded = json_decode($productosStr, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $productos = $decoded;
+            } else {
+                // Interpretar como lista separada por comas
+                $skus = [];
+                
+                // Si hay un SKU en la orden, usarlo
+                if (!empty($orderData['sku'])) {
+                    $skus = explode(',', trim($orderData['sku']));
+                }
+                
+                $productNames = explode(',', $productosStr);
+                
+                foreach ($productNames as $i => $name) {
+                    $productos[] = [
+                        'sku' => isset($skus[$i]) ? trim($skus[$i]) : 'SKU-' . str_pad((string)($i + 1), 6, '0', STR_PAD_LEFT),
+                        'nombre' => trim($name),
+                        'procesado' => 0
+                    ];
+                }
+            }
+        }
+        
+        // Registrar los productos encontrados para depuración
+        error_log("Productos en la orden: " . json_encode($productos));
+        
+        return $productos;
+    } catch (\Exception $e) {
+        error_log("Error al obtener productos de la orden: " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Busca un producto por código EAN en la base de datos
+ * AÑADIR como método privado en el controlador
+ */
+private function findProductByEan($ean)
+{
+    // Buscar en la tabla de variantes por código de barras
+    $sql = "SELECT v.id, v.code, v.barCode, v.description, v.product_id, p.name as product_name 
+            FROM bsale_variants v 
+            JOIN bsale_products p ON v.product_id = p.id 
+            WHERE v.barCode = ?";
+    
+    $statement = $this->dbAdapter->createStatement($sql);
+    $result = $statement->execute([$ean]);
+    
+    if ($result->count() > 0) {
+        return $result->current();
+    }
+    
+    // Intentar buscar por código (algunos sistemas guardan el EAN como código)
+    $sql = "SELECT v.id, v.code, v.barCode, v.description, v.product_id, p.name as product_name 
+            FROM bsale_variants v 
+            JOIN bsale_products p ON v.product_id = p.id 
+            WHERE v.code = ?";
+    
+    $statement = $this->dbAdapter->createStatement($sql);
+    $result = $statement->execute([$ean]);
+    
+    if ($result->count() > 0) {
+        return $result->current();
+    }
+    
+    return null;
+}
+
+/**
+ * Intenta encontrar un producto usando métodos alternativos cuando la búsqueda exacta falla
+ * AÑADIR como método privado en el controlador
+ */
+private function findProductWithAlternativeMethods($ean)
+{
+    // 1. Intentar con los últimos dígitos (para códigos con prefijos variables)
+    if (strlen($ean) > 6) {
+        $lastDigits = substr($ean, -6);
+        $sql = "SELECT v.id, v.code, v.barCode, v.description, v.product_id, p.name as product_name 
+                FROM bsale_variants v 
+                JOIN bsale_products p ON v.product_id = p.id 
+                WHERE v.barCode LIKE ? OR v.code LIKE ?";
+        
+        $statement = $this->dbAdapter->createStatement($sql);
+        $result = $statement->execute(['%' . $lastDigits, '%' . $lastDigits]);
+        
+        if ($result->count() > 0) {
+            $product = $result->current();
+            // Actualizar el código original para mantener consistencia
+            $product['originalEan'] = $ean;
+            return $product;
         }
     }
+    
+    // 2. Buscar códigos similares (por ejemplo, con errores tipográficos)
+    // Esto busca códigos que difieran en un solo carácter
+    for ($i = 0; $i < strlen($ean); $i++) {
+        $pattern = substr($ean, 0, $i) . '_' . substr($ean, $i + 1);
+        
+        $sql = "SELECT v.id, v.code, v.barCode, v.description, v.product_id, p.name as product_name 
+                FROM bsale_variants v 
+                JOIN bsale_products p ON v.product_id = p.id 
+                WHERE v.barCode LIKE ? OR v.code LIKE ?";
+        
+        $statement = $this->dbAdapter->createStatement($sql);
+        $result = $statement->execute([$pattern, $pattern]);
+        
+        if ($result->count() > 0) {
+            $product = $result->current();
+            $product['originalEan'] = $ean;
+            return $product;
+        }
+    }
+    
+    // 3. Intentar buscar por nombre parcial si el EAN parece contener texto
+    if (!is_numeric($ean) && strlen($ean) > 3) {
+        $sql = "SELECT v.id, v.code, v.barCode, v.description, v.product_id, p.name as product_name 
+                FROM bsale_variants v 
+                JOIN bsale_products p ON v.product_id = p.id 
+                WHERE p.name LIKE ? OR v.description LIKE ?";
+        
+        $statement = $this->dbAdapter->createStatement($sql);
+        $result = $statement->execute(['%' . $ean . '%', '%' . $ean . '%']);
+        
+        if ($result->count() > 0) {
+            $product = $result->current();
+            $product['originalEan'] = $ean;
+            return $product;
+        }
+    }
+    
+    return null;
+}
+
+/**
+ * Busca coincidencias de un producto en los productos de una orden
+ * AÑADIR como método privado en el controlador
+ */
+private function findProductMatchInOrder($product, $orderProducts)
+{
+    $productCode = $product['code'];
+    $productBarCode = $product['barCode'];
+    $productName = strtolower($product['product_name'] . ' ' . $product['description']);
+    
+    // Resultado predeterminado
+    $result = [
+        'found' => false,
+        'matchType' => 'none',
+        'orderSku' => null,
+        'confidence' => 0
+    ];
+    
+    foreach ($orderProducts as $orderProduct) {
+        $orderSku = isset($orderProduct['sku']) ? trim($orderProduct['sku']) : '';
+        $orderName = isset($orderProduct['nombre']) ? strtolower(trim($orderProduct['nombre'])) : '';
+        
+        // 1. Coincidencia exacta por SKU
+        if (!empty($orderSku) && ($orderSku === $productCode || $orderSku === $productBarCode)) {
+            return [
+                'found' => true,
+                'matchType' => 'exact_sku',
+                'orderSku' => $orderSku,
+                'confidence' => 100
+            ];
+        }
+        
+        // 2. Coincidencia por nombre exacto
+        if (!empty($orderName) && $orderName === $productName) {
+            return [
+                'found' => true,
+                'matchType' => 'exact_name',
+                'orderSku' => $orderSku,
+                'confidence' => 95
+            ];
+        }
+        
+        // 3. Coincidencia parcial por SKU
+        if (!empty($orderSku) && (
+            strpos($orderSku, $productCode) !== false || 
+            strpos($productCode, $orderSku) !== false
+        )) {
+            $confidence = min(strlen($orderSku), strlen($productCode)) / max(strlen($orderSku), strlen($productCode)) * 90;
+            
+            if ($confidence > $result['confidence']) {
+                $result = [
+                    'found' => true,
+                    'matchType' => 'partial_sku',
+                    'orderSku' => $orderSku,
+                    'confidence' => $confidence
+                ];
+            }
+        }
+        
+        // 4. Coincidencia por nombre parcial
+        if (!empty($orderName) && !empty($productName)) {
+            // Verificar coincidencia de palabras clave
+            $productWords = explode(' ', $productName);
+            $orderWords = explode(' ', $orderName);
+            
+            $commonWords = array_intersect($productWords, $orderWords);
+            $wordMatchRatio = count($commonWords) / max(count($productWords), count($orderWords));
+            
+            $confidence = $wordMatchRatio * 85;
+            
+            if ($confidence > $result['confidence']) {
+                $result = [
+                    'found' => true,
+                    'matchType' => 'partial_name',
+                    'orderSku' => $orderSku,
+                    'confidence' => $confidence
+                ];
+            }
+            
+            // Verificar si el nombre del producto contiene el nombre de la orden o viceversa
+            if (strpos($productName, $orderName) !== false || strpos($orderName, $productName) !== false) {
+                $confidence = min(strlen($orderName), strlen($productName)) / max(strlen($orderName), strlen($productName)) * 80;
+                
+                if ($confidence > $result['confidence']) {
+                    $result = [
+                        'found' => true,
+                        'matchType' => 'contained_name',
+                        'orderSku' => $orderSku,
+                        'confidence' => $confidence
+                    ];
+                }
+            }
+        }
+    }
+    
+    // Solo considerar como coincidencia si la confianza es superior al 60%
+    if ($result['confidence'] < 60) {
+        $result['found'] = false;
+    }
+    
+    return $result;
+}
+
+/**
+ * Obtiene productos similares para sugerir
+ * AÑADIR como método privado en el controlador
+ */
+private function getSimilarProducts($product)
+{
+    try {
+        $productName = $product['product_name'];
+        $brandName = explode(' ', $productName)[0]; // Utiliza la primera palabra como marca
+        
+        $sql = "SELECT v.code, p.name as product_name, v.description
+                FROM bsale_variants v
+                JOIN bsale_products p ON v.product_id = p.id
+                WHERE p.name LIKE ?
+                LIMIT 5";
+        
+        $statement = $this->dbAdapter->createStatement($sql);
+        $result = $statement->execute(['%' . $brandName . '%']);
+        
+        $suggestions = [];
+        foreach ($result as $row) {
+            $suggestions[] = [
+                'sku' => $row['code'],
+                'name' => $row['product_name'] . ' - ' . $row['description']
+            ];
+        }
+        
+        return $suggestions;
+    } catch (\Exception $e) {
+        error_log("Error al obtener productos similares: " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Función para obtener el nombre de un producto por su SKU
+ * AÑADIR como método privado en el controlador
+ */
+private function getProductNameBySku($sku)
+{
+    try {
+        $sql = "SELECT v.code, p.name as product_name, v.description 
+                FROM bsale_variants v 
+                JOIN bsale_products p ON v.product_id = p.id 
+                WHERE v.code = ?";
+        
+        $statement = $this->dbAdapter->createStatement($sql);
+        $result = $statement->execute([$sku]);
+        
+        if ($result->count() > 0) {
+            $row = $result->current();
+            return $row['product_name'] . ' - ' . $row['description'];
+        }
+        
+        return null;
+    } catch (\Exception $e) {
+        error_log("Error al obtener nombre de producto: " . $e->getMessage());
+        return null;
+    }
+}
+
+/**
+ * Compara dos nombres de productos para ver si están relacionados
+ * AÑADIR como método privado en el controlador
+ */
+private function areNamesRelated($name1, $name2)
+{
+    $name1 = strtolower(trim($name1));
+    $name2 = strtolower(trim($name2));
+    
+    // 1. Coincidencia exacta
+    if ($name1 === $name2) {
+        return true;
+    }
+    
+    // 2. Uno contiene al otro
+    if (strpos($name1, $name2) !== false || strpos($name2, $name1) !== false) {
+        return true;
+    }
+    
+    // 3. Palabras clave comunes (ignorando palabras comunes)
+    $commonWords = ['el', 'la', 'los', 'las', 'de', 'del', 'para', 'por', 'con', 'y', 'o', 'a', 'al', 'en'];
+    
+    $words1 = array_filter(explode(' ', $name1), function($word) use ($commonWords) {
+        return !in_array($word, $commonWords) && strlen($word) > 2;
+    });
+    
+    $words2 = array_filter(explode(' ', $name2), function($word) use ($commonWords) {
+        return !in_array($word, $commonWords) && strlen($word) > 2;
+    });
+    
+    $commonKeywords = array_intersect($words1, $words2);
+    
+    // Si hay al menos 2 palabras clave en común o más del 50% de coincidencia
+    return count($commonKeywords) >= 2 || 
+           (count($words1) > 0 && count($words2) > 0 && 
+            count($commonKeywords) / min(count($words1), count($words2)) >= 0.5);
+}
+
+/**
+ * Obtiene información detallada de un producto por su SKU
+ * AÑADIR como método privado en el controlador
+ */
+private function getDetailedProductInfo($sku)
+{
+    try {
+        $sql = "SELECT v.code, p.name as product_name, v.description, v.price
+                FROM bsale_variants v 
+                JOIN bsale_products p ON v.product_id = p.id 
+                WHERE v.code = ?";
+        
+        $statement = $this->dbAdapter->createStatement($sql);
+        $result = $statement->execute([$sku]);
+        
+        if ($result->count() > 0) {
+            $row = $result->current();
+            return [
+                'sku' => $row['code'],
+                'nombre' => $row['product_name'] . ' - ' . $row['description'],
+                'precio' => $row['price'] ?? 0
+            ];
+        }
+        
+        return null;
+    } catch (\Exception $e) {
+        error_log("Error al obtener información detallada del producto: " . $e->getMessage());
+        return null;
+    }
+}
+
+/**
+ * REEMPLAZAR la función markProductProcessedAction() existente con esta versión
+ * Acción para marcar un producto específico como procesado en una orden
+ */
+public function markProductProcessedAction()
+{
+    // Configurar cabeceras para respuesta JSON
+    $response = $this->getResponse();
+    $response->getHeaders()->addHeaderLine('Content-Type', 'application/json');
+    
+    // Permitir solo peticiones AJAX con método POST
+    $request = $this->getRequest();
+    if (!$request->isXmlHttpRequest() || !$request->isPost()) {
+        $response->setContent(json_encode([
+            'success' => false,
+            'message' => 'Método no permitido'
+        ]));
+        return $response;
+    }
+    
+    // Obtener parámetros JSON del cuerpo de la petición
+    $data = json_decode($request->getContent(), true);
+    $orderId = $data['orderId'] ?? '';
+    $table = $data['table'] ?? '';
+    $sku = $data['sku'] ?? '';
+    $orderSku = $data['orderSku'] ?? $sku; // Usar orderSku si está disponible, sino usar sku
+    
+    if (empty($orderId) || empty($table) || empty($sku)) {
+        $response->setContent(json_encode([
+            'success' => false,
+            'message' => 'Parámetros incompletos'
+        ]));
+        return $response;
+    }
+    
+    try {
+        // Primero obtenemos la orden para acceder a los productos
+        $sql = "SELECT id, productos FROM {$table} WHERE id = ? OR suborder_number = ?";
+        $statement = $this->dbAdapter->createStatement($sql);
+        $result = $statement->execute([$orderId, $orderId]);
+        
+        if ($result->count() === 0) {
+            $response->setContent(json_encode([
+                'success' => false,
+                'message' => 'Orden no encontrada'
+            ]));
+            return $response;
+        }
+        
+        $orderData = $result->current();
+        $orderRealId = $orderData['id']; // Guardamos el ID real de la orden
+        $productosStr = $orderData['productos'] ?? '';
+        
+        // Decodificar los productos (puede ser JSON o string)
+        $productos = json_decode($productosStr, true);
+        $updated = false;
+        
+        if (json_last_error() === JSON_ERROR_NONE && is_array($productos)) {
+            // Es un JSON válido
+            foreach ($productos as $key => $producto) {
+                // Comprobar coincidencia exacta o parcial
+                if (
+                    (isset($producto['sku']) && $producto['sku'] === $orderSku) ||
+                    (isset($producto['sku']) && $producto['sku'] === $sku) ||
+                    (isset($producto['sku']) && strpos($producto['sku'], $sku) !== false) ||
+                    (isset($producto['sku']) && strpos($sku, $producto['sku']) !== false)
+                ) {
+                    $productos[$key]['procesado'] = 1;
+                    $updated = true;
+                    break;
+                }
+            }
+            
+            if ($updated) {
+                // Actualizar la orden con los productos procesados
+                $updateSql = "UPDATE {$table} SET productos = ? WHERE id = ?";
+                $updateStatement = $this->dbAdapter->createStatement($updateSql);
+                $updateStatement->execute([json_encode($productos), $orderRealId]);
+                
+                // Verificar si todos los productos están procesados
+                $allProcessed = true;
+                foreach ($productos as $producto) {
+                    if (!isset($producto['procesado']) || $producto['procesado'] != 1) {
+                        $allProcessed = false;
+                        break;
+                    }
+                }
+                
+                // Si todos los productos están procesados, actualizar estado general
+                if ($allProcessed) {
+                    $updateOrderSql = "UPDATE {$table} SET procesado = 1 WHERE id = ?";
+                    $updateOrderStatement = $this->dbAdapter->createStatement($updateOrderSql);
+                    $updateOrderStatement->execute([$orderRealId]);
+                }
+                
+                $response->setContent(json_encode([
+                    'success' => true, 
+                    'message' => 'Producto marcado como procesado',
+                    'allProcessed' => $allProcessed
+                ]));
+                return $response;
+            } else {
+                // Si no se actualizó ningún producto, intentamos con una búsqueda más flexible
+                // Comparar nombres en lugar de SKUs
+                foreach ($productos as $key => $producto) {
+                    if (isset($producto['nombre'])) {
+                        // Obtener el nombre del producto escaneado
+                        $scannedProductName = $this->getProductNameBySku($sku);
+                        
+                        if ($scannedProductName && $this->areNamesRelated($producto['nombre'], $scannedProductName)) {
+                            $productos[$key]['procesado'] = 1;
+                            $updated = true;
+                            break;
+                        }
+                    }
+                }
+                
+                if ($updated) {
+                    // Actualizar la orden
+                    $updateSql = "UPDATE {$table} SET productos = ? WHERE id = ?";
+                    $updateStatement = $this->dbAdapter->createStatement($updateSql);
+                    $updateStatement->execute([json_encode($productos), $orderRealId]);
+                    
+                    // Verificar si todos los productos están procesados
+                    $allProcessed = true;
+                    foreach ($productos as $producto) {
+                        if (!isset($producto['procesado']) || $producto['procesado'] != 1) {
+                            $allProcessed = false;
+                            break;
+                        }
+                    }
+                    
+                    if ($allProcessed) {
+                        $updateOrderSql = "UPDATE {$table} SET procesado = 1 WHERE id = ?";
+                        $updateOrderStatement = $this->dbAdapter->createStatement($updateOrderSql);
+                        $updateOrderStatement->execute([$orderRealId]);
+                    }
+                    
+                    $response->setContent(json_encode([
+                        'success' => true, 
+                        'message' => 'Producto marcado como procesado (coincidencia de nombre)',
+                        'allProcessed' => $allProcessed
+                    ]));
+                    return $response;
+                } else {
+                    // Si aún no hay coincidencia, agregamos el producto a la orden
+                    $scannedProductInfo = $this->getDetailedProductInfo($sku);
+                    
+                    if ($scannedProductInfo) {
+                        $productos[] = [
+                            'sku' => $sku,
+                            'nombre' => $scannedProductInfo['nombre'],
+                            'cantidad' => 1,
+                            'precio_unitario' => $scannedProductInfo['precio'] ?? 0,
+                            'subtotal' => $scannedProductInfo['precio'] ?? 0,
+                            'procesado' => 1,
+                            'added_manually' => true
+                        ];
+                        
+                        $updateSql = "UPDATE {$table} SET productos = ? WHERE id = ?";
+                        $updateStatement = $this->dbAdapter->createStatement($updateSql);
+                        $updateStatement->execute([json_encode($productos), $orderRealId]);
+                        
+                        $response->setContent(json_encode([
+                            'success' => true, 
+                            'message' => 'Producto añadido a la orden y marcado como procesado',
+                            'allProcessed' => false,
+                            'productAdded' => true,
+                            'productName' => $scannedProductInfo['nombre']
+                        ]));
+                        return $response;
+                    }
+                    
+                    $response->setContent(json_encode([
+                        'success' => false,
+                        'message' => 'Producto no encontrado en la orden y no se pudo añadir'
+                    ]));
+                    return $response;
+                }
+            }
+        } else {
+            // No es un JSON válido, convertimos el campo de texto a formato JSON
+            $productNames = explode(',', $productosStr);
+            $productos = [];
+            
+            foreach ($productNames as $i => $nombre) {
+                $productoSku = 'SKU-' . str_pad((string)($i + 1), 6, '0', STR_PAD_LEFT);
+                $procesado = (strpos(strtolower(trim($nombre)), strtolower($sku)) !== false) ? 1 : 0;
+                
+                if ($procesado === 1) {
+                    $updated = true;
+                }
+                
+                $productos[] = [
+                    'sku' => $productoSku,
+                    'nombre' => trim($nombre),
+                    'cantidad' => 1,
+                    'precio_unitario' => 0,
+                    'subtotal' => 0,
+                    'procesado' => $procesado
+                ];
+            }
+            
+            // Si no se encontró coincidencia, agregar el producto escaneado
+            if (!$updated) {
+                $scannedProductInfo = $this->getDetailedProductInfo($sku);
+                
+                if ($scannedProductInfo) {
+                    $productos[] = [
+                        'sku' => $sku,
+                        'nombre' => $scannedProductInfo['nombre'],
+                        'cantidad' => 1,
+                        'precio_unitario' => $scannedProductInfo['precio'] ?? 0,
+                        'subtotal' => $scannedProductInfo['precio'] ?? 0,
+                        'procesado' => 1,
+                        'added_manually' => true
+                    ];
+                    $updated = true;
+                }
+            }
+            
+            if ($updated) {
+                // Actualizar la orden con el formato JSON
+                $updateSql = "UPDATE {$table} SET productos = ? WHERE id = ?";
+                $updateStatement = $this->dbAdapter->createStatement($updateSql);
+                $updateStatement->execute([json_encode($productos), $orderRealId]);
+                
+                // Verificar si todos los productos están procesados
+                $allProcessed = true;
+                foreach ($productos as $producto) {
+                    if (!isset($producto['procesado']) || $producto['procesado'] != 1) {
+                        $allProcessed = false;
+                        break;
+                    }
+                }
+                
+                if ($allProcessed) {
+                    $updateOrderSql = "UPDATE {$table} SET procesado = 1 WHERE id = ?";
+                    $updateOrderStatement = $this->dbAdapter->createStatement($updateOrderSql);
+                    $updateOrderStatement->execute([$orderRealId]);
+                }
+                
+                $response->setContent(json_encode([
+                    'success' => true, 
+                    'message' => 'Productos convertidos a formato JSON y actualizados',
+                    'allProcessed' => $allProcessed
+                ]));
+                return $response;
+            } else {
+                $response->setContent(json_encode([
+                    'success' => false,
+                    'message' => 'No se pudo encontrar o agregar el producto'
+                ]));
+                return $response;
+            }
+        }
+    } catch (\Exception $e) {
+        // Registrar error para depuración
+        error_log('Error al marcar producto como procesado: ' . $e->getMessage());
+        
+        $response->setContent(json_encode([
+            'success' => false,
+            'message' => 'Error al procesar la solicitud: ' . $e->getMessage()
+        ]));
+        return $response;
+    }
+}
     
     /**
      * Acción para actualizar el transportista de una orden

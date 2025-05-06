@@ -634,11 +634,6 @@
                         </a>
                         <ul class="submenu">
                             <li>
-                                <a href="<?= $this->url('application', ['action' => 'orders']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'orders']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
-                                    Todas las órdenes
-                                </a>
-                            </li>
-                            <li>
                                 <a href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_WALLMART']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_WALLMART']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
                                     Walmart
                                 </a>
