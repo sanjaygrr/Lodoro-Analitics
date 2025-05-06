@@ -1310,11 +1310,6 @@ public function detailAction()
         return $response;
     }
 
-
-    
-    /**
-     * Acción para visualizar las órdenes de un marketplace específico
-     */
     public function ordersDetailAction()
     {
         // Verificar autenticación
@@ -1323,149 +1318,232 @@ public function detailAction()
             return $redirect;
         }
         
-        // Obtener el marketplace desde la ruta
+        // Obtain marketplace from route
         $table = $this->params()->fromRoute('table', null);
         if (!$table) {
-            // Si no se especifica, redirigir a la vista de todas las órdenes
             return $this->redirect()->toRoute('application', ['action' => 'orders']);
         }
         
-        // Validar el nombre de la tabla (debe empezar con "Orders_")
+        // Validate table name
         if (strpos($table, 'Orders_') !== 0) {
             return $this->redirect()->toRoute('application', ['action' => 'orders']);
         }
         
-        // Obtener estadísticas para este marketplace
-        $statsSql = "SELECT 
-                        COUNT(*) as total,
-                        SUM(CASE WHEN estado = 'Nueva' THEN 1 ELSE 0 END) as nuevas,
-                        SUM(CASE WHEN estado = 'En Proceso' THEN 1 ELSE 0 END) as en_proceso,
-                        SUM(CASE WHEN estado = 'Enviada' THEN 1 ELSE 0 END) as enviadas,
-                        SUM(CASE WHEN estado = 'Entregada' THEN 1 ELSE 0 END) as entregadas,
-                        SUM(CASE WHEN estado = 'Pendiente de Pago' THEN 1 ELSE 0 END) as pendiente_pago,
-                        SUM(CASE WHEN estado = 'Cancelada' THEN 1 ELSE 0 END) as canceladas,
-                        SUM(CASE WHEN estado = 'Devuelta' THEN 1 ELSE 0 END) as devueltas
-                    FROM `$table`";
-        
-        $statsStatement = $this->dbAdapter->createStatement($statsSql);
-        $statsResult = $statsStatement->execute();
-        $stats = $statsResult->current() ?: [
-            'total' => 0,
-            'nuevas' => 0,
-            'en_proceso' => 0,
-            'enviadas' => 0,
-            'entregadas' => 0,
-            'pendiente_pago' => 0,
-            'canceladas' => 0,
-            'devueltas' => 0
-        ];
-        
-        // Parámetros de paginación
+        // Get pagination parameters and filters
         $page = (int) $this->params()->fromQuery('page', 1);
         $limit = (int) $this->params()->fromQuery('limit', 30);
         
-        // Obtener filtros
+        // Collect all available filters
         $filters = [
             'search' => $this->params()->fromQuery('search', ''),
             'status' => $this->params()->fromQuery('status', ''),
+            'printed' => $this->params()->fromQuery('printed', ''),
             'transportista' => $this->params()->fromQuery('transportista', ''),
             'startDate' => $this->params()->fromQuery('startDate', ''),
             'endDate' => $this->params()->fromQuery('endDate', '')
         ];
         
-        // Obtener órdenes paginadas
-        $paginatedData = $this->getOrdersWithPagination($table, $page, $limit, $filters);
-        
-        // Formatear resultados para la vista
-        $orders = [];
-        foreach ($paginatedData['orders'] as $row) {
-            // Añadir el marketplace a cada registro
-            $row['marketplace'] = str_replace('Orders_', '', $table);
-            $orders[] = $row;
+        try {
+            // Calculate counters for dashboard using specific SQL query with your column structure
+            $countersSql = "SELECT
+                SUM(CASE WHEN printed = 0 AND procesado = 0 THEN 1 ELSE 0 END) AS sin_imprimir,
+                SUM(CASE WHEN printed = 1 AND procesado = 0 THEN 1 ELSE 0 END) AS impresos_no_procesados,
+                SUM(CASE WHEN printed = 1 AND procesado = 1 THEN 1 ELSE 0 END) AS procesados
+            FROM `$table`";
+            
+            $countersStatement = $this->dbAdapter->createStatement($countersSql);
+            $countersResult = $countersStatement->execute();
+            
+            // Get results (handle case of no results)
+            $counters = $countersResult->current();
+            if (!$counters) {
+                $counters = [
+                    'sin_imprimir' => 0,
+                    'impresos_no_procesados' => 0,
+                    'procesados' => 0
+                ];
+            }
+            
+            // Ensure that values are numeric
+            $counters['sin_imprimir'] = (int)($counters['sin_imprimir'] ?? 0);
+            $counters['impresos_no_procesados'] = (int)($counters['impresos_no_procesados'] ?? 0);
+            $counters['procesados'] = (int)($counters['procesados'] ?? 0);
+            
+            // Get paginated orders with applied filters
+            $paginatedData = $this->getOrdersWithPagination($table, $page, $limit, $filters);
+            
+            // Format results for view
+            $orders = [];
+            foreach ($paginatedData['orders'] as $row) {
+                // Add marketplace to each order to facilitate actions
+                $row['marketplace'] = str_replace('Orders_', '', $table);
+                
+                // Ensure that 'printed' is a consistent boolean or numeric value
+                if (isset($row['printed'])) {
+                    $row['printed'] = (int)$row['printed'];
+                }
+                
+                // Process JSON product data if it exists
+                if (isset($row['productos']) && !empty($row['productos'])) {
+                    try {
+                        $productos = json_decode($row['productos'], true);
+                        if (json_last_error() === JSON_ERROR_NONE && is_array($productos)) {
+                            $row['productos'] = $productos;
+                        }
+                    } catch (\Exception $e) {
+                        // Keep products as text if not valid JSON
+                    }
+                }
+                
+                $orders[] = $row;
+            }
+            
+            // Create specific variables for the view from the counters
+            $sinImprimir = $counters['sin_imprimir'];
+            $impresosNoProcesados = $counters['impresos_no_procesados'];
+            $procesados = $counters['procesados'];
+            
+            // Return the view with the data
+            return new ViewModel([
+                'table' => $table,
+                'orders' => $orders,
+                'page' => $paginatedData['page'],
+                'limit' => $paginatedData['limit'],
+                'totalPages' => $paginatedData['totalPages'],
+                'total' => $paginatedData['total'],
+                'search' => $filters['search'],
+                'statusFilter' => $filters['status'],
+                'printedFilter' => $filters['printed'],
+                'transportistaFilter' => $filters['transportista'],
+                'startDate' => $filters['startDate'],
+                'endDate' => $filters['endDate'],
+                // Add specific variables for dashboard counters
+                'sinImprimir' => $sinImprimir,
+                'impresosNoProcesados' => $impresosNoProcesados,
+                'procesados' => $procesados
+            ]);
+        } catch (\Exception $e) {
+            // Error handling - log and display generic message
+            error_log('Error en ordersDetailAction: ' . $e->getMessage());
+            
+            // Create flash message with error
+            $this->flashMessenger()->addErrorMessage('Error al cargar los datos: ' . $e->getMessage());
+            
+            // Return view with empty data
+            return new ViewModel([
+                'table' => $table,
+                'orders' => [],
+                'page' => 1,
+                'limit' => $limit,
+                'totalPages' => 0,
+                'total' => 0,
+                'search' => $filters['search'],
+                'statusFilter' => $filters['status'],
+                'printedFilter' => $filters['printed'],
+                'transportistaFilter' => $filters['transportista'],
+                'startDate' => $filters['startDate'],
+                'endDate' => $filters['endDate'],
+                'sinImprimir' => 0,
+                'impresosNoProcesados' => 0,
+                'procesados' => 0,
+                'error' => true
+            ]);
         }
-        
-        // Devolver la vista con los datos
-        return new ViewModel([
-            'table' => $table,
-            'orders' => $orders,
-            'stats' => $stats,
-            'page' => $paginatedData['page'],
-            'limit' => $paginatedData['limit'],
-            'totalPages' => $paginatedData['totalPages'],
-            'total' => $paginatedData['total'],
-            'search' => $filters['search'],
-            'statusFilter' => $filters['status'],
-            'transportistaFilter' => $filters['transportista'],
-            'startDate' => $filters['startDate'],
-            'endDate' => $filters['endDate']
-        ]);
     }
-
-    /**
-     * Obtiene las órdenes con paginación
-     */
-    private function getOrdersWithPagination($table, $page = 1, $limit = 30, $filters = [])
+    private function getOrdersWithPagination($table, $page, $limit, $filters)
     {
-        // Valores predeterminados
-        $page = max(1, (int)$page);
-        $limit = max(10, min(100, (int)$limit)); // Limitar entre 10 y 100
-        $offset = ($page - 1) * $limit;
+        // Construir la consulta base
+        $sql = "SELECT * FROM `$table` WHERE 1=1";
+        $countSql = "SELECT COUNT(*) as total FROM `$table` WHERE 1=1";
         
-        // Construir condiciones de filtro
-        $whereConditions = [];
-        $whereParams = [];
+        $params = [];
         
+        // Aplicar filtro de búsqueda
         if (!empty($filters['search'])) {
-            $whereConditions[] = "(id LIKE ? OR cliente LIKE ? OR telefono LIKE ? OR direccion LIKE ?)";
-            $searchParam = '%' . $filters['search'] . '%';
-            $whereParams = array_merge($whereParams, [$searchParam, $searchParam, $searchParam, $searchParam]);
+            $searchTerm = '%' . $filters['search'] . '%';
+            $sql .= " AND (suborder_number LIKE ? OR cliente LIKE ? OR productos LIKE ?)";
+            $countSql .= " AND (suborder_number LIKE ? OR cliente LIKE ? OR productos LIKE ?)";
+            $params = array_merge($params, [$searchTerm, $searchTerm, $searchTerm]);
         }
         
+        // Aplicar filtro de estado
         if (!empty($filters['status'])) {
-            $whereConditions[] = "estado = ?";
-            $whereParams[] = $filters['status'];
+            $sql .= " AND estado = ?";
+            $countSql .= " AND estado = ?";
+            $params[] = $filters['status'];
         }
         
+        // Aplicar filtro de impresión (NUEVO)
+        if ($filters['printed'] !== '') {
+            $sql .= " AND printed = ?";
+            $countSql .= " AND printed = ?";
+            $params[] = $filters['printed'];
+        }
+        
+        // Aplicar filtro de transportista
         if (!empty($filters['transportista'])) {
-            $whereConditions[] = "transportista = ?";
-            $whereParams[] = $filters['transportista'];
+            $sql .= " AND transportista = ?";
+            $countSql .= " AND transportista = ?";
+            $params[] = $filters['transportista'];
         }
         
+        // Aplicar filtros de fecha
         if (!empty($filters['startDate'])) {
-            $whereConditions[] = "fecha_creacion >= ?";
-            $whereParams[] = $filters['startDate'] . ' 00:00:00';
+            $sql .= " AND fecha_creacion >= ?";
+            $countSql .= " AND fecha_creacion >= ?";
+            $params[] = $filters['startDate'] . ' 00:00:00';
         }
         
         if (!empty($filters['endDate'])) {
-            $whereConditions[] = "fecha_creacion <= ?";
-            $whereParams[] = $filters['endDate'] . ' 23:59:59';
+            $sql .= " AND fecha_creacion <= ?";
+            $countSql .= " AND fecha_creacion <= ?";
+            $params[] = $filters['endDate'] . ' 23:59:59';
         }
         
-        // Construir la cláusula WHERE
-        $whereClause = empty($whereConditions) ? "" : " WHERE " . implode(" AND ", $whereConditions);
+        // Ordenar por fecha de creación descendente
+        $sql .= " ORDER BY fecha_creacion DESC";
         
-        // Primero contamos el total de registros para la paginación
-        $countSql = "SELECT COUNT(*) as total FROM `$table`" . $whereClause;
+        // Obtener total de registros
         $countStatement = $this->dbAdapter->createStatement($countSql);
-        $countResult = $countStatement->execute($whereParams);
-        $totalRecords = (int)$countResult->current()['total'];
+        $countResult = $countStatement->execute($params);
+        $countData = $countResult->current();
+        $total = $countData['total'];
         
-        // Ahora obtenemos los datos paginados
-        $dataSql = "SELECT * FROM `$table`" . $whereClause . " ORDER BY fecha_creacion DESC LIMIT $limit OFFSET $offset";
-        $dataStatement = $this->dbAdapter->createStatement($dataSql);
-        $dataResult = $dataStatement->execute($whereParams);
+        // Calcular paginación
+        $totalPages = ceil($total / $limit);
+        $page = max(1, min($page, $totalPages));
+        $offset = ($page - 1) * $limit;
         
+        // Aplicar paginación
+        $sql .= " LIMIT $limit OFFSET $offset";
+        
+        // Ejecutar consulta principal
+        $statement = $this->dbAdapter->createStatement($sql);
+        $result = $statement->execute($params);
+        
+        // Convertir a array
         $orders = [];
-        foreach ($dataResult as $row) {
+        foreach ($result as $row) {
+            // Deserializar campo de productos si está serializado
+            if (isset($row['productos']) && !is_array($row['productos'])) {
+                try {
+                    $productos = json_decode($row['productos'], true);
+                    if (json_last_error() === JSON_ERROR_NONE) {
+                        $row['productos'] = $productos;
+                    }
+                } catch (\Exception $e) {
+                    // Si hay error, dejar como está
+                }
+            }
             $orders[] = $row;
         }
         
         return [
             'orders' => $orders,
-            'total' => $totalRecords,
             'page' => $page,
             'limit' => $limit,
-            'totalPages' => ceil($totalRecords / $limit)
+            'totalPages' => $totalPages,
+            'total' => $total
         ];
     }
     
@@ -2527,6 +2605,92 @@ public function markProductProcessedAction()
         }
     }
     
+    public function scanOrdersAction()
+    {
+        return new ViewModel();
+    }
+
+    public function findOrderAction()
+{
+    // Configurar cabeceras para respuesta JSON
+    $response = $this->getResponse();
+    $response->getHeaders()->addHeaderLine('Content-Type', 'application/json');
+    
+    // Permitir solo peticiones AJAX con método POST
+    $request = $this->getRequest();
+    if (!$request->isXmlHttpRequest() || !$request->isPost()) {
+        $response->setContent(json_encode([
+            'success' => false,
+            'message' => 'Método no permitido'
+        ]));
+        return $response;
+    }
+    
+    // Obtener parámetros JSON del cuerpo de la petición
+    $data = json_decode($request->getContent(), true);
+    $suborderNumber = $data['suborderNumber'] ?? '';
+    
+    if (empty($suborderNumber)) {
+        $response->setContent(json_encode([
+            'success' => false,
+            'message' => 'Número de suborden no especificado'
+        ]));
+        return $response;
+    }
+    
+    // Limpiar el código de posibles espacios
+    $suborderNumber = trim($suborderNumber);
+    
+    try {
+        // Tablas donde buscar
+        $tables = [
+            'Orders_WALLMART', 
+            'Orders_RIPLEY', 
+            'Orders_FALABELLA', 
+            'Orders_MERCADO_LIBRE', 
+            'Orders_PARIS'
+        ];
+        
+        // Buscar en cada tabla
+        foreach ($tables as $table) {
+            $sql = "SELECT id FROM `$table` WHERE suborder_number = ?";
+            $statement = $this->dbAdapter->createStatement($sql);
+            $result = $statement->execute([$suborderNumber]);
+            
+            if ($result->count() > 0) {
+                // Orden encontrada, extraer marketplace
+                $marketplace = str_replace('Orders_', '', $table);
+                
+                $response->setContent(json_encode([
+                    'success' => true,
+                    'tableName' => $table,
+                    'marketplace' => $marketplace,
+                    'message' => 'Orden encontrada'
+                ]));
+                return $response;
+            }
+        }
+        
+        // Si llegamos aquí, no se encontró la orden
+        $response->setContent(json_encode([
+            'success' => false,
+            'message' => 'No se encontró ninguna orden con el número: ' . $suborderNumber
+        ]));
+        return $response;
+        
+    } catch (\Exception $e) {
+        // Log del error
+        error_log('Error al buscar orden: ' . $e->getMessage());
+        
+        $response->setContent(json_encode([
+            'success' => false,
+            'message' => 'Error al buscar la orden: ' . $e->getMessage()
+        ]));
+        return $response;
+    }
+}
+
+
     /**
      * Acción para procesar lotes de órdenes (acciones masivas)
      */
@@ -2789,141 +2953,6 @@ public function markProductProcessedAction()
         return $response;
     }
     
-    /**
-     * Generar manifiesto para órdenes
-     * @param array $orderIds IDs de las órdenes
-     * @param string $table Tabla de órdenes (marketplace)
-     * @return Response
-     */
-    private function generateManifest(array $orderIds, string $table = null)
-    {
-        // Determinar la tabla a usar o aplicarlo para todas
-        $tables = [];
-        if ($table && $table !== 'all') {
-            $tables[] = $table;
-        } else {
-            $tables = [
-                'Orders_WALLMART',
-                'Orders_RIPLEY',
-                'Orders_FALABELLA',
-                'Orders_MERCADO_LIBRE',
-                'Orders_PARIS',
-                'Orders_WOOCOMMERCE'
-            ];
-        }
-        
-        // Recolectar datos de órdenes
-        $orders = [];
-        
-        foreach ($tables as $currentTable) {
-            $marketplace = str_replace('Orders_', '', $currentTable);
-            
-            $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
-            $sql = "SELECT * FROM `$currentTable` WHERE id IN ($placeholders)";
-            $statement = $this->dbAdapter->createStatement($sql);
-            $result = $statement->execute($orderIds);
-            
-            foreach ($result as $row) {
-                $row['marketplace'] = $marketplace;
-                $orders[] = $row;
-            }
-        }
-        
-        if (empty($orders)) {
-            throw new \Exception("No se encontraron órdenes con los IDs seleccionados.");
-        }
-        
-        // Generar HTML para el manifiesto
-        ob_start();
-        ?>
-        <style>
-            body { font-family: DejaVu Sans, sans-serif; font-size: 12px; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
-            th, td { border: 1px solid #000; padding: 6px; text-align: left; }
-            th { background-color: #eee; }
-            .title { font-size: 20px; font-weight: bold; margin-bottom: 10px; text-align: center; }
-            .subtitle { margin: 10px 0; font-weight: bold; }
-            .header { text-align: center; margin-bottom: 20px; }
-        </style>
-
-        <div class="header">
-            <div class="title">Manifiesto de Envío</div>
-            <div>GENERADO EL: <?= date("Y-m-d H:i:s") ?></div>
-        </div>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>ID Orden</th>
-                    <th>Marketplace</th>
-                    <th>Cliente</th>
-                    <th>Dirección</th>
-                    <th>Teléfono</th>
-                    <th>Transportista</th>
-                    <th>N° Seguimiento</th>
-                </tr>
-            </thead>
-            <tbody>
-            <?php foreach ($orders as $order): ?>
-                <tr>
-                    <td><?= $order['id'] ?></td>
-                    <td><?= $order['marketplace'] ?></td>
-                    <td><?= $order['cliente'] ?></td>
-                    <td><?= $order['direccion'] ?></td>
-                    <td><?= $order['telefono'] ?></td>
-                    <td><?= $order['transportista'] ?? 'Sin asignar' ?></td>
-                    <td><?= $order['num_seguimiento'] ?? 'Sin asignar' ?></td>
-                </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-
-        <div><strong>TOTAL ÓRDENES:</strong> <?= count($orders) ?></div>
-        
-        <div style="margin-top: 50px; border-top: 1px solid #000; padding-top: 10px;">
-            <table style="width: 100%; border: none;">
-                <tr style="border: none;">
-                    <td style="width: 50%; border: none; text-align: center; vertical-align: bottom; padding-top: 50px;">
-                        ______________________________<br>
-                        Firma Encargado de Envío
-                    </td>
-                    <td style="width: 50%; border: none; text-align: center; vertical-align: bottom; padding-top: 50px;">
-                        ______________________________<br>
-                        Firma Transportista
-                    </td>
-                </tr>
-            </table>
-        </div>
-        <?php
-        $html = ob_get_clean();
-        
-        // Crear PDF con DOMPDF
-        $options = new Options();
-        $options->set('isHtml5ParserEnabled', true);
-        $options->set('isRemoteEnabled', true);
-        
-        $dompdf = new Dompdf($options);
-        $dompdf->loadHtml($html, 'UTF-8');
-        $dompdf->setPaper('A4', 'portrait');
-        $dompdf->render();
-        
-        $pdfContent = $dompdf->output();
-        
-        // Crear respuesta HTTP
-        $response = new Response();
-        $response->setContent($pdfContent);
-        
-        // Configurar cabeceras
-        $headers = $response->getHeaders();
-        $headers->addHeaderLine('Content-Type', 'application/pdf');
-        $headers->addHeaderLine('Content-Disposition', 'inline; filename="Manifiesto_' . date('Y-m-d') . '.pdf"');
-        $headers->addHeaderLine('Content-Length', strlen($pdfContent));
-        $headers->addHeaderLine('Cache-Control', 'must-revalidate, post-check=0, pre-check=0');
-        $headers->addHeaderLine('Pragma', 'public');
-        $headers->addHeaderLine('Expires', '0');
-        
-        return $response;
-    }
 
 /**
  * Acción para marcar orden como impresa
@@ -2980,6 +3009,8 @@ public function markAsPrintedAction()
 }
 
 
+
+
 /**
  * Generar lista de empaque (Packing List) para órdenes
  * @param array $orderIds IDs de las órdenes
@@ -3014,53 +3045,74 @@ private function generatePackingList(array $orderIds, string $table = null)
         // Obtener los datos de las órdenes en esta tabla
         $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
         
-        // Consulta para obtener items de la tabla específica
-        $itemsTable = $currentTable . "_Items";
         try {
-            $sqlItems = "
-                SELECT 
-                    i.sku, i.name, i.itemSize, i.orderId, i.subOrderNumber, o.customer_name
-                FROM `$itemsTable` i
-                JOIN `$currentTable` o ON i.orderId = o.id
-                WHERE o.id IN ($placeholders)
-                ORDER BY i.name
-            ";
-            $stmt = $this->dbAdapter->createStatement($sqlItems);
-            $items = $stmt->execute($orderIds);
-            
-            // Procesar cada item individualmente
-            foreach ($items as $item) {
-                $productos[] = [
-                    'sku' => $item['sku'] ?? 'Sin SKU',
-                    'nombre' => $item['name'] ?? 'Sin nombre',
-                    'subOrderNumber' => $item['subOrderNumber'] ?? '',
-                    'customer_name' => $item['customer_name'] ?? 'N/A',
-                    'marketplace' => $tableMarketplace
-                ];
-            }
-        } catch (\Exception $e) {
-            // Si no hay tabla de items, procesar productos de la columna productos
-            $sqlOrders = "SELECT id, customer_name, suborder_number, productos 
-                         FROM `$currentTable` WHERE id IN ($placeholders)";
+            // Consulta para obtener detalles de órdenes
+            $sqlOrders = "SELECT id, customer_name, suborder_number, productos, sku FROM `$currentTable` WHERE id IN ($placeholders)";
             $stmt = $this->dbAdapter->createStatement($sqlOrders);
-            $orders = $stmt->execute($orderIds);
+            $ordersResult = $stmt->execute($orderIds);
             
-            foreach ($orders as $order) {
-                if (isset($order['productos'])) {
-                    $productStrings = explode(',', $order['productos']);
-                    foreach ($productStrings as $i => $productString) {
-                        if (!empty(trim($productString))) {
+            foreach ($ordersResult as $order) {
+                $orderId = $order['id'];
+                $suborderNumber = $order['suborder_number'] ?? '';
+                $customerName = $order['customer_name'] ?? 'N/A';
+                
+                // Obtener los productos de la orden con el método dedicado
+                $orderProducts = $this->getOrderProducts($orderId, $currentTable);
+                
+                if (!empty($orderProducts)) {
+                    foreach ($orderProducts as $product) {
+                        $productos[] = [
+                            'sku' => (string)($product['sku'] ?? 'Sin SKU'),
+                            'nombre' => (string)($product['nombre'] ?? 'Sin nombre'),
+                            'subOrderNumber' => (string)$suborderNumber,
+                            'customer_name' => (string)$customerName,
+                            'marketplace' => (string)$tableMarketplace,
+                            'cantidad' => (string)($product['cantidad'] ?? 1)
+                        ];
+                    }
+                } else {
+                    // Intentar extraer SKUs manualmente si el método anterior falló
+                    if (!empty($order['productos'])) {
+                        $productosStr = $order['productos'];
+                        
+                        // Intentar como lista separada por comas
+                        $skus = [];
+                        
+                        // Si hay un SKU en la orden, usarlo
+                        if (!empty($order['sku'])) {
+                            $skus = explode(',', trim($order['sku']));
+                        }
+                        
+                        $productNames = explode(',', $productosStr);
+                        
+                        foreach ($productNames as $i => $name) {
+                            if (empty(trim($name))) continue;
+                            
                             $productos[] = [
-                                'sku' => 'SKU-' . str_pad((string)($i + 1), 6, '0', STR_PAD_LEFT),
-                                'nombre' => trim($productString),
-                                'subOrderNumber' => $order['suborder_number'] ?? '',
-                                'customer_name' => $order['customer_name'] ?? 'N/A',
-                                'marketplace' => $tableMarketplace
+                                'sku' => (string)(isset($skus[$i]) ? trim($skus[$i]) : 'SKU-' . str_pad((string)($i + 1), 6, '0', STR_PAD_LEFT)),
+                                'nombre' => (string)trim($name),
+                                'subOrderNumber' => (string)$suborderNumber,
+                                'customer_name' => (string)$customerName,
+                                'marketplace' => (string)$tableMarketplace,
+                                'cantidad' => (string)1
                             ];
                         }
+                    } else {
+                        // Si no hay información de productos, crear un registro genérico
+                        $productos[] = [
+                            'sku' => (string)('SKU-' . substr(md5($suborderNumber), 0, 8)),
+                            'nombre' => (string)('Producto de orden #' . $suborderNumber),
+                            'subOrderNumber' => (string)$suborderNumber,
+                            'customer_name' => (string)$customerName,
+                            'marketplace' => (string)$tableMarketplace,
+                            'cantidad' => (string)1
+                        ];
                     }
                 }
             }
+        } catch (\Exception $e) {
+            error_log("Error procesando tabla {$currentTable}: " . $e->getMessage());
+            continue;
         }
     }
     
@@ -3098,12 +3150,12 @@ private function generatePackingList(array $orderIds, string $table = null)
         <tbody>
         <?php foreach ($productos as $producto): ?>
             <tr>
-                <td><?= htmlspecialchars($producto['customer_name'] ?? 'N/A') ?></td>
-                <td><?= htmlspecialchars($producto['subOrderNumber'] ?? 'N/A') ?></td>
-                <td><?= htmlspecialchars($producto['nombre'] ?? 'Sin nombre') ?></td>
-                <td><?= htmlspecialchars($producto['sku'] ?? 'Sin SKU') ?></td>
-                <td>1</td>
-                <td><?= htmlspecialchars($producto['marketplace'] ?? 'N/A') ?></td>
+                <td><?= htmlspecialchars((string)($producto['customer_name'] ?? 'N/A')) ?></td>
+                <td><?= htmlspecialchars((string)($producto['subOrderNumber'] ?? 'N/A')) ?></td>
+                <td><?= htmlspecialchars((string)($producto['nombre'] ?? 'Sin nombre')) ?></td>
+                <td><?= htmlspecialchars((string)($producto['sku'] ?? 'Sin SKU')) ?></td>
+                <td><?= htmlspecialchars((string)($producto['cantidad'] ?? '1')) ?></td>
+                <td><?= htmlspecialchars((string)($producto['marketplace'] ?? 'N/A')) ?></td>
             </tr>
         <?php endforeach; ?>
         </tbody>
@@ -3141,6 +3193,8 @@ private function generatePackingList(array $orderIds, string $table = null)
     return $response;
 }
 
+
+
 /**
  * Generar lista de picking para órdenes
  * @param array $orderIds IDs de las órdenes
@@ -3172,6 +3226,7 @@ private function generatePickingList(array $orderIds, string $table = null)
     
     foreach ($tables as $currentTable) {
         $tableMarketplace = str_replace('Orders_', '', $currentTable);
+        $mkpTable = 'MKP_' . $tableMarketplace;
         
         // Obtener los datos de las órdenes en esta tabla
         $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
@@ -3181,31 +3236,97 @@ private function generatePickingList(array $orderIds, string $table = null)
         $result = $statement->execute($orderIds);
         
         foreach ($result as $index => $order) {
-            // Obtener items de la orden
-            $itemsTable = $currentTable . "_Items";
+            $items = [];
+            $orderId = $order['id'];
+            $suborderNumber = $order['suborder_number'] ?? '';
+            
+            // 1. INTENTO: Obtener productos usando el método dedicado
             try {
-                // También usar id en lugar de suborder_number
-                $productsSql = "SELECT * FROM `$itemsTable` WHERE order_id = ?";
-                $productsStatement = $this->dbAdapter->createStatement($productsSql);
-                $productsResult = $productsStatement->execute([$order['id']]);
+                // Usar el método dedicado para obtener productos de una orden
+                $orderProducts = $this->getOrderProducts($orderId, $currentTable);
                 
-                $items = [];
-                foreach ($productsResult as $product) {
-                    $items[] = $product;
+                if (!empty($orderProducts)) {
+                    foreach ($orderProducts as $product) {
+                        $items[] = [
+                            'sku' => $product['sku'] ?? 'Sin SKU',
+                            'name' => $product['nombre'] ?? 'Sin nombre',
+                            'quantity' => $product['cantidad'] ?? 1
+                        ];
+                    }
                 }
             } catch (\Exception $e) {
-                // Si no hay tabla de items, usar datos básicos
-                $items = [];
+                error_log("Error al obtener productos con getOrderProducts: " . $e->getMessage());
+                // Continuar con otros enfoques si este falla
+            }
+            
+            // 2. INTENTO: Buscar en la tabla MKP_ correspondiente si aún no tenemos productos
+            if (empty($items) && !empty($suborderNumber)) {
+                try {
+                    $mkpSql = "SELECT sku, nombre_producto, codigo_sku FROM `$mkpTable` WHERE numero_suborden = ?";
+                    $mkpStatement = $this->dbAdapter->createStatement($mkpSql);
+                    $mkpResult = $mkpStatement->execute([$suborderNumber]);
+                    
+                    foreach ($mkpResult as $mkpItem) {
+                        // Priorizar campos con SKU
+                        $sku = !empty($mkpItem['sku']) ? $mkpItem['sku'] : 
+                              (!empty($mkpItem['codigo_sku']) ? $mkpItem['codigo_sku'] : 'Sin SKU');
+                        
+                        $items[] = [
+                            'sku' => $sku,
+                            'name' => $mkpItem['nombre_producto'] ?? 'Sin nombre',
+                            'quantity' => 1
+                        ];
+                    }
+                } catch (\Exception $e) {
+                    error_log("Error al buscar en tabla MKP: " . $e->getMessage());
+                }
+            }
+            
+            // 3. INTENTO: Buscar en la tabla específica de items si aún no tenemos productos
+            if (empty($items)) {
+                $itemsTable = $currentTable . "_Items";
+                try {
+                    // Buscar por orden_id o por suborder_number según disponibilidad
+                    $productsSql = "SELECT * FROM `$itemsTable` WHERE order_id = ? OR orderId = ? OR subOrderNumber = ?";
+                    $productsStatement = $this->dbAdapter->createStatement($productsSql);
+                    $productsResult = $productsStatement->execute([$orderId, $orderId, $suborderNumber]);
+                    
+                    foreach ($productsResult as $product) {
+                        $items[] = [
+                            'sku' => $product['sku'] ?? 'Sin SKU',
+                            'name' => $product['name'] ?? ($product['nombre'] ?? 'Sin nombre'),
+                            'quantity' => $product['quantity'] ?? ($product['cantidad'] ?? 1)
+                        ];
+                    }
+                } catch (\Exception $e) {
+                    error_log("Error al buscar en tabla de items: " . $e->getMessage());
+                }
+            }
+            
+            // 4. INTENTO: Si aún no hay productos, usar información básica de la orden
+            if (empty($items)) {
+                // Buscar si hay campo 'sku' en la orden primero
+                $orderSku = $order['sku'] ?? '';
+                $skus = !empty($orderSku) ? explode(',', $orderSku) : [];
+                
                 $productStrings = explode(',', $order['productos'] ?? '');
                 foreach ($productStrings as $i => $productString) {
                     if (!empty(trim($productString))) {
                         $items[] = [
-                            'sku' => 'SKU-' . str_pad((string)($i + 1), 6, '0', STR_PAD_LEFT),
+                            'sku' => !empty($skus[$i]) ? trim($skus[$i]) : 'SKU-' . str_pad((string)($i + 1), 6, '0', STR_PAD_LEFT),
                             'name' => trim($productString),
-                            'price' => ($order['total'] ?? 0) / max(1, count(array_filter($productStrings))),
                             'quantity' => 1
                         ];
                     }
+                }
+                
+                // Si aún así no hay productos, crear uno genérico
+                if (empty($items)) {
+                    $items[] = [
+                        'sku' => 'SKU-' . substr(md5($suborderNumber ?: $orderId), 0, 8),
+                        'name' => 'Producto de orden #' . ($suborderNumber ?: $orderId),
+                        'quantity' => 1
+                    ];
                 }
             }
             
@@ -3239,16 +3360,16 @@ private function generatePickingList(array $orderIds, string $table = null)
 
                 <table>
                     <tr>
-                        <td><b>Cliente:</b><br>'.$customerName.'</td>
-                        <td><b>Fecha Pedido:</b><br>'.$order['fecha_creacion'].'</td>
+                        <td><b>Cliente:</b><br>'.htmlspecialchars((string)$customerName).'</td>
+                        <td><b>Fecha Pedido:</b><br>'.htmlspecialchars((string)($order['fecha_creacion'] ?? 'N/A')).'</td>
                     </tr>
                     <tr>
-                        <td><b>Dirección:</b><br>'.$order['direccion'].'</td>
-                        <td><b>N° Orden:</b><br>'.$order['id'].'</td>
+                        <td><b>Dirección:</b><br>'.htmlspecialchars((string)($order['direccion'] ?? 'N/A')).'</td>
+                        <td><b>N° Orden:</b><br>'.htmlspecialchars((string)$order['id']).'</td>
                     </tr>
                     <tr>
                         <td><b>Entregas Del Día:</b><br>'.date('d-m-Y').'</td>
-                        <td><b>Suborden:</b><br>'.$order['suborder_number'].'</td>
+                        <td><b>Suborden:</b><br>'.htmlspecialchars((string)($order['suborder_number'] ?? 'N/A')).'</td>
                     </tr>
                 </table>
 
@@ -3266,18 +3387,18 @@ private function generatePickingList(array $orderIds, string $table = null)
                     <tbody>';
 
             foreach ($items as $item) {
-                $itemName = $item['name'] ?? $item['nombre'] ?? $item['nombre_producto'] ?? 'Sin nombre';
-                $itemSku = $item['sku'] ?? $item['SKU'] ?? $item['codigo_sku'] ?? 'N/A';
-                $itemQuantity = $item['quantity'] ?? $item['cantidad'] ?? 1;
+                $itemName = htmlspecialchars((string)($item['name'] ?? 'Sin nombre'));
+                $itemSku = htmlspecialchars((string)($item['sku'] ?? 'N/A'));
+                $itemQuantity = htmlspecialchars((string)($item['quantity'] ?? 1));
                 
                 $html .= '
                     <tr>
-                        <td>'.$customerName.'</td>
-                        <td>'.$order['suborder_number'].'</td>
+                        <td>'.htmlspecialchars((string)$customerName).'</td>
+                        <td>'.htmlspecialchars((string)($order['suborder_number'] ?? 'N/A')).'</td>
                         <td>'.$itemName.'</td>
                         <td>'.$itemSku.'</td>
                         <td>'.$itemQuantity.'</td>
-                        <td>'.$tableMarketplace.'</td>
+                        <td>'.htmlspecialchars((string)$tableMarketplace).'</td>
                     </tr>';
             }
             
@@ -3287,7 +3408,7 @@ private function generatePickingList(array $orderIds, string $table = null)
                     <tr>
                         <td colspan="4"><b>TOTAL PRODUCTOS</b></td>
                         <td><b>'.$totalProductos.'</b></td>
-                        <td><b>'.$tableMarketplace.'</b></td>
+                        <td><b>'.htmlspecialchars((string)$tableMarketplace).'</b></td>
                     </tr>
                     </tbody>
                 </table>

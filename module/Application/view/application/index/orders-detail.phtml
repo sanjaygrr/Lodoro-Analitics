@@ -28,32 +28,12 @@ $marketColor = $marketplaceDetails[$marketplace]['color'] ?? '#4361ee';
 // Asegurar que $orders esté definido como un array
 $orders = $orders ?? [];
 
-// Definir contadores específicos
-$nuevas = 0;
-$pendientesProcesar = 0;
-$enProceso = 0;
-$pendientesRecoger = 0;
-$porEntregar = 0;
+// Obtener valores de filtros actuales (para mantenerlos en links)
+$currentPrinted = $printedFilter ?? '';
+$currentStatus = $statusFilter ?? '';
 
-// Calcular contadores según el estado de printed y el estado general
-if (!empty($orders)) {
-    foreach ($orders as $order) {
-        $estado = strtolower($order['estado'] ?? '');
-        $printed = strtolower($order['printed'] ?? '0');
-        
-        if ($estado === 'nueva') {
-            if ($printed === '0' || $printed === 'no') {
-                $nuevas++;
-            } else {
-                $pendientesProcesar++;
-            }
-        } elseif ($estado === 'en proceso') {
-            $enProceso++;
-        } elseif ($estado === 'enviada') {
-            $porEntregar++;
-        }
-    }
-}
+// Usar los contadores enviados desde el controlador
+// En lugar de calcularlos en la vista
 ?>
 
 <div class="container-fluid">
@@ -65,47 +45,52 @@ if (!empty($orders)) {
         </div>
         <div class="col-md-6 text-end">
             <div class="d-flex justify-content-md-end gap-2">
-                <a href="<?= $this->url('application', ['action' => 'select-orders']) ?>" class="btn btn-outline-primary">
-                    <i class="fas fa-clipboard-check me-1"></i> Selección de Órdenes
-                </a>
                 <a href="<?= $this->url('application', ['action' => 'marketplace-config']) ?>" class="btn btn-outline-secondary">
                     <i class="fas fa-cogs me-1"></i> Configuración
                 </a>
-                <button type="button" class="btn btn-primary" id="syncOrdersBtn">
-                    <i class="fas fa-sync-alt me-1"></i> Sincronizar Órdenes
-                </button>
             </div>
         </div>
     </div>
 
-    <!-- Resumen estadístico actualizado -->
+    <!-- TARJETAS DE ESTADO: Dashboard Superior usando contadores de la base de datos -->
     <div class="row mb-4">
         <div class="col-md-12">
             <div class="card">
                 <div class="card-body p-0">
                     <div class="row g-0 text-center">
-                        <div class="col-md-3 border-end">
+                        <!-- Tarjeta 1: No Impresos (Sin Imprimir) -->
+                        <div class="col-md-4 border-end">
                             <div class="p-3">
-                                <h5 class="fw-semibold mb-1 text-primary"><?= number_format($nuevas) ?></h5>
-                                <span class="text-muted">Nuevas (Sin Imprimir)</span>
+                                <h5 class="fw-semibold mb-1 text-primary"><?= number_format($sinImprimir) ?></h5>
+                                <span class="text-muted">Sin Imprimir</span>
+                                <?php if ($currentPrinted !== '0' && $sinImprimir > 0): ?>
+                                <?php endif; ?>
                             </div>
                         </div>
-                        <div class="col-md-3 border-end">
+
+                        <!-- Tarjeta 2: Impresos pero No Procesados -->
+                        <div class="col-md-4 border-end">
                             <div class="p-3">
-                                <h5 class="fw-semibold mb-1 text-warning"><?= number_format($pendientesProcesar) ?></h5>
+                                <h5 class="fw-semibold mb-1 text-warning"><?= number_format($impresosNoProcesados) ?></h5>
                                 <span class="text-muted">Pendientes a Procesar</span>
+                                <?php if (($currentPrinted !== '1' || $currentStatus !== 'Nueva') && $impresosNoProcesados > 0): ?>
+
+                                <?php endif; ?>
                             </div>
                         </div>
-                        <div class="col-md-3 border-end">
+
+                        <!-- Tarjeta 3: Procesados -->
+                        <div class="col-md-4">
                             <div class="p-3">
-                                <h5 class="fw-semibold mb-1 text-info"><?= number_format($enProceso) ?></h5>
-                                <span class="text-muted">En Proceso</span>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="p-3">
-                                <h5 class="fw-semibold mb-1 text-success"><?= number_format($porEntregar) ?></h5>
-                                <span class="text-muted">Por Entregar</span>
+                                <h5 class="fw-semibold mb-1 text-success"><?= number_format($procesados) ?></h5>
+                                <span class="text-muted">Procesados</span>
+                                <?php if ($currentStatus !== 'En Proceso' && $procesados > 0): ?>
+                                <div class="mt-2">
+                                    <a href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => $table], ['query' => ['status' => 'En Proceso']]) ?>" class="btn btn-sm btn-outline-success">
+                                        Ver pedidos
+                                    </a>
+                                </div>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -114,42 +99,52 @@ if (!empty($orders)) {
         </div>
     </div>
   
-    <!-- Filtros y botones de acción -->
+    <!-- Filtros y botones de acción mejorados -->
     <div class="row mb-4">
         <div class="col-md-12">
-            <div class="card" style="overflow: visible;">
+            <div class="card order-filters-card">
                 <div class="card-body">
                     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
                         <div class="d-flex flex-column flex-md-row gap-3">
-                            <form class="d-flex" role="search" method="GET">
+                            <!-- Formulario de búsqueda con conservación de filtros -->
+                            <form class="d-flex" role="search" method="GET" id="searchForm">
+                                <!-- Mantener filtros actuales en búsquedas -->
+                                <?php if ($currentPrinted !== ''): ?>
+                                <input type="hidden" name="printed" value="<?= $this->escapeHtmlAttr($currentPrinted) ?>">
+                                <?php endif; ?>
+                                <?php if ($currentStatus !== ''): ?>
+                                <input type="hidden" name="status" value="<?= $this->escapeHtmlAttr($currentStatus) ?>">
+                                <?php endif; ?>
+                                
                                 <div class="input-group">
-                                    <input type="text" class="form-control" placeholder="Buscar órdenes..." name="search" value="<?= isset($search) ? $this->escapeHtml($search) : '' ?>">
+                                    <input type="text" class="form-control" placeholder="Buscar órdenes..." 
+                                           name="search" value="<?= isset($search) ? $this->escapeHtml($search) : '' ?>">
                                     <button class="btn btn-primary" type="submit">
                                         <i class="fas fa-search"></i>
                                     </button>
                                 </div>
                             </form>
                             
+                            <!-- Filtros con mejor integración -->
                             <div class="d-flex gap-2">
-                                <select class="form-select" name="status" id="statusFilter">
-                                    <option value="">Todos los estados</option>
-                                    <option value="Nueva" <?= isset($statusFilter) && $statusFilter === 'Nueva' ? 'selected' : '' ?>>Nueva</option>
-                                    <option value="En Proceso" <?= isset($statusFilter) && $statusFilter === 'En Proceso' ? 'selected' : '' ?>>En Proceso</option>
-                                    <option value="Enviada" <?= isset($statusFilter) && $statusFilter === 'Enviada' ? 'selected' : '' ?>>Enviada</option>
-                                    <option value="Entregada" <?= isset($statusFilter) && $statusFilter === 'Entregada' ? 'selected' : '' ?>>Entregada</option>
+                                <!-- Filtro por estado de impresión -->
+                                <select class="form-select" name="printed" id="printedFilter">
+                                    <option value="">Todos los pedidos</option>
+                                    <option value="0" <?= isset($printedFilter) && $printedFilter === '0' ? 'selected' : '' ?>>Sin imprimir</option>
+                                    <option value="1" <?= isset($printedFilter) && $printedFilter === '1' ? 'selected' : '' ?>>Impresos</option>
                                 </select>
                                 
-                                <select class="form-select" name="printed" id="printedFilter">
-                                    <option value="">Estado de Impresión</option>
-                                    <option value="0" <?= isset($printedFilter) && $printedFilter === '0' ? 'selected' : '' ?>>Sin Imprimir</option>
-                                    <option value="1" <?= isset($printedFilter) && $printedFilter === '1' ? 'selected' : '' ?>>Impreso</option>
-                                </select>
+
                             </div>
                         </div>
                           
-                        <div class="d-flex gap-2" style="position: relative; z-index: 99999;">
+                        <div class="d-flex gap-2">
                             <button type="button" class="btn btn-success" id="refreshListBtn">
                                 <i class="fas fa-sync me-1"></i> Actualizar
+                            </button>
+                            
+                            <button type="button" class="btn btn-outline-danger" id="clearFiltersBtn">
+                                <i class="fas fa-eraser me-1"></i> Limpiar Filtros
                             </button>
                         </div>
                     </div>
@@ -157,50 +152,61 @@ if (!empty($orders)) {
             </div>
         </div>
     </div>
-    
-    <div class="dropdown" style="position: relative; z-index: 99999;">
-        <button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="bulkActionsBtn">
-            <i class="fas fa-cog me-1"></i> Acciones
-        </button>
-        <ul class="dropdown-menu dropdown-menu-end" style="z-index: 99999;">
-            <li><a class="dropdown-item" href="#" id="printLabelsBtn"><i class="fas fa-print me-2"></i>Imprimir etiquetas</a></li>
-            <li><a class="dropdown-item" href="#" id="generateInvoiceBtn"><i class="fas fa-file-invoice me-2"></i>Imprimir boletas</a></li>
-            <li><a class="dropdown-item" href="#" id="generatePackingBtn"><i class="fas fa-box me-2"></i>Picking List</a></li>
-            <li><a class="dropdown-item" href="#" id="generatePickingBtn"><i class="fas fa-clipboard-list me-2"></i>Packing List</a></li>
-            <li><hr class="dropdown-divider"></li>
-            <li><a class="dropdown-item mark-as-printed" href="#" id="markAsPrintedBtn"><i class="fas fa-check-circle me-2"></i>Marcar como impreso</a></li>
-        </ul>
-    </div>
-
-<!-- Tabla de órdenes actualizada -->
-<div class="row">
-    <div class="col-md-12">
-        <div class="card" style="overflow: visible;">
-            <div class="card-body" style="overflow: visible;">
-                <div class="table-responsive" style="overflow: visible;">
-                    <table class="table table-hover table-striped">
-                        <thead>
-                            <tr>
-                                <th width="20">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="selectAllOrders">
-                                    </div>
-                                </th>
-                                <th>N° Suborden</th>
-                                <th>Cliente</th>
-                                <th>Dirección</th>
-                                <th>Producto</th>
-                                <th>Total</th>
-                                <th>Estado</th>
-                                <th>Impreso</th>
-                                <th>Fecha</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if (isset($orders) && !empty($orders)): ?>
+                                <!-- BOTÓN DE ACCIONES MASIVAS - MOVIDO AQUÍ -->
+                                <div class="dropdown orders-dropdown">
+                                    <button class="btn btn-primary dropdown-toggle" type="button" id="bulkActionsBtn" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="fas fa-cog me-1"></i> Acciones
+                                    </button>
+                                    <ul class="dropdown-menu orders-dropdown-menu">
+                                        <li><a class="dropdown-item" href="#" id="printLabelsBtn"><i class="fas fa-print me-2"></i>Imprimir etiquetas</a></li>
+                                        <li><a class="dropdown-item" href="#" id="generateInvoiceBtn"><i class="fas fa-file-invoice me-2"></i>Imprimir boletas</a></li>
+                                        <li><a class="dropdown-item" href="#" id="generatePackingBtn"><i class="fas fa-box me-2"></i>Picking List</a></li>
+                                        <li><a class="dropdown-item" href="#" id="generatePickingBtn"><i class="fas fa-clipboard-list me-2"></i>Packing List</a></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li><a class="dropdown-item mark-as-printed" href="#" id="markAsPrintedBtn"><i class="fas fa-check-circle me-2"></i>Marcar como impreso</a></li>
+                                    </ul>
+                                </div>
+    <!-- Tabla de órdenes mejorada -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    <?php if (isset($orders) && !empty($orders)): ?>
+                    <!-- Mostrar contador de resultados -->
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="text-muted">
+                            Mostrando <?= count($orders) ?> de <?= $total ?> resultados
+                            <?php if ($search || $statusFilter || $printedFilter): ?>
+                                con los filtros aplicados
+                            <?php endif; ?>
+                        </span>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped">
+                            <thead>
+                                <tr>
+                                    <th width="20">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="selectAllOrders">
+                                        </div>
+                                    </th>
+                                    <th>N° Suborden</th>
+                                    <th>Cliente</th>
+                                    <th>Dirección</th>
+                                    <th>Producto</th>
+                                    <th>Total</th>
+                                    <th>Estado</th>
+                                    <th>Impreso</th>
+                                    <th>Fecha</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
                                 <?php foreach ($orders as $order): ?>
-                                    <tr data-id="<?= $this->escapeHtml($order['id']) ?>">
+                                    <tr data-id="<?= $this->escapeHtml($order['id']) ?>" 
+                                        data-estado="<?= strtolower($order['estado'] ?? '') ?>"
+                                        data-printed="<?= strtolower($order['printed'] ?? '0') ?>">
                                         <td>
                                             <div class="form-check">
                                                 <input class="form-check-input order-checkbox" type="checkbox" 
@@ -233,7 +239,6 @@ if (!empty($orders)) {
                                                         <?= $this->escapeHtml($order['productos'] ?? 'N/A') ?>
                                                     <?php endif; ?>
                                                 </span>
- 
                                             </div>
                                         </td>
                                         <td><?= isset($order['total']) ? '$' . number_format($order['total'], 0, ',', '.') : 'N/A' ?></td>
@@ -265,10 +270,13 @@ if (!empty($orders)) {
                                         <td><?= $this->escapeHtml($order['fecha_creacion'] ?? '') ?></td>
                                         <td>
                                             <div class="d-flex gap-1">
-                                            <a href="<?= $this->url('order-detail', ['id' => $order['suborder_number'], 'table' => $table]) ?>" 
-                                                class="btn btn-sm btn-outline-primary" title="Ver detalle">
+                                                <!-- BOTÓN DE NAVEGACIÓN AL DETALLE (OJO) -->
+                                                <a href="<?= $this->url('order-detail', ['id' => $order['suborder_number'], 'table' => $table]) ?>" 
+                                                    class="btn btn-sm btn-outline-primary" title="Ver detalle">
                                                     <i class="fas fa-eye"></i>
-                                            </a>
+                                                </a>
+                                                
+                                                <!-- Botones condicionales según estado -->
                                                 <?php if ($printed === '0' || $printed === 'no'): ?>
                                                 <button type="button" class="btn btn-sm btn-outline-secondary print-single-label" 
                                                         data-id="<?= $this->escapeHtml($order['id']) ?>" 
@@ -299,59 +307,97 @@ if (!empty($orders)) {
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
-                            <?php else: ?>
-                                <tr>
-                                    <td colspan="10" class="text-center py-4">
-                                        <div class="d-flex flex-column align-items-center">
-                                            <i class="fas fa-search fa-2x mb-3 text-muted"></i>
-                                            <h5 class="text-muted">No se encontraron órdenes</h5>
-                                            <p class="small text-muted">Intenta con otros filtros o elimina los filtros actuales</p>
-                                        </div>
-                                    </td>
-                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Paginación mejorada -->
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        <div class="d-flex align-items-center">
+                            <span class="me-2">Mostrar</span>
+                            <select id="pageSizeSelect" class="form-select form-select-sm" style="width: auto;">
+                                <option value="30" <?= $limit == 30 ? 'selected' : '' ?>>30</option>
+                                <option value="50" <?= $limit == 50 ? 'selected' : '' ?>>50</option>
+                                <option value="100" <?= $limit == 100 ? 'selected' : '' ?>>100</option>
+                                <option value="200" <?= $limit == 200 ? 'selected' : '' ?>>200</option>
+                            </select>
+                            <span class="ms-2">registros por página</span>
+                        </div>
+                        
+                        <?php if ($totalPages > 1): ?>
+                            <nav aria-label="Paginación de órdenes">
+                                <ul class="pagination mb-0">
+                                    <!-- Primera página -->
+                                    <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
+                                        <a class="page-link" href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => $table], ['query' => array_merge(['page' => 1, 'limit' => $limit], ['search' => $search, 'status' => $statusFilter, 'printed' => $printedFilter])]) ?>">
+                                            <i class="fas fa-angle-double-left"></i>
+                                        </a>
+                                    </li>
+                                    
+                                    <!-- Página anterior -->
+                                    <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
+                                        <a class="page-link" href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => $table], ['query' => array_merge(['page' => max(1, $page - 1), 'limit' => $limit], ['search' => $search, 'status' => $statusFilter, 'printed' => $printedFilter])]) ?>">
+                                            <i class="fas fa-angle-left"></i>
+                                        </a>
+                                    </li>
+                                    
+                                    <!-- Páginas numéricas -->
+                                    <?php
+                                        $startPage = max(1, min($page - 1, $totalPages - 3));
+                                        $endPage = min($totalPages, max($page + 1, 4));
+                                        
+                                        for ($i = $startPage; $i <= $endPage; $i++):
+                                    ?>
+                                        <li class="page-item <?= $i == $page ? 'active' : '' ?>">
+                                            <a class="page-link" href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => $table], ['query' => array_merge(['page' => $i, 'limit' => $limit], ['search' => $search, 'status' => $statusFilter, 'printed' => $printedFilter])]) ?>">
+                                                <?= $i ?>
+                                            </a>
+                                        </li>
+                                    <?php endfor; ?>
+                                    
+                                    <!-- Página siguiente -->
+                                    <li class="page-item <?= $page >= $totalPages ? 'disabled' : '' ?>">
+                                        <a class="page-link" href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => $table], ['query' => array_merge(['page' => min($totalPages, $page + 1), 'limit' => $limit], ['search' => $search, 'status' => $statusFilter, 'printed' => $printedFilter])]) ?>">
+                                            <i class="fas fa-angle-right"></i>
+                                        </a>
+                                    </li>
+                                    
+                                    <!-- Última página -->
+                                    <li class="page-item <?= $page >= $totalPages ? 'disabled' : '' ?>">
+                                        <a class="page-link" href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => $table], ['query' => array_merge(['page' => $totalPages, 'limit' => $limit], ['search' => $search, 'status' => $statusFilter, 'printed' => $printedFilter])]) ?>">
+                                            <i class="fas fa-angle-double-right"></i>
+                                        </a>
+                                    </li>
+                                </ul>
+                            </nav>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <?php else: ?>
+                        <!-- Estado vacío mejorado -->
+                        <div class="text-center py-5">
+                            <div class="mb-4">
+                                <i class="fas fa-search fa-3x text-muted"></i>
+                            </div>
+                            <h4 class="text-muted mb-3">No se encontraron órdenes</h4>
+                            <p class="text-muted mb-4">
+                                <?php if ($search || $statusFilter || $printedFilter): ?>
+                                    No hay resultados que coincidan con los filtros aplicados.
+                                <?php else: ?>
+                                    No hay órdenes disponibles en este marketplace.
+                                <?php endif; ?>
+                            </p>
+                            <?php if ($search || $statusFilter || $printedFilter): ?>
+                                <a href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => $table]) ?>" class="btn btn-outline-primary">
+                                    <i class="fas fa-eraser me-2"></i> Limpiar filtros
+                                </a>
                             <?php endif; ?>
-                        </tbody>
-                    </table>
+                        </div>
+                    <?php endif; ?>
                 </div>
-                
-                <!-- Paginación (igual que antes) -->
             </div>
         </div>
     </div>
-</div>
-
-<!-- Modal para ver detalles de productos -->
-<div class="modal fade" id="productDetailsModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Detalles de Productos - Orden #<span id="productOrderId"></span></h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="table-responsive">
-                    <table class="table table-bordered">
-                        <thead>
-                            <tr>
-                                <th>SKU</th>
-                                <th>Producto</th>
-                                <th>Cantidad</th>
-                                <th>Precio Unitario</th>
-                                <th>Subtotal</th>
-                            </tr>
-                        </thead>
-                        <tbody id="productDetailsBody">
-                            <!-- Será llenado dinámicamente -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-            </div>
-        </div>
-    </div>
-</div>
 </div>
 
 <!-- Modal para programar entrega -->
@@ -374,104 +420,132 @@ if (!empty($orders)) {
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="confirmDelivery">Confirmar Entrega</button>
+                <button type="button" class="btn btn-primary" id="confirmDelivery">Confirmar</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- JavaScript -->
+<!-- JavaScript para la funcionalidad -->
 <script>
-function showProductDetails(orderId) {
-    const productModal = new bootstrap.Modal(document.getElementById('productDetailsModal'));
-    document.getElementById('productOrderId').textContent = orderId;
-    
-    // Hacer una solicitud AJAX para obtener los detalles de productos
-    fetch(`<?= $this->url('application', ['action' => 'get-order-products']) ?>?id=${orderId}`, {
-        method: 'GET',
-        headers: {
-            'Content-Type': 'application/json'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        const tbody = document.getElementById('productDetailsBody');
-        tbody.innerHTML = '';
-        
-        if (data.success && data.products) {
-            data.products.forEach(product => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${product.sku || 'N/A'}</td>
-                    <td>${product.nombre || 'N/A'}</td>
-                    <td>${product.cantidad || 0}</td>
-                    <td>$${number_format(product.precio_unitario || 0, 0, ',', '.')}</td>
-                    <td>$${number_format((product.cantidad || 0) * (product.precio_unitario || 0), 0, ',', '.')}</td>
-                `;
-                tbody.appendChild(row);
-            });
-        } else {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center">No se encontraron productos</td></tr>';
-        }
-        
-        productModal.show();
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        const tbody = document.getElementById('productDetailsBody');
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Error al cargar productos</td></tr>';
-        productModal.show();
-    });
-}
-
-function number_format(number, decimals = 0, decPoint = ',', thousandsSep = '.') {
-    number = (number + '').replace(/[^0-9+\-Ee.]/g, '');
-    var n = !isFinite(+number) ? 0 : +number,
-        prec = !isFinite(+decimals) ? 0 : Math.abs(decimals),
-        sep = (typeof thousandsSep === 'undefined') ? ',' : thousandsSep,
-        dec = (typeof decPoint === 'undefined') ? '.' : decPoint,
-        s = '',
-        toFixedFix = function(n, prec) {
-            var k = Math.pow(10, prec);
-            return '' + Math.round(n * k) / k;
-        };
-    // Fix for IE parseFloat(0.55).toFixed(0) = 0;
-    s = (prec ? toFixedFix(n, prec) : '' + Math.round(n)).split('.');
-    if (s[0].length > 3) {
-        s[0] = s[0].replace(/\B(?=(?:\d{3})+(?!\d))/g, sep);
-    }
-    if ((s[1] || '').length < prec) {
-        s[1] = s[1] || '';
-        s[1] += new Array(prec - s[1].length + 1).join('0');
-    }
-    return s.join(dec);
-}
-
 document.addEventListener('DOMContentLoaded', function() {
-    // Asegurar que el dropdown esté correctamente posicionado
-    const dropdownElements = document.querySelectorAll('.dropdown');
-    dropdownElements.forEach(dropdown => {
-        dropdown.style.position = 'relative';
-        dropdown.style.zIndex = '99999';
-    });
+    // Solución para arreglar el problema con el botón de órdenes
+    // Dejamos que Bootstrap maneje el dropdown normalmente
     
-    // Forzar el estilo cuando el dropdown se muestra
-    const dropdownButton = document.getElementById('bulkActionsBtn');
-    if (dropdownButton) {
-        dropdownButton.addEventListener('click', function() {
-            const dropdownMenu = this.nextElementSibling;
-            if (dropdownMenu && dropdownMenu.classList.contains('dropdown-menu')) {
-                dropdownMenu.style.zIndex = '99999';
-                dropdownMenu.style.position = 'absolute';
-            }
+    // Referencia a elementos DOM importantes
+    const statusFilter = document.getElementById('statusFilter');
+    const printedFilter = document.getElementById('printedFilter');
+    const pageSizeSelect = document.getElementById('pageSizeSelect');
+    const refreshListBtn = document.getElementById('refreshListBtn');
+    const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+    const selectAllOrders = document.getElementById('selectAllOrders');
+    const orderCheckboxes = document.querySelectorAll('.order-checkbox');
+    const bulkActionsBtn = document.getElementById('bulkActionsBtn');
+    
+    // Manejar cambios en filtros (estado y printed)
+    if (printedFilter) {
+        printedFilter.addEventListener('change', function() {
+            updateFilterUrl();
         });
     }
-
-    const scheduleDeliveryModal = new bootstrap.Modal(document.getElementById('scheduleDeliveryModal'));
-    let currentOrderId = null;
-    let currentTable = null;
     
-    // Imprimir etiqueta individual
+    // Manejar cambios en tamaño de página
+    if (pageSizeSelect) {
+        pageSizeSelect.addEventListener('change', function() {
+            updateFilterUrl(true);
+        });
+    }
+    
+    // Manejar clic en botón de refrescar
+    if (refreshListBtn) {
+        refreshListBtn.addEventListener('click', function() {
+            window.location.reload();
+        });
+    }
+    
+    // Manejar clic en botón de limpiar filtros
+    if (clearFiltersBtn) {
+        clearFiltersBtn.addEventListener('click', function() {
+            window.location.href = '<?= $this->url('application', ['action' => 'orders-detail', 'table' => $table]) ?>';
+        });
+    }
+    
+    // Seleccionar todos los pedidos
+    if (selectAllOrders) {
+        selectAllOrders.addEventListener('change', function() {
+            orderCheckboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+            updateBulkActionsButton();
+        });
+    }
+    
+    // Actualizar estado de botón de acciones masivas al seleccionar/deseleccionar pedidos
+    orderCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            updateBulkActionsButton();
+            
+            // Verificar si todos están seleccionados
+            if (!this.checked && selectAllOrders && selectAllOrders.checked) {
+                selectAllOrders.checked = false;
+            } else if (selectAllOrders) {
+                const allChecked = Array.from(orderCheckboxes).every(cb => cb.checked);
+                selectAllOrders.checked = allChecked;
+            }
+        });
+    });
+    
+    // Actualizar botón de acciones masivas
+    function updateBulkActionsButton() {
+        if (!bulkActionsBtn) return;
+        
+        const selectedCount = document.querySelectorAll('.order-checkbox:checked').length;
+        if (selectedCount > 0) {
+            bulkActionsBtn.classList.remove('disabled');
+            bulkActionsBtn.innerHTML = `<i class="fas fa-cog me-1"></i> Acciones (${selectedCount})`;
+        } else {
+            bulkActionsBtn.classList.add('disabled');
+            bulkActionsBtn.innerHTML = `<i class="fas fa-cog me-1"></i> Acciones`;
+        }
+    }
+    
+    // Inicializar estado del botón
+    updateBulkActionsButton();
+    
+    // Función para actualizar URL con los filtros
+    function updateFilterUrl(resetPage = false) {
+        const currentUrl = new URL(window.location.href);
+        
+        // Actualizar filtros
+        const status = statusFilter ? statusFilter.value : '';
+        const printed = printedFilter ? printedFilter.value : '';
+        const limit = pageSizeSelect ? pageSizeSelect.value : '30';
+        
+        // Aplicar filtros a URL
+        if (status) {
+            currentUrl.searchParams.set('status', status);
+        } else {
+            currentUrl.searchParams.delete('status');
+        }
+        
+        if (printed !== '') {
+            currentUrl.searchParams.set('printed', printed);
+        } else {
+            currentUrl.searchParams.delete('printed');
+        }
+        
+        currentUrl.searchParams.set('limit', limit);
+        
+        // Reset a primera página si cambian los filtros
+        if (resetPage) {
+            currentUrl.searchParams.set('page', '1');
+        }
+        
+        // Navegar a la nueva URL
+        window.location.href = currentUrl.toString();
+    }
+    
+    // Manejar botones de imprimir etiqueta individual
     document.addEventListener('click', function(e) {
         if (e.target.closest('.print-single-label')) {
             const btn = e.target.closest('.print-single-label');
@@ -482,7 +556,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Procesar orden (cambiar de Nueva a En Proceso)
+    // Manejar botones de procesar orden
     document.addEventListener('click', function(e) {
         if (e.target.closest('.process-order')) {
             const btn = e.target.closest('.process-order');
@@ -493,60 +567,160 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Programar entrega (cambiar de En Proceso a Enviada)
+    // Manejar botones de programar entrega
     document.addEventListener('click', function(e) {
         if (e.target.closest('.schedule-delivery')) {
             const btn = e.target.closest('.schedule-delivery');
-            currentOrderId = btn.dataset.id;
-            currentTable = btn.dataset.table;
+            const orderId = btn.dataset.id;
+            const table = btn.dataset.table;
             
-            scheduleDeliveryModal.show();
+            // Guardar para uso en el modal
+            document.getElementById('scheduleDeliveryModal').dataset.orderId = orderId;
+            document.getElementById('scheduleDeliveryModal').dataset.table = table;
+            
+            // Mostrar modal
+            const modal = new bootstrap.Modal(document.getElementById('scheduleDeliveryModal'));
+            modal.show();
         }
     });
     
-    // Confirmar programación de entrega
-    document.getElementById('confirmDelivery').addEventListener('click', function() {
-        const transportista = document.getElementById('deliveryTransportista').value;
-        const tracking = document.getElementById('deliveryTracking').value;
-        
-        if (!transportista) {
-            showToast('Por favor ingresa un transportista', 'warning');
-            return;
-        }
-        
-        scheduleOrderDelivery(currentOrderId, currentTable, transportista, tracking);
-    });
-    
-    // Marcar como impreso - CORREGIDO
-    if (document.getElementById('markAsPrintedBtn')) {
-        document.getElementById('markAsPrintedBtn').addEventListener('click', function(e) {
-            e.preventDefault();
+    // Confirmar entrega
+    const confirmDeliveryBtn = document.getElementById('confirmDelivery');
+    if (confirmDeliveryBtn) {
+        confirmDeliveryBtn.addEventListener('click', function() {
+            const modal = document.getElementById('scheduleDeliveryModal');
+            const orderId = modal.dataset.orderId;
+            const table = modal.dataset.table;
+            const transportista = document.getElementById('deliveryTransportista').value;
+            const tracking = document.getElementById('deliveryTracking').value;
             
-            const selectedOrders = getSelectedOrders();
-            if (selectedOrders.length === 0) {
-                showToast('Por favor, selecciona al menos una orden para marcar como impresa.', 'warning');
+            if (!transportista) {
+                showToast('Por favor ingresa un transportista', 'warning');
                 return;
             }
             
-            if (confirm(`¿Confirmas que deseas marcar ${selectedOrders.length} órdenes como impresas?`)) {
-                selectedOrders.forEach(order => {
-                    // Asegurarse de enviar la tabla correctamente
-                    const table = order.marketplace ? 'Orders_' + order.marketplace : '<?= $table ?>';
-                    markOrderAsPrinted(order.id, table);
-                });
-            }
+            scheduleOrderDelivery(orderId, table, transportista, tracking);
         });
     }
     
-    // Función para imprimir etiqueta individual
+    // Botones de acciones masivas
+    document.getElementById('printLabelsBtn')?.addEventListener('click', function(e) {
+        e.preventDefault();
+        const selectedOrders = getSelectedOrders();
+        if (selectedOrders.length === 0) {
+            showToast('Por favor, selecciona al menos una orden', 'warning');
+            return;
+        }
+        submitBulkAction(selectedOrders, 'print-labels');
+    });
+    
+    document.getElementById('generateInvoiceBtn')?.addEventListener('click', function(e) {
+        e.preventDefault();
+        const selectedOrders = getSelectedOrders();
+        if (selectedOrders.length === 0) {
+            showToast('Por favor, selecciona al menos una orden', 'warning');
+            return;
+        }
+        submitBulkAction(selectedOrders, 'print-invoice');
+    });
+    
+    document.getElementById('generatePackingBtn')?.addEventListener('click', function(e) {
+        e.preventDefault();
+        const selectedOrders = getSelectedOrders();
+        if (selectedOrders.length === 0) {
+            showToast('Por favor, selecciona al menos una orden', 'warning');
+            return;
+        }
+        submitBulkAction(selectedOrders, 'generate-packing');
+    });
+    
+    document.getElementById('generatePickingBtn')?.addEventListener('click', function(e) {
+        e.preventDefault();
+        const selectedOrders = getSelectedOrders();
+        if (selectedOrders.length === 0) {
+            showToast('Por favor, selecciona al menos una orden', 'warning');
+            return;
+        }
+        submitBulkAction(selectedOrders, 'generate-picking');
+    });
+    
+    document.getElementById('markAsPrintedBtn')?.addEventListener('click', function(e) {
+        e.preventDefault();
+        const selectedOrders = getSelectedOrders();
+        if (selectedOrders.length === 0) {
+            showToast('Por favor, selecciona al menos una orden', 'warning');
+            return;
+        }
+        
+        if (confirm(`¿Confirmas que deseas marcar ${selectedOrders.length} órdenes como impresas?`)) {
+            selectedOrders.forEach(order => {
+                // Asegurarse de enviar la tabla correctamente
+                const table = order.marketplace ? 'Orders_' + order.marketplace : '<?= $table ?>';
+                markOrderAsPrinted(order.id, table);
+            });
+        }
+    });
+    
+    // Funciones de soporte
+    function getSelectedOrders() {
+        const selected = [];
+        document.querySelectorAll('.order-checkbox:checked').forEach(checkbox => {
+            let table = checkbox.dataset.marketplace;
+            if (table && !table.startsWith('Orders_')) {
+                table = 'Orders_' + table;
+            } else if (!table) {
+                table = '<?= $table ?>';
+            }
+            
+            selected.push({
+                id: checkbox.value,
+                marketplace: checkbox.dataset.marketplace,
+                table: table
+            });
+        });
+        return selected;
+    }
+    
+    function submitBulkAction(selectedOrders, action) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '<?= $this->url('application', ['action' => 'bulk-orders']) ?>';
+        
+        if (['print-labels', 'generate-manifest', 'generate-packing', 'generate-picking', 'print-invoice'].includes(action)) {
+            form.target = '_blank';
+        }
+        
+        selectedOrders.forEach(order => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'orderIds[]';
+            input.value = order.id;
+            form.appendChild(input);
+        });
+        
+        const tableInput = document.createElement('input');
+        tableInput.type = 'hidden';
+        tableInput.name = 'table';
+        tableInput.value = '<?= $this->escapeJs($table ?? '') ?>';
+        form.appendChild(tableInput);
+        
+        const actionInput = document.createElement('input');
+        actionInput.type = 'hidden';
+        actionInput.name = 'action';
+        actionInput.value = action;
+        form.appendChild(actionInput);
+        
+        document.body.appendChild(form);
+        form.submit();
+        document.body.removeChild(form);
+    }
+    
     function printSingleLabel(orderId, table) {
-        // Crear formulario para enviar solicitud
         const form = document.createElement('form');
         form.method = 'POST';
         form.action = '<?= $this->url('application', ['action' => 'bulk-orders']) ?>';
         form.target = '_blank';
         
-        // Agregar campos ocultos
         const orderIdInput = document.createElement('input');
         orderIdInput.type = 'hidden';
         orderIdInput.name = 'orderIds[]';
@@ -565,22 +739,17 @@ document.addEventListener('DOMContentLoaded', function() {
         actionInput.value = 'print-labels';
         form.appendChild(actionInput);
         
-        // Enviar formulario
         document.body.appendChild(form);
         form.submit();
         document.body.removeChild(form);
         
-        // Actualizar interfaz
         updateOrderPrintedStatus(orderId, true);
         
-        // Mostrar mensaje
         showToast(`Etiqueta generada. Orden ${orderId} marcada como impresa.`, 'success');
         
-        // Recargar después de un breve delay
         setTimeout(() => window.location.reload(), 2000);
     }
     
-    // Función para procesar orden
     function processOrder(orderId, table) {
         if (!confirm('¿Confirmas que deseas procesar esta orden? Se cambiará a estado "En Proceso".')) {
             return;
@@ -612,61 +781,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Función para marcar orden como impresa - CORREGIDO
-    function markOrderAsPrinted(orderId, table) {
-        // Asegurarse de que la tabla tenga el formato correcto
-        if (!table || !table.startsWith('Orders_')) {
-            table = table ? 'Orders_' + table : '<?= $table ?>';
-        }
-        
-        console.log('Enviando solicitud:', { orderId: orderId, table: table });
-        
-        fetch('<?= $this->url('application', ['action' => 'mark-as-printed']) ?>', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                orderId: orderId,
-                table: table
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showToast('Orden marcada como impresa', 'success');
-                updateOrderPrintedStatus(orderId, true);
-                setTimeout(() => window.location.reload(), 2000);
-            } else {
-                showToast('Error al marcar orden: ' + data.message, 'error');
-                console.error('Error:', data);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showToast('Error de comunicación', 'error');
-        });
-    }
-
-    // Agregar event listener para botones individuales de marcar como impreso
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('.mark-as-printed')) {
-            const btn = e.target.closest('.mark-as-printed');
-            const orderId = btn.dataset.id;
-            let table = btn.dataset.table;
-            
-            // Asegurarse de que la tabla tenga el formato correcto
-            if (!table.startsWith('Orders_')) {
-                table = 'Orders_' + table;
-            }
-            
-            if (confirm('¿Confirmas que deseas marcar esta orden como impresa?')) {
-                markOrderAsPrinted(orderId, table);
-            }
-        }
-    });
-
-    // Función para programar entrega
     function scheduleOrderDelivery(orderId, table, transportista, tracking) {
         fetch('<?= $this->url('application', ['action' => 'update-order-carrier']) ?>', {
             method: 'POST',
@@ -685,7 +799,11 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             if (data.success) {
                 showToast('Entrega programada. Orden cambiada a "Enviada"', 'success');
-                scheduleDeliveryModal.hide();
+                
+                // Cerrar modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('scheduleDeliveryModal'));
+                if (modal) modal.hide();
+                
                 setTimeout(() => window.location.reload(), 1500);
             } else {
                 showToast('Error al programar entrega', 'error');
@@ -697,7 +815,37 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Función para actualizar estado de impresión
+    function markOrderAsPrinted(orderId, table) {
+        if (!table.startsWith('Orders_')) {
+            table = 'Orders_' + table;
+        }
+        
+        fetch('<?= $this->url('application', ['action' => 'mark-as-printed']) ?>', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                orderId: orderId,
+                table: table
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Orden marcada como impresa', 'success');
+                updateOrderPrintedStatus(orderId, true);
+                setTimeout(() => window.location.reload(), 2000);
+            } else {
+                showToast('Error al marcar orden: ' + (data.message || 'Error desconocido'), 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('Error de comunicación', 'error');
+        });
+    }
+    
     function updateOrderPrintedStatus(orderId, printed) {
         const row = document.querySelector(`tr[data-id="${orderId}"]`);
         if (row) {
@@ -707,30 +855,38 @@ document.addEventListener('DOMContentLoaded', function() {
                 printedCell.textContent = printed ? 'Sí' : 'No';
             }
             
+            // Actualizar atributo para futuros filtros
+            row.dataset.printed = printed ? '1' : '0';
+            
             // Actualizar checkbox
             const checkbox = row.querySelector('.order-checkbox');
             if (checkbox) {
                 checkbox.dataset.printed = printed ? '1' : '0';
             }
             
-            // Actualizar botones de acción
+            // Actualizar botones de acción según el nuevo estado
             updateActionButtons(row);
         }
     }
     
-    // Función para actualizar botones de acción según estado
     function updateActionButtons(row) {
-        const estado = row.querySelector('td:nth-child(7) .badge').textContent.toLowerCase();
-        const printed = row.querySelector('td:nth-child(8) .badge').textContent.toLowerCase() === 'sí';
+        const estado = row.dataset.estado;
+        const printed = row.dataset.printed === '1' || row.dataset.printed === 'yes';
         const actionsCell = row.querySelector('td:last-child .d-flex');
         
-        // Limpiar botones actuales
-        while (actionsCell.children.length > 1) {
-            actionsCell.removeChild(actionsCell.lastChild);
-        }
+        // Conservar botón de detalle (ojo)
+        const detailButton = actionsCell.querySelector('a.btn-outline-primary');
         
-        // Agregar botones según estado
-        if (estado === 'nueva' && !printed) {
+        // Limpiar otros botones
+        Array.from(actionsCell.children).forEach(button => {
+            if (button !== detailButton) {
+                actionsCell.removeChild(button);
+            }
+        });
+        
+        // Añadir botones según estado
+        if (!printed) {
+            // Botón de imprimir
             const printBtn = document.createElement('button');
             printBtn.className = 'btn btn-sm btn-outline-secondary print-single-label ms-1';
             printBtn.dataset.id = row.dataset.id;
@@ -738,7 +894,8 @@ document.addEventListener('DOMContentLoaded', function() {
             printBtn.title = 'Imprimir etiqueta';
             printBtn.innerHTML = '<i class="fas fa-print"></i>';
             actionsCell.appendChild(printBtn);
-        } else if (estado === 'nueva' && printed) {
+        } else if (estado === 'nueva') {
+            // Botón de procesar
             const processBtn = document.createElement('button');
             processBtn.className = 'btn btn-sm btn-outline-info process-order ms-1';
             processBtn.dataset.id = row.dataset.id;
@@ -747,6 +904,7 @@ document.addEventListener('DOMContentLoaded', function() {
             processBtn.innerHTML = '<i class="fas fa-tasks"></i>';
             actionsCell.appendChild(processBtn);
         } else if (estado === 'en proceso') {
+            // Botón de programar entrega
             const deliveryBtn = document.createElement('button');
             deliveryBtn.className = 'btn btn-sm btn-outline-success schedule-delivery ms-1';
             deliveryBtn.dataset.id = row.dataset.id;
@@ -757,12 +915,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Función para mostrar toast messages
     function showToast(message, type = 'info') {
         let toastContainer = document.querySelector('.toast-container');
         if (!toastContainer) {
             toastContainer = document.createElement('div');
             toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+            toastContainer.style.zIndex = '9999';
             document.body.appendChild(toastContainer);
         }
         
@@ -793,237 +951,6 @@ document.addEventListener('DOMContentLoaded', function() {
             toastEl.remove();
         });
     }
-    
-    // Actualizar filtro de estado de impresión
-    const printedFilter = document.getElementById('printedFilter');
-    if (printedFilter) {
-        printedFilter.addEventListener('change', function() {
-            const currentUrl = new URL(window.location.href);
-            
-            if (this.value) {
-                currentUrl.searchParams.set('printed', this.value);
-            } else {
-                currentUrl.searchParams.delete('printed');
-            }
-            
-            currentUrl.searchParams.set('page', 1);
-            window.location.href = currentUrl.toString();
-        });
-    }
-    
-    // Funcionalidad de selección de órdenes
-    const selectAllCheckbox = document.getElementById('selectAllOrders');
-    const orderCheckboxes = document.querySelectorAll('.order-checkbox');
-    
-    if (selectAllCheckbox) {
-        selectAllCheckbox.addEventListener('change', function() {
-            orderCheckboxes.forEach(checkbox => {
-                checkbox.checked = this.checked;
-            });
-            updateBulkActionsState();
-        });
-    }
-    
-    orderCheckboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', function() {
-            updateBulkActionsState();
-            
-            // Si se desmarca alguna casilla, desmarcar "Seleccionar todos"
-            if (!this.checked && selectAllCheckbox.checked) {
-                selectAllCheckbox.checked = false;
-            }
-            
-            // Si se marcan todas manualmente, marcar "Seleccionar todos"
-            if (document.querySelectorAll('.order-checkbox:checked').length === orderCheckboxes.length) {
-                selectAllCheckbox.checked = true;
-            }
-        });
-    });
-    
-    // Función para mostrar/ocultar el botón de acciones masivas
-    function updateBulkActionsState() {
-        const selectedCount = document.querySelectorAll('.order-checkbox:checked').length;
-        const bulkActionsBtn = document.getElementById('bulkActionsBtn');
-        
-        if (bulkActionsBtn) {
-            if (selectedCount > 0) {
-                bulkActionsBtn.classList.remove('disabled');
-                bulkActionsBtn.innerHTML = `<i class="fas fa-cog me-1"></i> Acciones (${selectedCount})`;
-            } else {
-                bulkActionsBtn.classList.add('disabled');
-                bulkActionsBtn.innerHTML = `<i class="fas fa-cog me-1"></i> Acciones`;
-            }
-        }
-    }
-    
-    // Función para obtener órdenes seleccionadas - CORREGIDO
-    function getSelectedOrders() {
-        const selected = [];
-        document.querySelectorAll('.order-checkbox:checked').forEach(checkbox => {
-            let table = checkbox.dataset.marketplace;
-            // Asegurarse de que la tabla tenga el formato correcto
-            if (table && !table.startsWith('Orders_')) {
-                table = 'Orders_' + table;
-            } else if (!table) {
-                table = '<?= $table ?>';
-            }
-            
-            selected.push({
-                id: checkbox.value,
-                marketplace: checkbox.dataset.marketplace, // Guardar el marketplace original
-                table: table
-            });
-        });
-        return selected;
-    }
-    
-    // Función para enviar acciones masivas
-    function submitBulkAction(selectedOrders, action) {
-        // Crear un form temporal para enviar la solicitud
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '<?= $this->url('application', ['action' => 'bulk-orders']) ?>';
-        
-        // Si la acción genera un documento, abrir en nueva pestaña
-        if (['print-labels', 'generate-manifest', 'generate-packing', 'generate-picking', 'print-invoice'].includes(action)) {
-            form.target = '_blank';
-        }
-        
-        // Agregar los IDs de órdenes seleccionadas
-        selectedOrders.forEach(order => {
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = 'orderIds[]';
-            input.value = order.id;
-            form.appendChild(input);
-        });
-        
-        // Agregar la tabla (marketplace)
-        const tableInput = document.createElement('input');
-        tableInput.type = 'hidden';
-        tableInput.name = 'table';
-        tableInput.value = '<?= $this->escapeJs($table ?? '') ?>';
-        form.appendChild(tableInput);
-        
-        // Agregar la acción
-        const actionInput = document.createElement('input');
-        actionInput.type = 'hidden';
-        actionInput.name = 'action';
-        actionInput.value = action;
-        form.appendChild(actionInput);
-        
-        // Enviar el formulario
-        document.body.appendChild(form);
-        form.submit();
-        document.body.removeChild(form);
-    }
-    
-    // Inicializar acciones masivas
-    if (document.getElementById('printLabelsBtn')) {
-        document.getElementById('printLabelsBtn').addEventListener('click', function(e) {
-            e.preventDefault();
-            const selectedOrders = getSelectedOrders();
-            if (selectedOrders.length === 0) {
-                showToast('Por favor, selecciona al menos una orden para imprimir etiquetas.', 'warning');
-                return;
-            }
-            submitBulkAction(selectedOrders, 'print-labels');
-        });
-    }
-    
-    if (document.getElementById('generateInvoiceBtn')) {
-        document.getElementById('generateInvoiceBtn').addEventListener('click', function(e) {
-            e.preventDefault();
-            const selectedOrders = getSelectedOrders();
-            if (selectedOrders.length === 0) {
-                showToast('Por favor, selecciona al menos una orden para imprimir boletas.', 'warning');
-                return;
-            }
-            submitBulkAction(selectedOrders, 'print-invoice');
-        });
-    }
-    
-    if (document.getElementById('generateManifestBtn')) {
-        document.getElementById('generateManifestBtn').addEventListener('click', function(e) {
-            e.preventDefault();
-            
-            const selectedOrders = getSelectedOrders();
-            if (selectedOrders.length === 0) {
-                showToast('Por favor, selecciona al menos una orden para generar manifiesto.', 'warning');
-                return;
-            }
-            
-            submitBulkAction(selectedOrders, 'generate-manifest');
-        });
-    }
-    
-    if (document.getElementById('generatePackingBtn')) {
-        document.getElementById('generatePackingBtn').addEventListener('click', function(e) {
-            e.preventDefault();
-            
-            const selectedOrders = getSelectedOrders();
-            if (selectedOrders.length === 0) {
-                showToast('Por favor, selecciona al menos una orden para generar lista de empaque.', 'warning');
-                return;
-            }
-            
-            submitBulkAction(selectedOrders, 'generate-packing');
-        });
-    }
-    
-    if (document.getElementById('generatePickingBtn')) {
-        document.getElementById('generatePickingBtn').addEventListener('click', function(e) {
-            e.preventDefault();
-            
-            const selectedOrders = getSelectedOrders();
-            if (selectedOrders.length === 0) {
-                showToast('Por favor, selecciona al menos una orden para generar lista de picking.', 'warning');
-                return;
-            }
-            
-            submitBulkAction(selectedOrders, 'generate-picking');
-        });
-    }
-    
-    if (document.getElementById('exportExcelBtn')) {
-        document.getElementById('exportExcelBtn').addEventListener('click', function(e) {
-            e.preventDefault();
-            
-            const selectedOrders = getSelectedOrders();
-            if (selectedOrders.length === 0) {
-                showToast('Por favor, selecciona al menos una orden para exportar.', 'warning');
-                return;
-            }
-            
-            submitBulkAction(selectedOrders, 'export-excel');
-        });
-    }
-    
-    // Funcionalidad de filtros select
-    const statusFilterSelect = document.getElementById('statusFilter');
-    
-    if (statusFilterSelect) {
-        statusFilterSelect.addEventListener('change', function() {
-            const currentUrl = new URL(window.location.href);
-            
-            if (this.value) {
-                currentUrl.searchParams.set('status', this.value);
-            } else {
-                currentUrl.searchParams.delete('status');
-            }
-            
-            currentUrl.searchParams.set('page', 1); // Reset page
-            window.location.href = currentUrl.toString();
-        });
-    }
-    
-    // Inicializar botón de actualización
-    const refreshListBtn = document.getElementById('refreshListBtn');
-    if (refreshListBtn) {
-        refreshListBtn.addEventListener('click', function() {
-            window.location.reload();
-        });
-    }
 });
 </script>
 
@@ -1047,117 +974,72 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 .toast-container {
-    z-index: 9999;
+    z-index: 9999 !important;
 }
 
-/* Estilos para diferentes estados de órdenes */
-tr[data-estado="nueva"] {
-    background-color: #fff3cd;
+/* Estilos por estado */
+tr[data-estado="nueva"][data-printed="0"] {
+    background-color: rgba(255, 243, 205, 0.3);
 }
 
-tr[data-estado="en-proceso"] {
-    background-color: #cff4fc;
+tr[data-estado="nueva"][data-printed="1"] {
+    background-color: rgba(207, 244, 252, 0.3);
 }
 
-tr[data-estado="enviada"] {
-    background-color: #d1e7dd;
+tr[data-estado="en proceso"] {
+    background-color: rgba(209, 231, 221, 0.3);
 }
 
-/* SOLUCION DEFINITIVA PARA DROPDOWN */
-/* Asegurar que la tabla tenga un z-index muy bajo */
-.table-container {
-    position: relative;
-    z-index: 1 !important;
-}
-
-.table-responsive {
-    position: relative;
-    z-index: 1 !important;
-    overflow: auto !important;
-}
-
-.table {
-    position: relative;
-    z-index: 1 !important;
-}
-
-.table thead {
-    position: relative;
-    z-index: 2 !important;
-}
-
-.table th {
-    z-index: 2 !important;
-}
-
-.table td {
-    z-index: 1 !important;
-}
-
-/* Asegurar que los contenedores de filtros y botones tengan z-index alto */
-.filters-card {
-    position: relative;
-    z-index: 10 !important;
-}
-
-.actions-container {
+/* SOLUCIÓN PARA EL DROPDOWN DE ÓRDENES */
+/* Usamos clases específicas para este dropdown */
+.order-filters-card {
     position: relative;
     z-index: 100 !important;
+    overflow: visible !important;
 }
 
-/* DROPDOWN CON Z-INDEX MÁXIMO */
-.dropdown {
-    position: relative;
-    z-index: 1000 !important;
+.orders-dropdown {
+    position: relative !important;
+    z-index: 10000 !important;
 }
 
-.dropdown .btn {
-    position: relative;
-    z-index: 1001 !important;
+.orders-dropdown .dropdown-toggle {
+    position: relative !important;
+    z-index: 10000 !important;
 }
 
-.dropdown-menu {
-    position: absolute;
-    z-index: 1002 !important;
-    transform: translateZ(0);
+.orders-dropdown-menu {
+    position: absolute !important;
+    z-index: 10001 !important;
 }
 
-.dropdown.show {
-    z-index: 1003 !important;
+/* Aseguramos que las tablas no interfieran */
+.table-responsive,
+.table,
+.card,
+.card-body {
+    position: relative !important;
+    z-index: 1 !important;
+    overflow: visible !important;
 }
 
+/* Mejoras visuales adicionales */
+.page-link {
+    color: #4361ee;
+}
+
+.page-item.active .page-link {
+    background-color: #4361ee;
+    border-color: #4361ee;
+}
+
+.form-select:focus, .form-control:focus {
+    border-color: #4361ee;
+    box-shadow: 0 0 0 0.25rem rgba(67, 97, 238, 0.25);
+}
+
+/* Fix adicional para la visibilidad del dropdown */
 .dropdown-menu.show {
     display: block !important;
-    z-index: 1004 !important;
-    position: absolute !important;
-}
-
-/* Asegurar que el contenedor de los botones tenga mayor z-index */
-.d-flex.gap-2 {
-    position: relative;
-    z-index: 500 !important;
-}
-
-/* Removemos cualquier overflow que pueda interferir */
-.card {
-    overflow: visible !important;
-}
-
-.card-body {
-    overflow: visible !important;
-}
-
-/* Para asegurar que nada interfiera con el dropdown */
-.dropdown .dropdown-toggle::after {
-    z-index: 1005 !important;
-}
-
-/* Estilo específico para el modal que no interfiera */
-.modal {
-    z-index: 2000 !important;
-}
-
-.modal-backdrop {
-    z-index: 1999 !important;
 }
 </style>

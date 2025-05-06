@@ -35,6 +35,20 @@ return [
                 ],
             ],
 
+            'scan-orders' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/scan-orders',
+                    'defaults' => [
+                        'controller' => Controller\IndexController::class,
+                        'action'     => 'scan-orders',
+                    ],
+                ],
+                'middleware' => [
+                    AuthenticationMiddleware::class,
+                ],
+            ],
+
             'order-detail' => [
                 'type' => Segment::class,
                 'options' => [
