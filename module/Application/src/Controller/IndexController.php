@@ -1310,81 +1310,88 @@ public function detailAction()
         return $response;
     }
 
+
     public function ordersDetailAction()
-    {
-        // Verificar autenticación
-        $redirect = $this->checkAuth();
-        if ($redirect !== null) {
-            return $redirect;
+{
+    // Verificar autenticación
+    $redirect = $this->checkAuth();
+    if ($redirect !== null) {
+        return $redirect;
+    }
+    
+    // Obtain marketplace from route
+    $table = $this->params()->fromRoute('table', null);
+    if (!$table) {
+        return $this->redirect()->toRoute('application', ['action' => 'orders']);
+    }
+    
+    // Validate table name
+    if (strpos($table, 'Orders_') !== 0) {
+        return $this->redirect()->toRoute('application', ['action' => 'orders']);
+    }
+    
+    // Get pagination parameters and filters
+    $page = (int) $this->params()->fromQuery('page', 1);
+    $limit = (int) $this->params()->fromQuery('limit', 30);
+    
+    // Collect all available filters
+    $filters = [
+        'search' => $this->params()->fromQuery('search', ''),
+        'status' => $this->params()->fromQuery('status', ''),
+        'printed' => $this->params()->fromQuery('printed', ''),
+        'transportista' => $this->params()->fromQuery('transportista', ''),
+        'startDate' => $this->params()->fromQuery('startDate', ''),
+        'endDate' => $this->params()->fromQuery('endDate', '')
+    ];
+    
+    try {
+        // Calculate counters for dashboard using specific SQL query with your column structure
+        $countersSql = "SELECT
+            SUM(CASE WHEN printed = 0 AND procesado = 0 THEN 1 ELSE 0 END) AS sin_imprimir,
+            SUM(CASE WHEN printed = 1 AND procesado = 0 THEN 1 ELSE 0 END) AS impresos_no_procesados,
+            SUM(CASE WHEN printed = 1 AND procesado = 1 THEN 1 ELSE 0 END) AS procesados
+        FROM `$table`";
+        
+        $countersStatement = $this->dbAdapter->createStatement($countersSql);
+        $countersResult = $countersStatement->execute();
+        
+        // Get results (handle case of no results)
+        $counters = $countersResult->current();
+        if (!$counters) {
+            $counters = [
+                'sin_imprimir' => 0,
+                'impresos_no_procesados' => 0,
+                'procesados' => 0
+            ];
         }
         
-        // Obtain marketplace from route
-        $table = $this->params()->fromRoute('table', null);
-        if (!$table) {
-            return $this->redirect()->toRoute('application', ['action' => 'orders']);
-        }
+        // Ensure that values are numeric
+        $counters['sin_imprimir'] = (int)($counters['sin_imprimir'] ?? 0);
+        $counters['impresos_no_procesados'] = (int)($counters['impresos_no_procesados'] ?? 0);
+        $counters['procesados'] = (int)($counters['procesados'] ?? 0);
         
-        // Validate table name
-        if (strpos($table, 'Orders_') !== 0) {
-            return $this->redirect()->toRoute('application', ['action' => 'orders']);
-        }
+        // Get paginated orders with applied filters
+        $paginatedData = $this->getOrdersWithPagination($table, $page, $limit, $filters);
         
-        // Get pagination parameters and filters
-        $page = (int) $this->params()->fromQuery('page', 1);
-        $limit = (int) $this->params()->fromQuery('limit', 30);
-        
-        // Collect all available filters
-        $filters = [
-            'search' => $this->params()->fromQuery('search', ''),
-            'status' => $this->params()->fromQuery('status', ''),
-            'printed' => $this->params()->fromQuery('printed', ''),
-            'transportista' => $this->params()->fromQuery('transportista', ''),
-            'startDate' => $this->params()->fromQuery('startDate', ''),
-            'endDate' => $this->params()->fromQuery('endDate', '')
-        ];
-        
-        try {
-            // Calculate counters for dashboard using specific SQL query with your column structure
-            $countersSql = "SELECT
-                SUM(CASE WHEN printed = 0 AND procesado = 0 THEN 1 ELSE 0 END) AS sin_imprimir,
-                SUM(CASE WHEN printed = 1 AND procesado = 0 THEN 1 ELSE 0 END) AS impresos_no_procesados,
-                SUM(CASE WHEN printed = 1 AND procesado = 1 THEN 1 ELSE 0 END) AS procesados
-            FROM `$table`";
+        // Format results for view
+        $orders = [];
+        foreach ($paginatedData['orders'] as $row) {
+            // Add marketplace to each order to facilitate actions
+            $row['marketplace'] = str_replace('Orders_', '', $table);
             
-            $countersStatement = $this->dbAdapter->createStatement($countersSql);
-            $countersResult = $countersStatement->execute();
-            
-            // Get results (handle case of no results)
-            $counters = $countersResult->current();
-            if (!$counters) {
-                $counters = [
-                    'sin_imprimir' => 0,
-                    'impresos_no_procesados' => 0,
-                    'procesados' => 0
-                ];
+            // Ensure that 'printed' is a consistent boolean or numeric value
+            if (isset($row['printed'])) {
+                $row['printed'] = (int)$row['printed'];
             }
             
-            // Ensure that values are numeric
-            $counters['sin_imprimir'] = (int)($counters['sin_imprimir'] ?? 0);
-            $counters['impresos_no_procesados'] = (int)($counters['impresos_no_procesados'] ?? 0);
-            $counters['procesados'] = (int)($counters['procesados'] ?? 0);
-            
-            // Get paginated orders with applied filters
-            $paginatedData = $this->getOrdersWithPagination($table, $page, $limit, $filters);
-            
-            // Format results for view
-            $orders = [];
-            foreach ($paginatedData['orders'] as $row) {
-                // Add marketplace to each order to facilitate actions
-                $row['marketplace'] = str_replace('Orders_', '', $table);
-                
-                // Ensure that 'printed' is a consistent boolean or numeric value
-                if (isset($row['printed'])) {
-                    $row['printed'] = (int)$row['printed'];
-                }
-                
-                // Process JSON product data if it exists
-                if (isset($row['productos']) && !empty($row['productos'])) {
+            // Process JSON product data if it exists
+            if (isset($row['productos']) && !empty($row['productos'])) {
+                // Check if $row['productos'] is already an array
+                if (is_array($row['productos'])) {
+                    // Already an array, no need to decode
+                    $productos = $row['productos'];
+                } else {
+                    // Try to decode if it's a string
                     try {
                         $productos = json_decode($row['productos'], true);
                         if (json_last_error() === JSON_ERROR_NONE && is_array($productos)) {
@@ -1394,62 +1401,65 @@ public function detailAction()
                         // Keep products as text if not valid JSON
                     }
                 }
-                
-                $orders[] = $row;
             }
             
-            // Create specific variables for the view from the counters
-            $sinImprimir = $counters['sin_imprimir'];
-            $impresosNoProcesados = $counters['impresos_no_procesados'];
-            $procesados = $counters['procesados'];
-            
-            // Return the view with the data
-            return new ViewModel([
-                'table' => $table,
-                'orders' => $orders,
-                'page' => $paginatedData['page'],
-                'limit' => $paginatedData['limit'],
-                'totalPages' => $paginatedData['totalPages'],
-                'total' => $paginatedData['total'],
-                'search' => $filters['search'],
-                'statusFilter' => $filters['status'],
-                'printedFilter' => $filters['printed'],
-                'transportistaFilter' => $filters['transportista'],
-                'startDate' => $filters['startDate'],
-                'endDate' => $filters['endDate'],
-                // Add specific variables for dashboard counters
-                'sinImprimir' => $sinImprimir,
-                'impresosNoProcesados' => $impresosNoProcesados,
-                'procesados' => $procesados
-            ]);
-        } catch (\Exception $e) {
-            // Error handling - log and display generic message
-            error_log('Error en ordersDetailAction: ' . $e->getMessage());
-            
-            // Create flash message with error
-            $this->flashMessenger()->addErrorMessage('Error al cargar los datos: ' . $e->getMessage());
-            
-            // Return view with empty data
-            return new ViewModel([
-                'table' => $table,
-                'orders' => [],
-                'page' => 1,
-                'limit' => $limit,
-                'totalPages' => 0,
-                'total' => 0,
-                'search' => $filters['search'],
-                'statusFilter' => $filters['status'],
-                'printedFilter' => $filters['printed'],
-                'transportistaFilter' => $filters['transportista'],
-                'startDate' => $filters['startDate'],
-                'endDate' => $filters['endDate'],
-                'sinImprimir' => 0,
-                'impresosNoProcesados' => 0,
-                'procesados' => 0,
-                'error' => true
-            ]);
+            $orders[] = $row;
         }
+        
+        // Create specific variables for the view from the counters
+        $sinImprimir = $counters['sin_imprimir'];
+        $impresosNoProcesados = $counters['impresos_no_procesados'];
+        $procesados = $counters['procesados'];
+        
+        // Return the view with the data
+        return new ViewModel([
+            'table' => $table,
+            'orders' => $orders,
+            'page' => $paginatedData['page'],
+            'limit' => $paginatedData['limit'],
+            'totalPages' => $paginatedData['totalPages'],
+            'total' => $paginatedData['total'],
+            'search' => $filters['search'],
+            'statusFilter' => $filters['status'],
+            'printedFilter' => $filters['printed'],
+            'transportistaFilter' => $filters['transportista'],
+            'startDate' => $filters['startDate'],
+            'endDate' => $filters['endDate'],
+            // Add specific variables for dashboard counters
+            'sinImprimir' => $sinImprimir,
+            'impresosNoProcesados' => $impresosNoProcesados,
+            'procesados' => $procesados
+        ]);
+    } catch (\Exception $e) {
+        // Error handling - log and display generic message
+        error_log('Error en ordersDetailAction: ' . $e->getMessage());
+        
+        // Create flash message with error
+        $this->flashMessenger()->addErrorMessage('Error al cargar los datos: ' . $e->getMessage());
+        
+        // Return view with empty data
+        return new ViewModel([
+            'table' => $table,
+            'orders' => [],
+            'page' => 1,
+            'limit' => $limit,
+            'totalPages' => 0,
+            'total' => 0,
+            'search' => $filters['search'],
+            'statusFilter' => $filters['status'],
+            'printedFilter' => $filters['printed'],
+            'transportistaFilter' => $filters['transportista'],
+            'startDate' => $filters['startDate'],
+            'endDate' => $filters['endDate'],
+            'sinImprimir' => 0,
+            'impresosNoProcesados' => 0,
+            'procesados' => 0,
+            'error' => true
+        ]);
     }
+}
+
+
     private function getOrdersWithPagination($table, $page, $limit, $filters)
     {
         // Construir la consulta base
@@ -1658,7 +1668,6 @@ public function orderDetailAction()
     }
 }
 
-
 private function processOrderProducts($order, $mkpData)
 {
     $products = [];
@@ -1668,6 +1677,12 @@ private function processOrderProducts($order, $mkpData)
     
     // Si tenemos un SKU y un producto
     if ($orderSku && !empty($order['productos'])) {
+        // Verificar si productos ya es un array
+        if (is_array($order['productos'])) {
+            // Ya es un array, usarlo directamente
+            return $order['productos'];
+        }
+        
         // No dividir el SKU, mantenerlo como está para mostrarlo en una sola línea
         $productName = $order['productos'];
         
@@ -1689,15 +1704,24 @@ private function processOrderProducts($order, $mkpData)
     
     // Código de respaldo por si lo anterior no funciona
     // Primero verificar si productos está en formato JSON
-    if (!empty($order['productos']) && is_string($order['productos'])) {
-        // Intentar decodificar JSON
-        $jsonProducts = json_decode($order['productos'], true);
-        
-        if (json_last_error() === JSON_ERROR_NONE && is_array($jsonProducts)) {
-            // Ya tenemos productos en formato JSON
-            $products = $jsonProducts;
+    if (!empty($order['productos'])) {
+        // Verificar si ya es un array
+        if (is_array($order['productos'])) {
+            // Ya es un array, usarlo directamente
+            $jsonProducts = $order['productos'];
+        } else if (is_string($order['productos'])) {
+            // Intentar decodificar JSON solo si es una cadena
+            $jsonProducts = json_decode($order['productos'], true);
         } else {
-            // Si no es JSON, procesar como cadena de productos
+            // No es ni string ni array, inicializar como array vacío
+            $jsonProducts = [];
+        }
+        
+        if (is_array($jsonProducts) && !empty($jsonProducts)) {
+            // Ya tenemos productos en formato array
+            $products = $jsonProducts;
+        } else if (is_string($order['productos'])) {
+            // Si no es JSON válido, procesar como cadena de productos
             $productStrings = explode(',', $order['productos']);
             foreach ($productStrings as $i => $productString) {
                 $productString = trim($productString);
@@ -1718,15 +1742,20 @@ private function processOrderProducts($order, $mkpData)
     
     // Si no hay productos o el array está vacío, usar datos de MKP
     if (empty($products) && $mkpData) {
-        $products[] = [
-            'id' => 1,
-            'nombre' => $mkpData['productos'] ?? $order['productos'] ?? 'Sin nombre',
-            'sku' => $mkpData['sku'] ?? $orderSku ?? 'N/A',
-            'cantidad' => 1,
-            'precio_unitario' => $mkpData['precio_base'] ?? $order['total'] ?? 0,
-            'subtotal' => $mkpData['precio_base'] ?? $order['total'] ?? 0,
-            'procesado' => $order['procesado'] ?? 0
-        ];
+        // Verificar si mkpData['productos'] es un array
+        if (isset($mkpData['productos']) && is_array($mkpData['productos'])) {
+            $products = $mkpData['productos'];
+        } else {
+            $products[] = [
+                'id' => 1,
+                'nombre' => $mkpData['productos'] ?? $order['productos'] ?? 'Sin nombre',
+                'sku' => $mkpData['sku'] ?? $orderSku ?? 'N/A',
+                'cantidad' => 1,
+                'precio_unitario' => $mkpData['precio_base'] ?? $order['total'] ?? 0,
+                'subtotal' => $mkpData['precio_base'] ?? $order['total'] ?? 0,
+                'procesado' => $order['procesado'] ?? 0
+            ];
+        }
     }
     
     // Si después de todo no hay productos, crear uno genérico
@@ -1743,6 +1772,62 @@ private function processOrderProducts($order, $mkpData)
     }
     
     return $products;
+}
+
+
+public function updateOrderProcessedStatusAction()
+{
+    $request = $this->getRequest();
+    $response = $this->getResponse();
+    $response->getHeaders()->addHeaderLine('Content-Type', 'application/json');
+    
+    if ($request->isPost()) {
+        $data = json_decode($request->getContent(), true);
+        $orderId = $data['orderId'] ?? null;
+        $table = $data['table'] ?? null;
+        $allProcessed = $data['allProcessed'] ?? false;
+        
+        if (!$orderId || !$table) {
+            $response->setContent(json_encode([
+                'success' => false,
+                'message' => 'Datos incompletos'
+            ]));
+            return $response;
+        }
+        
+        try {
+            // Actualizar el campo procesado de la orden
+            $sql = "UPDATE `$table` SET procesado = 1 WHERE suborder_number = ?";
+            $statement = $this->dbAdapter->createStatement($sql);
+            $result = $statement->execute([$orderId]);
+            
+            if ($result->getAffectedRows() > 0) {
+                $response->setContent(json_encode([
+                    'success' => true,
+                    'message' => 'Orden actualizada correctamente'
+                ]));
+            } else {
+                $response->setContent(json_encode([
+                    'success' => false,
+                    'message' => 'No se pudo actualizar la orden'
+                ]));
+            }
+        } catch (\Exception $e) {
+            error_log("Error en updateOrderProcessedStatusAction: " . $e->getMessage());
+            $response->setContent(json_encode([
+                'success' => false,
+                'message' => 'Error al actualizar orden: ' . $e->getMessage()
+            ]));
+        }
+        
+        return $response;
+    }
+    
+    $response->setContent(json_encode([
+        'success' => false,
+        'message' => 'Método no permitido'
+    ]));
+    return $response;
 }
 
 /**

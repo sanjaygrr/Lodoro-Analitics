@@ -32,12 +32,13 @@ $marketplaceColor = $marketplaceColors[$marketplace] ?? '#4361ee';
 $productsJson = [];
 foreach ($products as $product) {
     $productsJson[] = [
-        'id' => $product['id'],
-        'sku' => $product['sku'],
-        'nombre' => $product['nombre'],
-        'procesado' => $product['procesado'] ?? 0
+        'id'        => $product['id']        ?? null,
+        'sku'       => $product['sku']       ?? '',
+        'nombre'    => $product['nombre']    ?? '',
+        'procesado' => $product['procesado'] ?? 0,
     ];
 }
+
 ?>
 
 <div class="container-fluid py-4">
@@ -360,6 +361,14 @@ foreach ($products as $product) {
                         <button class="btn btn-outline-secondary" onclick="window.print()">
                             <i class="fas fa-print me-2"></i> Imprimir Resumen
                         </button>
+
+
+                        <!-- Añadir en la sección "Acciones Rápidas" dentro del <div class="d-grid gap-2"> -->
+                        <?php if ($order['procesado'] == '0'): ?>
+                        <button class="btn btn-success" id="markOrderProcessedBtn">
+                            <i class="fas fa-check-circle me-2"></i> Marcar Orden como Procesada
+                        </button>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -896,6 +905,49 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+
+    // Marcar orden como procesada
+const markOrderProcessedBtn = document.getElementById('markOrderProcessedBtn');
+if (markOrderProcessedBtn) {
+    markOrderProcessedBtn.addEventListener('click', function() {
+        if (!confirm('¿Confirmas que deseas marcar esta orden como procesada?')) {
+            return;
+        }
+        
+        console.log("Marcando orden como procesada:", orderId, "tabla:", table);
+        
+        fetch('<?= $this->url('application', ['action' => 'update-order-processed-status']) ?>', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+                orderId: orderId,
+                table: table,
+                allProcessed: true
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Error HTTP ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                alert('Orden marcada como procesada correctamente');
+                location.reload();
+            } else {
+                alert('Error al marcar la orden como procesada');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error de comunicación');
+        });
+    });
+}
     // Función para marcar producto como procesado
     window.markAsProcessed = function(sku) {
         console.log("Enviando solicitud para marcar como procesado:", sku);
