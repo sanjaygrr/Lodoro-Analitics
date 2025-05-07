@@ -35,6 +35,20 @@ return [
                 ],
             ],
 
+            'process-all-products' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/application/process-all-products',
+                    'defaults' => [
+                        'controller' => Controller\IndexController::class,
+                        'action'     => 'process-all-products',
+                    ],
+                ],
+                'middleware' => [
+                    AuthenticationMiddleware::class,
+                ],
+            ],
+
             'scan-orders' => [
                 'type' => Literal::class,
                 'options' => [
