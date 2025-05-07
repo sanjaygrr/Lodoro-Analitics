@@ -88,29 +88,6 @@ foreach ($products as $product) {
                     <div class="row">
                         <div class="col-md-4">
                             <div class="mb-3">
-                                <label class="form-label text-muted">Estado Actual</label>
-                                <div>
-                                    <?php
-                                    $estado = strtolower($order['estado'] ?? '');
-                                    $estadoClass = match ($estado) {
-                                        'nueva' => 'bg-primary',
-                                        'en proceso' => 'bg-info text-dark',
-                                        'enviada' => 'bg-success',
-                                        'entregada' => 'bg-success',
-                                        'devuelta' => 'bg-danger',
-                                        'pendiente de pago' => 'bg-warning text-dark',
-                                        'cancelada' => 'bg-danger',
-                                        default => 'bg-secondary'
-                                    };
-                                    ?>
-                                    <span class="badge <?= $estadoClass ?> fs-6">
-                                        <?= ucfirst($this->escapeHtml($order['estado'] ?? 'Sin estado')) ?>
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
                                 <label class="form-label text-muted">Estado de Impresión</label>
                                 <div>
                                     <?php
@@ -447,27 +424,6 @@ foreach ($products as $product) {
                         </p>
                     </div>
                     
-                    <div class="mb-3">
-                        <label class="form-label text-muted">Número de Liquidación</label>
-                        <p class="mb-0">
-                            <?php if (!empty($order['numero_liquidacion'])): ?>
-                                <code><?= $this->escapeHtml($order['numero_liquidacion']) ?></code>
-                            <?php else: ?>
-                                <span class="text-muted">N/A</span>
-                            <?php endif; ?>
-                        </p>
-                    </div>
-                    
-                    <div class="mb-0">
-                        <label class="form-label text-muted">Monto Liquidación</label>
-                        <p class="mb-0">
-                            <?php if (isset($order['monto_liquidacion']) && $order['monto_liquidacion'] > 0): ?>
-                                <strong>$<?= number_format($order['monto_liquidacion'], 0, ',', '.') ?></strong>
-                            <?php else: ?>
-                                <span class="text-muted">N/A</span>
-                            <?php endif; ?>
-                        </p>
-                    </div>
                 </div>
             </div>
 
@@ -485,11 +441,6 @@ foreach ($products as $product) {
                     <div class="mb-3">
                         <label class="form-label text-muted">Tipo de Documento</label>
                         <p class="mb-0"><?= $this->escapeHtml($order['tipo_documento'] ?? 'N/A') ?></p>
-                    </div>
-                    
-                    <div class="mb-0">
-                        <label class="form-label text-muted">ID Estado</label>
-                        <p class="mb-0"><?= $this->escapeHtml($order['id_estado'] ?? 'N/A') ?></p>
                     </div>
                 </div>
             </div>
