@@ -1187,6 +1187,8 @@ body {
     transition: all var(--transition-speed) ease;
 }
 
+
+
 /* Iconos en las cards */
 .card .fa, 
 .card .fas,

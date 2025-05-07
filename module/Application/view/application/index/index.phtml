@@ -121,8 +121,10 @@ try {
                             </div>
                             <h3 class="card-title">Gestión de Pedidos</h3>
                             <p class="card-text">Administre órdenes de todos sus marketplaces en un solo lugar con seguimiento en tiempo real.</p>
-                            <a href="<?= $this->url('application', ['action' => 'orders']) ?>" class="btn btn-success mt-3">
-                                Administrar <i class="fas fa-arrow-right ms-2"></i>
+                            <a href="<?= $this->url('scan-orders') ?>"
+                            class="btn btn-success mt-3 <?= $this->url('scan-orders') === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                                <i class="fas fa-barcode nav-icon"></i>
+                                <span>Escáner de Órdenes</span>
                             </a>
                         </div>
                     </div>
