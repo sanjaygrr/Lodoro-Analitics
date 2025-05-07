@@ -85,11 +85,6 @@ $currentStatus = $statusFilter ?? '';
                                 <h5 class="fw-semibold mb-1 text-success"><?= number_format($procesados) ?></h5>
                                 <span class="text-muted">Procesados</span>
                                 <?php if ($currentStatus !== 'En Proceso' && $procesados > 0): ?>
-                                <div class="mt-2">
-                                    <a href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => $table], ['query' => ['status' => 'En Proceso']]) ?>" class="btn btn-sm btn-outline-success">
-                                        Ver pedidos
-                                    </a>
-                                </div>
                                 <?php endif; ?>
                             </div>
                         </div>
