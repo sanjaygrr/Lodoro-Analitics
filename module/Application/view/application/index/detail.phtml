@@ -718,61 +718,86 @@ function closeLiquidationModal() {
 
 
 
-
 document.getElementById('liquidationForm').addEventListener('submit', function(e) {
     e.preventDefault();
 
     const fileInput = document.getElementById('liquidationFile');
     const file = fileInput.files[0];
-    const form = e.target;
-
+    
     if (!file) {
         alert('Por favor selecciona un archivo');
         return;
     }
 
-    const allowedExtensions = ['xls', 'xlsx'];
-    const fileExtension = file.name.split('.').pop().toLowerCase();
-
-    if (!allowedExtensions.includes(fileExtension)) {
-        alert('Solo se permiten archivos Excel (.xls, .xlsx)');
-        return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-        alert('El archivo es muy grande. Tamaño máximo: 10MB');
-        return;
-    }
-
-    const formData = new FormData(form);
-
-    // Deshabilita el botón para evitar múltiples envíos
-    form.querySelector('button[type="submit"]').disabled = true;
-
-    // Cierra el modal
+    const formData = new FormData(this);
+    
+    // Show loading indicator
+    showLoading();
+    
+    // Disable submit button
+    const submitBtn = this.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+    
+    // Close modal
     closeLiquidationModal();
 
-    // Envía el formulario manualmente
-    fetch(form.action, {
+    fetch(this.action, {
         method: 'POST',
         body: formData
     })
     .then(response => {
-        if (!response.ok) throw new Error('Error al procesar el archivo');
-        return response.text(); // o .json() si tu backend responde con JSON
+        console.log('Response status:', response.status);
+        console.log('Response headers:', response.headers.get('Content-Type'));
+        
+        // Check if response is OK
+        if (!response.ok) {
+            throw new Error('Error HTTP: ' + response.status);
+        }
+        
+        // Try to parse as JSON
+        return response.text().then(text => {
+            console.log('Response text:', text);
+            try {
+                // Try to parse as JSON
+                return JSON.parse(text);
+            } catch (e) {
+                console.error('Error parsing JSON:', e);
+                // If not valid JSON, throw error with text
+                throw new Error('Respuesta inválida del servidor: ' + text);
+            }
+        });
     })
-    .then(() => {
-        alert('Archivo procesado correctamente.');
-        window.location.reload(); // O redirecciona si prefieres
+    .then(data => {
+        console.log('Parsed data:', data);
+        hideLoading();
+        
+        if (data.success) {
+            alert('Archivo subido correctamente. ' + (data.message || ''));
+            
+            // If we have a job ID, redirect to status page
+            if (data.jobId) {
+                window.location.href = '/liquidation-status/' + data.jobId;
+            } else {
+                // Otherwise reload the page
+                window.location.reload();
+            }
+        } else {
+            alert('Error: ' + (data.message || 'Error desconocido'));
+        }
     })
     .catch(error => {
-        alert('Ocurrió un error al subir el archivo.');
-        console.error(error);
+        console.error('Error:', error);
+        hideLoading();
+        alert('Error al procesar el archivo: ' + error.message);
     })
     .finally(() => {
-        form.querySelector('button[type="submit"]').disabled = false;
+        // Re-enable submit button
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-upload"></i> Subir Archivo';
     });
 });
+
 function hideLoading() {
     const overlay = document.querySelector('.loading-overlay');
     if (overlay) overlay.remove();

@@ -67,13 +67,6 @@ foreach ($products as $product) {
                 <i class="fas fa-file-pdf me-1"></i> Ver Boleta
             </a>
             <?php endif; ?>
-            
-            <?php if (!empty($order['label_url'])): ?>
-            <a href="<?= $this->escapeHtmlAttr($order['label_url']) ?>" 
-               target="_blank" class="btn btn-outline-info">
-                <i class="fas fa-print me-1"></i> Imprimir Etiqueta
-            </a>
-            <?php endif; ?>
         </div>
     </div>
 

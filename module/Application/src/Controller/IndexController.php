@@ -1078,141 +1078,33 @@ public function detailAction()
     }
 
 
-    public function uploadLiquidationAction()
-    {
-        // Verificar autenticación
-        $redirect = $this->checkAuth();
-        if ($redirect !== null) {
-            return $redirect;
-        }
-        
-        if (!$this->getRequest()->isPost()) {
-            return $this->redirect()->toRoute('application', ['action' => 'detail', 'table' => 'liquidaciones_paris']);
-        }
-        
-        try {
-            $files = $this->getRequest()->getFiles();
-            
-            if (!isset($files['liquidationFile']) || $files['liquidationFile']['error'] !== UPLOAD_ERR_OK) {
-                throw new \Exception('Error al subir el archivo');
-            }
-            
-            $file = $files['liquidationFile'];
-            $originalName = $file['name'];
-            
-            // Guardar archivo temporal para procesamiento posterior
-            $uploadDir = 'data/uploads/liquidations/';
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0777, true);
-            }
-            
-            $fileName = uniqid() . '_' . $originalName;
-            $filePath = $uploadDir . $fileName;
-            
-            if (!move_uploaded_file($file['tmp_name'], $filePath)) {
-                throw new \Exception('Error al guardar el archivo temporal');
-            }
-            
-            // Crear registro de trabajo para procesamiento en segundo plano
-            $sql = "INSERT INTO liquidaciones_jobs (
-                        status, 
-                        marketplace, 
-                        filename, 
-                        original_filename, 
-                        created_at, 
-                        user_id
-                    ) VALUES (?, ?, ?, ?, NOW(), ?)";
-            
-            $statement = $this->dbAdapter->createStatement($sql);
-            $statement->execute([
-                'pending',
-                'PARIS',
-                $fileName,
-                $originalName,
-                $this->authService->getIdentity() ?? 'system'
-            ]);
-            
-            $jobId = $this->dbAdapter->getDriver()->getLastGeneratedValue();
-            
-            // Iniciar procesamiento en segundo plano
-            $this->processLiquidationAsync($jobId, $filePath);
-            
-            // Redirigir a página de estado
-            return $this->redirect()->toRoute('application', [
-                'action' => 'liquidation-status', 
-                'id' => $jobId
-            ]);
-            
-        } catch (\Exception $e) {
-            error_log('Error al subir liquidación: ' . $e->getMessage());
-            
-            return $this->redirect()->toRoute('application', [
-                'action' => 'detail', 
-                'table' => 'liquidaciones_paris'
-            ], [
-                'query' => [
-                    'message' => 'Error al subir liquidación: ' . $e->getMessage(),
-                    'messageType' => 'error'
-                ]
-            ]);
-        }
-    }
-    
-    // Método para procesar de forma asíncrona
-    private function processLiquidationAsync($jobId, $filePath)
-    {
-        // Crear comando para ejecutar en segundo plano
-        $command = "php " . getcwd() . "/process-liquidation.php $jobId $filePath > /dev/null 2>&1 &";
-        
-        if (substr(php_uname(), 0, 7) == "Windows"){
-            pclose(popen("start /B " . $command, "r")); 
-        } else {
-            exec($command);
-        }
-    }
-    
-    public function getLiquidationStatusAction()
-{
-    $jobId = $this->params()->fromQuery('id');
-    
-    $sql = "SELECT status, progress, error_message FROM liquidaciones_jobs WHERE id = ?";
-    $statement = $this->dbAdapter->createStatement($sql);
-    $result = $statement->execute([$jobId]);
-    $job = $result->current();
-    
-    if (!$job) {
-        return $this->jsonResponse(['error' => 'Job not found']);
-    }
-    
-    return $this->jsonResponse([
-        'status' => $job['status'],
-        'progress' => $job['progress'] ?? 0,
-        'error_message' => $job['error_message']
-    ]);
-}
-    // Página de estado
-    public function liquidationStatusAction()
-    {
-        $jobId = $this->params()->fromRoute('id');
-        
-        if (!$jobId) {
-            return $this->redirect()->toRoute('application', ['action' => 'detail', 'table' => 'liquidaciones_paris']);
-        }
-        
-        $sql = "SELECT * FROM liquidaciones_jobs WHERE id = ?";
-        $statement = $this->dbAdapter->createStatement($sql);
-        $result = $statement->execute([$jobId]);
-        $job = $result->current();
-        
-        if (!$job) {
-            return $this->redirect()->toRoute('application', ['action' => 'detail', 'table' => 'liquidaciones_paris']);
-        }
-        
-        return new ViewModel([
-            'job' => $job,
-            'jobId' => $jobId
-        ]);
-    }
+
+
+
+
+
+
+/**
+ * Insert batch of records
+ *
+ * @param \Laminas\Db\Adapter\AdapterInterface $dbAdapter
+ * @param array $batch Array of placeholder strings
+ * @param array $params Array of parameters
+ * @param array $fields Array of field names
+ * @return void
+ */
+
+/**
+ * Process the uploaded file directly
+ *
+ * @param int $jobId
+ * @param string $filePath
+ * @return void
+ */
+
+
+
+
 
     /**
      * Método para probar la conexión con un marketplace
@@ -3992,3 +3884,4 @@ private function generatePickingList(array $orderIds, string $table = null)
         ]);
     }
 }
+

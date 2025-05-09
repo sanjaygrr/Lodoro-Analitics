@@ -11,6 +11,27 @@ use Laminas\Authentication\AuthenticationService;
 use Application\Middleware\AuthenticationMiddleware;
 
 return [
+
+    'controller_plugins' => [
+        'aliases' => [
+            'getServiceLocator' => 'ServiceLocator',
+        ],
+        'factories' => [
+            'ServiceLocator' => function($container) {
+                return new class($container) {
+                    private $container;
+                    
+                    public function __construct($container) {
+                        $this->container = $container;
+                    }
+                    
+                    public function __invoke() {
+                        return $this->container;
+                    }
+                };
+            },
+        ],
+    ],
     'router' => [
         'routes' => [
 
@@ -75,19 +96,6 @@ return [
             ],
 
 
-                'upload-liquidation' => [
-                'type' => Literal::class,
-                'options' => [
-                    'route'    => '/upload-liquidation',
-                    'defaults' => [
-                        'controller' => Controller\IndexController::class,
-                        'action'     => 'upload-liquidation',
-                    ],
-                ],
-                'middleware' => [
-                    AuthenticationMiddleware::class,
-                ],
-            ],
             'dashboard' => [
                 'type' => Segment::class,
                 'options' => [
@@ -101,38 +109,7 @@ return [
                     AuthenticationMiddleware::class,
                 ],
             ],
-            'liquidation-status' => [
-                'type' => Segment::class,
-                'options' => [
-                    'route'    => '/liquidation-status/[:id]',
-                    'defaults' => [
-                        'controller' => Controller\IndexController::class,
-                        'action'     => 'liquidation-status',
-                    ],
-                ],
-            ],
-
-            'get-liquidation-status' => [
-                'type' => Literal::class,
-                'options' => [
-                    'route'    => '/application/get-liquidation-status',
-                    'defaults' => [
-                        'controller' => Controller\IndexController::class,
-                        'action'     => 'get-liquidation-status',
-                    ],
-                ],
-            ],
-
-            'upload-liquidation' => [
-                'type' => Literal::class,
-                'options' => [
-                    'route'    => '/upload-liquidation',
-                    'defaults' => [
-                        'controller' => Controller\IndexController::class,
-                        'action'     => 'upload-liquidation',
-                    ],
-                ],
-            ],
+    
 
             'home' => [
                 'type'    => Literal::class,
@@ -232,6 +209,10 @@ return [
         ],
         'template_path_stack' => [
             __DIR__ . '/../view',
+        ],
+
+            'strategies' => [
+            'ViewJsonStrategy', // Add this line to enable JSON view strategy
         ],
     ],
     'view_helpers' => [
