@@ -56,6 +56,38 @@ return [
                 ],
             ],
 
+            
+            
+                'upload-liquidation' => [
+                'type' => \Laminas\Router\Http\Literal::class,
+                'options' => [
+                    'route' => '/application/upload-liquidation',
+                    'defaults' => [
+                        'controller' => Controller\IndexController::class, // Cambiado a IndexController
+                        'action' => 'uploadLiquidation',
+                    ],
+                ],
+            ],
+            'liquidation-status' => [
+                'type' => \Laminas\Router\Http\Segment::class,
+                'options' => [
+                    'route' => '/liquidation-status/:jobId',
+                    'defaults' => [
+                        'controller' => Controller\IndexController::class,
+                        'action' => 'liquidationStatus',
+                    ],
+                ],
+            ],
+            'liquidation-status-check' => [
+                'type' => \Laminas\Router\Http\Segment::class,
+                'options' => [
+                    'route' => '/liquidation-status-check/:jobId',
+                    'defaults' => [
+                        'controller' => Controller\IndexController::class, // Cambiado a IndexController
+                        'action' => 'checkStatus',
+                    ],
+                ],
+            ],
             'process-all-products' => [
                 'type' => Literal::class,
                 'options' => [
@@ -178,6 +210,7 @@ return [
         'factories' => [
             Controller\IndexController::class => IndexControllerFactory::class,
             Controller\AuthController::class => Controller\Factory\AuthControllerFactory::class,
+            Controller\UploadLiquidationController::class => Controller\Factory\UploadLiquidationControllerFactory::class,
         ],
     ],
     // AGREGAR ESTA SECCIÓN

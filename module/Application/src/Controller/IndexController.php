@@ -63,6 +63,372 @@ class IndexController extends AbstractActionController
             // Aquí puedes pasar datos a tu vista index.phtml si los necesitas
         ]);
     }
+/**
+ * Upload liquidation action
+ *
+ * @return JsonModel
+ */
+public function uploadLiquidationAction()
+{
+    // Set default response
+    $response = [
+        'success' => false,
+        'message' => 'Error al procesar la solicitud',
+        'processedRows' => 0,
+    ];
+
+    // Check if request is POST
+    if (!$this->getRequest()->isPost()) {
+        $response['message'] = 'Método no permitido';
+        return new \Laminas\View\Model\JsonModel($response);
+    }
+
+    try {
+        // Get uploaded file
+        $files = $this->getRequest()->getFiles()->toArray();
+        
+        if (empty($files) || !isset($files['liquidationFile']) || $files['liquidationFile']['error'] !== UPLOAD_ERR_OK) {
+            $response['message'] = 'No se ha seleccionado un archivo válido';
+            return new \Laminas\View\Model\JsonModel($response);
+        }
+
+        $file = $files['liquidationFile'];
+        $filePath = $file['tmp_name'];
+        
+        // Check if process in background
+        $processInBackground = $this->params()->fromPost('processInBackground', false);
+        
+        if ($processInBackground) {
+            // Generate a job ID
+            $jobId = uniqid('job_');
+            
+            // Save the file to a temporary location that can be accessed by the background process
+            $tempFilePath = sys_get_temp_dir() . '/' . $jobId . '_' . basename($file['name']);
+            move_uploaded_file($filePath, $tempFilePath);
+            
+            // Start a background process
+            $this->startBackgroundProcess($tempFilePath, $jobId);
+            
+            $response = [
+                'success' => true,
+                'message' => 'El archivo se está procesando en segundo plano',
+                'jobId' => $jobId,
+            ];
+            
+            return new \Laminas\View\Model\JsonModel($response);
+        } else {
+            // Process immediately
+            $result = $this->processLiquidationFile($filePath);
+            
+            $response = [
+                'success' => $result['success'],
+                'message' => $result['message'],
+                'processedRows' => $result['processedRows'],
+            ];
+            
+            return new \Laminas\View\Model\JsonModel($response);
+        }
+        
+    } catch (\Exception $e) {
+        $response['message'] = 'Error: ' . $e->getMessage();
+        return new \Laminas\View\Model\JsonModel($response);
+    }
+}
+
+/**
+ * Start a background process to handle the Excel file
+ *
+ * @param string $filePath Path to the uploaded file
+ * @param string $jobId Unique job identifier
+ * @return void
+ */
+private function startBackgroundProcess($filePath, $jobId)
+{
+    // Create a log file for this job
+    $logFile = sys_get_temp_dir() . '/' . $jobId . '_log.txt';
+    
+    // Escape path for shell
+    $escapedFilePath = escapeshellarg($filePath);
+    $escapedLogFile = escapeshellarg($logFile);
+    $escapedJobId = escapeshellarg($jobId);
+    
+    // Command to run the processor in background
+    $root = realpath(__DIR__ . '/../../../..');
+    $cmd = sprintf(
+        'php %s/public/process-liquidation.php %s %s %s > /dev/null 2>&1 &',
+        $root,
+        $escapedFilePath,
+        $escapedLogFile,
+        $escapedJobId
+    );
+    
+    // Execute command (runs in background)
+    exec($cmd);
+}
+
+/**
+ * Process liquidation file (Excel)
+ *
+ * @param string $filePath Path to the uploaded file
+ * @return array Processing result with success status, message and processed rows count
+ */
+private function processLiquidationFile($filePath)
+{
+    $result = [
+        'success' => false,
+        'message' => 'Error al procesar el archivo',
+        'processedRows' => 0,
+    ];
+    
+    try {
+        // Load the spreadsheet
+        $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($filePath);
+        $worksheet = $spreadsheet->getActiveSheet();
+        
+        // Get the highest row and column
+        $highestRow = $worksheet->getHighestRow();
+        $highestColumn = $worksheet->getHighestColumn();
+        $highestColumnIndex = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($highestColumn);
+        
+        // If there are fewer than 2 rows (header + at least one data row), return error
+        if ($highestRow < 2) {
+            $result['message'] = 'El archivo no contiene datos suficientes';
+            return $result;
+        }
+        
+        // Initialize column mapping (try to find the columns we need)
+        $columnMap = $this->findColumnMapping($worksheet, $highestColumnIndex);
+        
+        if (empty($columnMap['numero_suborden']) || 
+            empty($columnMap['numero_liquidacion']) || 
+            empty($columnMap['monto_liquidacion'])) {
+            $result['message'] = 'No se encontraron las columnas necesarias en el archivo Excel';
+            return $result;
+        }
+        
+        // Process data rows
+        $processedRows = 0;
+        $updateCount = 0;
+        $errorRows = [];
+        
+        for ($row = 2; $row <= $highestRow; $row++) {
+            $numeroSuborden = trim($worksheet->getCellByColumnAndRow($columnMap['numero_suborden'], $row)->getValue());
+            $numeroLiquidacion = trim($worksheet->getCellByColumnAndRow($columnMap['numero_liquidacion'], $row)->getValue());
+            $montoLiquidacion = $worksheet->getCellByColumnAndRow($columnMap['monto_liquidacion'], $row)->getValue();
+            
+            // Skip empty rows
+            if (empty($numeroSuborden) || empty($numeroLiquidacion)) {
+                continue;
+            }
+            
+            // Convert monto_liquidacion to a proper decimal
+            $montoLiquidacion = floatval(str_replace(',', '.', str_replace('.', '', $montoLiquidacion)));
+            
+            // Update the database
+            $updated = $this->updateLiquidationData($numeroSuborden, $numeroLiquidacion, $montoLiquidacion);
+            
+            if ($updated) {
+                $updateCount++;
+            } else {
+                $errorRows[] = $row;
+            }
+            
+            $processedRows++;
+        }
+        
+        if ($processedRows > 0) {
+            $result['success'] = true;
+            $result['message'] = "Se procesaron {$processedRows} filas. Se actualizaron {$updateCount} registros.";
+            if (!empty($errorRows)) {
+                $result['message'] .= " No se pudieron actualizar " . count($errorRows) . " filas.";
+            }
+            $result['processedRows'] = $processedRows;
+        } else {
+            $result['message'] = 'No se procesaron filas. Verifique el formato del archivo.';
+        }
+        
+        return $result;
+        
+    } catch (\Exception $e) {
+        $result['message'] = 'Error al procesar el archivo: ' . $e->getMessage();
+        return $result;
+    }
+}
+
+/**
+ * Find column mapping in the Excel file
+ * 
+ * @param \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $worksheet
+ * @param int $highestColumnIndex
+ * @return array Column mapping with column indices
+ */
+private function findColumnMapping($worksheet, $highestColumnIndex)
+{
+    $columnMap = [
+        'numero_suborden' => null,
+        'numero_liquidacion' => null,
+        'monto_liquidacion' => null,
+    ];
+    
+    // List of possible header names for each column
+    $headerMapping = [
+        'numero_suborden' => ['numero_suborden', 'numero de suborden', 'suborden', 'orden', 'id', 'codigo', 'order'],
+        'numero_liquidacion' => ['numero_liquidacion', 'numero de liquidacion', 'liquidacion', 'num liquidacion', 'n° liquidacion', 'n liquidacion'],
+        'monto_liquidacion' => ['monto_liquidacion', 'monto de liquidacion', 'valor liquidacion', 'importe', 'total liquidacion', 'monto'],
+    ];
+    
+    // Read header row
+    for ($col = 1; $col <= $highestColumnIndex; $col++) {
+        $headerValue = trim(strtolower($worksheet->getCellByColumnAndRow($col, 1)->getValue()));
+        
+        // Check against possible header names
+        foreach ($headerMapping as $column => $possibleHeaders) {
+            if (in_array($headerValue, $possibleHeaders) || $this->containsKeyword($headerValue, $possibleHeaders)) {
+                $columnMap[$column] = $col;
+                break;
+            }
+        }
+    }
+    
+    return $columnMap;
+}
+
+/**
+ * Check if a header value contains any of the keywords
+ * 
+ * @param string $headerValue
+ * @param array $keywords
+ * @return bool
+ */
+private function containsKeyword($headerValue, $keywords)
+{
+    foreach ($keywords as $keyword) {
+        if (strpos($headerValue, $keyword) !== false) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Update liquidation data in the database
+ * 
+ * @param string $numeroSuborden
+ * @param string $numeroLiquidacion
+ * @param float $montoLiquidacion
+ * @return bool Success or failure
+ */
+private function updateLiquidationData($numeroSuborden, $numeroLiquidacion, $montoLiquidacion)
+{
+    try {
+        $sql = "UPDATE MKP_PARIS SET 
+                numero_liquidacion = ?, 
+                monto_liquidacion = ? 
+                WHERE numero_suborden = ?";
+        
+        $statement = $this->dbAdapter->query($sql);
+        $result = $statement->execute([
+            $numeroLiquidacion,
+            $montoLiquidacion,
+            $numeroSuborden
+        ]);
+        
+        return ($result->getAffectedRows() > 0);
+    } catch (\Exception $e) {
+        // Log the error but don't throw it up
+        error_log("Error updating liquidation data: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Check liquidation job status
+ *
+ * @return JsonModel
+ */
+public function checkStatusAction()
+{
+    $jobId = $this->params()->fromRoute('jobId', null);
+    
+    if (!$jobId) {
+        return new \Laminas\View\Model\JsonModel([
+            'success' => false,
+            'message' => 'ID de trabajo no proporcionado'
+        ]);
+    }
+    
+    $logFile = sys_get_temp_dir() . '/' . $jobId . '_log.txt';
+    
+    if (!file_exists($logFile)) {
+        return new \Laminas\View\Model\JsonModel([
+            'success' => false,
+            'message' => 'El trabajo no existe o aún no ha comenzado',
+            'status' => 'pending'
+        ]);
+    }
+    
+    $logContent = file_get_contents($logFile);
+    
+    // Check if the job is completed
+    if (strpos($logContent, 'COMPLETED') !== false) {
+        // Extract completion data
+        preg_match('/COMPLETED: (.*?)(\r\n|\n|$)/', $logContent, $completionMatch);
+        $completionData = isset($completionMatch[1]) ? json_decode($completionMatch[1], true) : [];
+        
+        return new \Laminas\View\Model\JsonModel([
+            'success' => true,
+            'status' => 'completed',
+            'message' => $completionData['message'] ?? 'Proceso completado',
+            'processedRows' => $completionData['processedRows'] ?? 0,
+            'timestamp' => $completionData['timestamp'] ?? time()
+        ]);
+    } 
+    // Check if the job failed
+    else if (strpos($logContent, 'FAILED') !== false) {
+        preg_match('/FAILED: (.*?)(\r\n|\n|$)/', $logContent, $failedMatch);
+        
+        return new \Laminas\View\Model\JsonModel([
+            'success' => false,
+            'status' => 'failed',
+            'message' => isset($failedMatch[1]) ? 'Error: ' . $failedMatch[1] : 'El proceso falló',
+            'timestamp' => time()
+        ]);
+    } 
+    // Job is still running
+    else {
+        // Extract progress if available
+        preg_match('/PROGRESS: (\d+)\/(\d+)/', $logContent, $progressMatch);
+        $current = isset($progressMatch[1]) ? (int)$progressMatch[1] : 0;
+        $total = isset($progressMatch[2]) ? (int)$progressMatch[2] : 1;
+        $percentage = $total > 0 ? round(($current / $total) * 100) : 0;
+        
+        return new \Laminas\View\Model\JsonModel([
+            'success' => true,
+            'status' => 'running',
+            'message' => 'Procesando liquidaciones...',
+            'progress' => $percentage,
+            'current' => $current,
+            'total' => $total
+        ]);
+    }
+}
+    /**
+ * Liquidation status page
+ *
+ * @return ViewModel
+ */
+public function liquidationStatusAction()
+{
+    $jobId = $this->params()->fromRoute('jobId', null);
+    
+    if (!$jobId) {
+        return $this->redirect()->toRoute('application', ['action' => 'detail', 'table' => 'MKP_PARIS']);
+    }
+    
+    return new ViewModel([
+        'jobId' => $jobId
+    ]);
+}
 
     /**
  * Acción que muestra un dashboard con resumen de todas las tablas.
@@ -3772,6 +4138,8 @@ private function generatePickingList(array $orderIds, string $table = null)
         
         return $response;
     }
+
+    
     
     /**
      * Acción para seleccionar órdenes y generar documentos
@@ -3885,3 +4253,369 @@ private function generatePickingList(array $orderIds, string $table = null)
     }
 }
 
+
+class UploadLiquidationController extends AbstractActionController
+{
+    private $dbAdapter;
+
+    /**
+     * Constructor
+     *
+     * @param AdapterInterface $dbAdapter Database adapter
+     */
+    public function __construct(AdapterInterface $dbAdapter)
+    {
+        $this->dbAdapter = $dbAdapter;
+    }
+
+    /**
+     * Upload liquidation action
+     *
+     * @return JsonModel
+     */
+    public function uploadLiquidationAction()
+    {
+        // Set default response
+        $response = [
+            'success' => false,
+            'message' => 'Error al procesar la solicitud',
+            'processedRows' => 0,
+        ];
+
+        // Check if request is POST
+        if (!$this->getRequest()->isPost()) {
+            $response['message'] = 'Método no permitido';
+            return new JsonModel($response);
+        }
+
+        try {
+            // Get uploaded file
+            $files = $this->getRequest()->getFiles()->toArray();
+            
+            if (empty($files) || !isset($files['liquidationFile']) || $files['liquidationFile']['error'] !== UPLOAD_ERR_OK) {
+                $response['message'] = 'No se ha seleccionado un archivo válido';
+                return new JsonModel($response);
+            }
+
+            $file = $files['liquidationFile'];
+            $filePath = $file['tmp_name'];
+            
+            // Check if process in background
+            $processInBackground = $this->params()->fromPost('processInBackground', false);
+            
+            if ($processInBackground) {
+                // Generate a job ID
+                $jobId = uniqid('job_');
+                
+                // Save the file to a temporary location that can be accessed by the background process
+                $tempFilePath = sys_get_temp_dir() . '/' . $jobId . '_' . basename($file['name']);
+                move_uploaded_file($filePath, $tempFilePath);
+                
+                // Start a background process
+                $this->startBackgroundProcess($tempFilePath, $jobId);
+                
+                $response = [
+                    'success' => true,
+                    'message' => 'El archivo se está procesando en segundo plano',
+                    'jobId' => $jobId,
+                ];
+                
+                return new JsonModel($response);
+            } else {
+                // Process immediately
+                $result = $this->processLiquidationFile($filePath);
+                
+                $response = [
+                    'success' => $result['success'],
+                    'message' => $result['message'],
+                    'processedRows' => $result['processedRows'],
+                ];
+                
+                return new JsonModel($response);
+            }
+            
+        } catch (Exception $e) {
+            $response['message'] = 'Error: ' . $e->getMessage();
+            return new JsonModel($response);
+        }
+    }
+    
+    /**
+     * Start a background process to handle the Excel file
+     *
+     * @param string $filePath Path to the uploaded file
+     * @param string $jobId Unique job identifier
+     * @return void
+     */
+    private function startBackgroundProcess($filePath, $jobId)
+    {
+        // Create a log file for this job
+        $logFile = sys_get_temp_dir() . '/' . $jobId . '_log.txt';
+        
+        // Escape path for shell
+        $escapedFilePath = escapeshellarg($filePath);
+        $escapedLogFile = escapeshellarg($logFile);
+        $escapedJobId = escapeshellarg($jobId);
+        
+        // Command to run the processor in background
+        // This will run a PHP CLI script that processes the Excel file
+        // The script would be a new file we need to create: process-liquidation.php
+        $cmd = sprintf(
+            'php %s/public/process-liquidation.php %s %s %s > /dev/null 2>&1 &',
+            APPLICATION_PATH,
+            $escapedFilePath,
+            $escapedLogFile,
+            $escapedJobId
+        );
+        
+        // Execute command (runs in background)
+        exec($cmd);
+    }
+    
+    /**
+     * Process liquidation file (Excel)
+     *
+     * @param string $filePath Path to the uploaded file
+     * @return array Processing result with success status, message and processed rows count
+     */
+    private function processLiquidationFile($filePath)
+    {
+        $result = [
+            'success' => false,
+            'message' => 'Error al procesar el archivo',
+            'processedRows' => 0,
+        ];
+        
+        try {
+            // Load the spreadsheet
+            $spreadsheet = IOFactory::load($filePath);
+            $worksheet = $spreadsheet->getActiveSheet();
+            
+            // Get the highest row and column
+            $highestRow = $worksheet->getHighestRow();
+            $highestColumn = $worksheet->getHighestColumn();
+            $highestColumnIndex = Coordinate::columnIndexFromString($highestColumn);
+            
+            // If there are fewer than 2 rows (header + at least one data row), return error
+            if ($highestRow < 2) {
+                $result['message'] = 'El archivo no contiene datos suficientes';
+                return $result;
+            }
+            
+            // Initialize column mapping (try to find the columns we need)
+            $columnMap = $this->findColumnMapping($worksheet, $highestColumnIndex);
+            
+            if (empty($columnMap['numero_suborden']) || 
+                empty($columnMap['numero_liquidacion']) || 
+                empty($columnMap['monto_liquidacion'])) {
+                $result['message'] = 'No se encontraron las columnas necesarias en el archivo Excel';
+                return $result;
+            }
+            
+            // Process data rows
+            $processedRows = 0;
+            $updateCount = 0;
+            $errorRows = [];
+            
+            for ($row = 2; $row <= $highestRow; $row++) {
+                $numeroSuborden = trim($worksheet->getCellByColumnAndRow($columnMap['numero_suborden'], $row)->getValue());
+                $numeroLiquidacion = trim($worksheet->getCellByColumnAndRow($columnMap['numero_liquidacion'], $row)->getValue());
+                $montoLiquidacion = $worksheet->getCellByColumnAndRow($columnMap['monto_liquidacion'], $row)->getValue();
+                
+                // Skip empty rows
+                if (empty($numeroSuborden) || empty($numeroLiquidacion)) {
+                    continue;
+                }
+                
+                // Convert monto_liquidacion to a proper decimal
+                $montoLiquidacion = floatval(str_replace(',', '.', str_replace('.', '', $montoLiquidacion)));
+                
+                // Update the database
+                $updated = $this->updateLiquidationData($numeroSuborden, $numeroLiquidacion, $montoLiquidacion);
+                
+                if ($updated) {
+                    $updateCount++;
+                } else {
+                    $errorRows[] = $row;
+                }
+                
+                $processedRows++;
+            }
+            
+            if ($processedRows > 0) {
+                $result['success'] = true;
+                $result['message'] = "Se procesaron {$processedRows} filas. Se actualizaron {$updateCount} registros.";
+                if (!empty($errorRows)) {
+                    $result['message'] .= " No se pudieron actualizar " . count($errorRows) . " filas.";
+                }
+                $result['processedRows'] = $processedRows;
+            } else {
+                $result['message'] = 'No se procesaron filas. Verifique el formato del archivo.';
+            }
+            
+            return $result;
+            
+        } catch (Exception $e) {
+            $result['message'] = 'Error al procesar el archivo: ' . $e->getMessage();
+            return $result;
+        }
+    }
+    
+    /**
+     * Find column mapping in the Excel file
+     * 
+     * @param \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $worksheet
+     * @param int $highestColumnIndex
+     * @return array Column mapping with column indices
+     */
+    private function findColumnMapping($worksheet, $highestColumnIndex)
+    {
+        $columnMap = [
+            'numero_suborden' => null,
+            'numero_liquidacion' => null,
+            'monto_liquidacion' => null,
+        ];
+        
+        // List of possible header names for each column
+        $headerMapping = [
+            'numero_suborden' => ['numero_suborden', 'numero de suborden', 'suborden', 'orden', 'id', 'codigo', 'order'],
+            'numero_liquidacion' => ['numero_liquidacion', 'numero de liquidacion', 'liquidacion', 'num liquidacion', 'n° liquidacion', 'n liquidacion'],
+            'monto_liquidacion' => ['monto_liquidacion', 'monto de liquidacion', 'valor liquidacion', 'importe', 'total liquidacion', 'monto'],
+        ];
+        
+        // Read header row
+        for ($col = 1; $col <= $highestColumnIndex; $col++) {
+            $headerValue = trim(strtolower($worksheet->getCellByColumnAndRow($col, 1)->getValue()));
+            
+            // Check against possible header names
+            foreach ($headerMapping as $column => $possibleHeaders) {
+                if (in_array($headerValue, $possibleHeaders) || $this->containsKeyword($headerValue, $possibleHeaders)) {
+                    $columnMap[$column] = $col;
+                    break;
+                }
+            }
+        }
+        
+        return $columnMap;
+    }
+    
+    /**
+     * Check if a header value contains any of the keywords
+     * 
+     * @param string $headerValue
+     * @param array $keywords
+     * @return bool
+     */
+    private function containsKeyword($headerValue, $keywords)
+    {
+        foreach ($keywords as $keyword) {
+            if (strpos($headerValue, $keyword) !== false) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * Update liquidation data in the database
+     * 
+     * @param string $numeroSuborden
+     * @param string $numeroLiquidacion
+     * @param float $montoLiquidacion
+     * @return bool Success or failure
+     */
+    private function updateLiquidationData($numeroSuborden, $numeroLiquidacion, $montoLiquidacion)
+    {
+        try {
+            $sql = "UPDATE MKP_PARIS SET 
+                    numero_liquidacion = ?, 
+                    monto_liquidacion = ? 
+                    WHERE numero_suborden = ?";
+            
+            $statement = $this->dbAdapter->query($sql);
+            $result = $statement->execute([
+                $numeroLiquidacion,
+                $montoLiquidacion,
+                $numeroSuborden
+            ]);
+            
+            return ($result->getAffectedRows() > 0);
+        } catch (Exception $e) {
+            // Log the error but don't throw it up
+            error_log("Error updating liquidation data: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Check liquidation job status
+     *
+     * @return JsonModel
+     */
+    public function checkStatusAction()
+    {
+        $jobId = $this->params()->fromRoute('jobId', null);
+        
+        if (!$jobId) {
+            return new JsonModel([
+                'success' => false,
+                'message' => 'ID de trabajo no proporcionado'
+            ]);
+        }
+        
+        $logFile = sys_get_temp_dir() . '/' . $jobId . '_log.txt';
+        
+        if (!file_exists($logFile)) {
+            return new JsonModel([
+                'success' => false,
+                'message' => 'El trabajo no existe o aún no ha comenzado',
+                'status' => 'pending'
+            ]);
+        }
+        
+        $logContent = file_get_contents($logFile);
+        
+        // Check if the job is completed
+        if (strpos($logContent, 'COMPLETED') !== false) {
+            // Extract completion data
+            preg_match('/COMPLETED: (.*?)(\r\n|\n|$)/', $logContent, $completionMatch);
+            $completionData = isset($completionMatch[1]) ? json_decode($completionMatch[1], true) : [];
+            
+            return new JsonModel([
+                'success' => true,
+                'status' => 'completed',
+                'message' => $completionData['message'] ?? 'Proceso completado',
+                'processedRows' => $completionData['processedRows'] ?? 0,
+                'timestamp' => $completionData['timestamp'] ?? time()
+            ]);
+        } 
+        // Check if the job failed
+        else if (strpos($logContent, 'FAILED') !== false) {
+            preg_match('/FAILED: (.*?)(\r\n|\n|$)/', $logContent, $failedMatch);
+            
+            return new JsonModel([
+                'success' => false,
+                'status' => 'failed',
+                'message' => isset($failedMatch[1]) ? 'Error: ' . $failedMatch[1] : 'El proceso falló',
+                'timestamp' => time()
+            ]);
+        } 
+        // Job is still running
+        else {
+            // Extract progress if available
+            preg_match('/PROGRESS: (\d+)\/(\d+)/', $logContent, $progressMatch);
+            $current = isset($progressMatch[1]) ? (int)$progressMatch[1] : 0;
+            $total = isset($progressMatch[2]) ? (int)$progressMatch[2] : 1;
+            $percentage = $total > 0 ? round(($current / $total) * 100) : 0;
+            
+            return new JsonModel([
+                'success' => true,
+                'status' => 'running',
+                'message' => 'Procesando liquidaciones...',
+                'progress' => $percentage,
+                'current' => $current,
+                'total' => $total
+            ]);
+        }
+    }
+}
