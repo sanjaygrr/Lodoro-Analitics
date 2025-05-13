@@ -1,0 +1,324 @@
+<?php
+/**
+ * @var Laminas\View\Renderer\PhpRenderer $this
+ */
+$this->headTitle('Impresión de Facturas/Boletas');
+
+// Estilos para vista de impresión
+$this->headStyle()->captureStart();
+?>
+@media print {
+    @page {
+        size: A4;
+        margin: 10mm;
+    }
+    body {
+        margin: 0;
+        padding: 0;
+    }
+    .factura {
+        page-break-after: always;
+        padding: 0;
+        border: none;
+        box-shadow: none;
+    }
+    .no-print {
+        display: none !important;
+    }
+    .print-footer {
+        display: none;
+    }
+    .logo-area img {
+        max-height: 60px;
+    }
+}
+
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f0f0f0;
+}
+
+.factura {
+    width: 210mm;
+    min-height: 250mm;
+    padding: 10mm;
+    margin: 10mm auto;
+    background-color: white;
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+.cabecera {
+    border-bottom: 1px solid #000;
+    padding-bottom: 5mm;
+    margin-bottom: 5mm;
+    display: flex;
+    justify-content: space-between;
+}
+
+.logo-area {
+    width: 40%;
+}
+
+.logo-area img {
+    max-width: 100%;
+    max-height: 80px;
+}
+
+.doc-info {
+    width: 25%;
+    border: 1px solid #000;
+    padding: 3mm;
+    text-align: center;
+}
+
+.doc-title {
+    font-weight: bold;
+    font-size: 14pt;
+    color: #333;
+    margin-bottom: 5mm;
+}
+
+.doc-number {
+    font-weight: bold;
+    font-size: 12pt;
+}
+
+.doc-date {
+    font-size: 10pt;
+    margin-top: 3mm;
+}
+
+.cliente-info {
+    margin: 5mm 0;
+    display: flex;
+    justify-content: space-between;
+}
+
+.cliente-data {
+    width: 48%;
+}
+
+.cliente-label {
+    font-weight: bold;
+    font-size: 9pt;
+    color: #666;
+    text-transform: uppercase;
+}
+
+.cliente-value {
+    font-size: 10pt;
+    margin-bottom: 2mm;
+}
+
+.productos {
+    margin: 8mm 0;
+}
+
+.tabla-productos {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.tabla-productos th {
+    background-color: #f2f2f2;
+    border: 1px solid #ddd;
+    padding: 2.5mm;
+    text-align: left;
+    font-size: 9pt;
+}
+
+.tabla-productos td {
+    border: 1px solid #ddd;
+    padding: 2.5mm;
+    font-size: 9pt;
+}
+
+.tabla-productos .text-right {
+    text-align: right;
+}
+
+.tabla-productos .text-center {
+    text-align: center;
+}
+
+.totales {
+    margin-top: 10mm;
+    float: right;
+    width: 30%;
+}
+
+.total-line {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 2mm;
+    padding: 1mm 0;
+    font-size: 10pt;
+}
+
+.total-line.border-top {
+    border-top: 1px solid #ddd;
+}
+
+.total-line.total {
+    font-weight: bold;
+    border-top: 2px solid #000;
+    padding-top: 2mm;
+}
+
+.notas {
+    clear: both;
+    margin-top: 15mm;
+    padding-top: 5mm;
+    border-top: 1px solid #ddd;
+    font-size: 9pt;
+}
+
+.footer {
+    margin-top: 5mm;
+    text-align: center;
+    font-size: 8pt;
+    color: #666;
+}
+
+.no-print {
+    text-align: center;
+    margin: 20px 0;
+}
+
+<?php $this->headStyle()->captureEnd(); ?>
+
+<div class="no-print">
+    <div class="container text-center py-4">
+        <h1>Facturas / Boletas</h1>
+        <p class="text-muted">Se imprimirán <?= count($orders) ?> documentos. Generado el <?= date('d/m/Y H:i', strtotime($fechaGeneracion)) ?></p>
+        <button class="btn btn-primary" onclick="window.print()"><i class="fas fa-print me-2"></i> Imprimir Facturas</button>
+        <a href="javascript:history.back()" class="btn btn-outline-secondary ms-2"><i class="fas fa-arrow-left me-2"></i> Volver</a>
+    </div>
+</div>
+
+<?php foreach ($orders as $order): ?>
+<div class="factura">
+    <div class="cabecera">
+        <div class="logo-area">
+            <img src="/img/logo.png" alt="Logo">
+            <div style="margin-top: 5mm;">
+                <div>Lodoro Analytics SpA</div>
+                <div>RUT: 76.123.456-7</div>
+                <div>Dirección: Av. Example 123, Santiago</div>
+                <div>Teléfono: +56 2 1234 5678</div>
+            </div>
+        </div>
+        
+        <div class="doc-info">
+            <div class="doc-title">BOLETA ELECTRÓNICA</div>
+            <div class="doc-number">Nº <?= sprintf('%08d', $order['id']) ?></div>
+            <div class="doc-date">Fecha: <?= date('d/m/Y', strtotime($order['fecha'])) ?></div>
+        </div>
+    </div>
+    
+    <div class="cliente-info">
+        <div class="cliente-data">
+            <div class="cliente-label">Cliente:</div>
+            <div class="cliente-value"><?= $this->escapeHtml($order['cliente']['nombre']) ?></div>
+            
+            <div class="cliente-label">RUT:</div>
+            <div class="cliente-value"><?= $this->escapeHtml($order['cliente']['rut'] ?: 'N/A') ?></div>
+        </div>
+        
+        <div class="cliente-data">
+            <div class="cliente-label">Dirección:</div>
+            <div class="cliente-value"><?= nl2br($this->escapeHtml($order['cliente']['direccion'])) ?></div>
+            
+            <div class="cliente-label">Teléfono:</div>
+            <div class="cliente-value"><?= $this->escapeHtml($order['cliente']['telefono'] ?: 'N/A') ?></div>
+        </div>
+    </div>
+    
+    <div class="productos">
+        <table class="tabla-productos">
+            <thead>
+                <tr>
+                    <th width="15%">SKU</th>
+                    <th width="40%">Descripción</th>
+                    <th width="10%" class="text-center">Cantidad</th>
+                    <th width="15%" class="text-right">Precio Unit.</th>
+                    <th width="20%" class="text-right">Subtotal</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (empty($order['productos'])): ?>
+                <tr>
+                    <td colspan="5" class="text-center">No hay productos disponibles</td>
+                </tr>
+                <?php else: ?>
+                    <?php foreach ($order['productos'] as $producto): ?>
+                    <tr>
+                        <td><?= $this->escapeHtml($producto['sku'] ?? '') ?></td>
+                        <td><?= $this->escapeHtml($producto['nombre'] ?? $producto['name'] ?? ($producto['sku'] ? 'Producto ' . $producto['sku'] : 'Producto')) ?></td>
+                        <td class="text-center"><?= $producto['cantidad'] ?? 1 ?></td>
+                        <td class="text-right">$<?= number_format($producto['precio_unitario'] ?? $producto['precio'] ?? 0, 0, ',', '.') ?></td>
+                        <td class="text-right">$<?= number_format(($producto['precio_unitario'] ?? $producto['precio'] ?? 0) * ($producto['cantidad'] ?? 1), 0, ',', '.') ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+
+                <?php if (empty($order['productos']) && isset($order['sku']) && !empty($order['sku'])): ?>
+                <tr>
+                    <td><?= $this->escapeHtml($order['sku']) ?></td>
+                    <td>Producto <?= $this->escapeHtml($order['sku']) ?></td>
+                    <td class="text-center">1</td>
+                    <td class="text-right">$<?= number_format($order['total'] ?? 0, 0, ',', '.') ?></td>
+                    <td class="text-right">$<?= number_format($order['total'] ?? 0, 0, ',', '.') ?></td>
+                </tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="totales">
+        <div class="total-line">
+            <div>Subtotal:</div>
+            <div>$<?= number_format($order['subtotal'], 0, ',', '.') ?></div>
+        </div>
+        
+        <?php if ($order['envio'] > 0): ?>
+        <div class="total-line">
+            <div>Envío:</div>
+            <div>$<?= number_format($order['envio'], 0, ',', '.') ?></div>
+        </div>
+        <?php endif; ?>
+        
+        <div class="total-line border-top">
+            <div>IVA (19%):</div>
+            <div>$<?= number_format($order['impuesto'], 0, ',', '.') ?></div>
+        </div>
+        
+        <div class="total-line total">
+            <div>TOTAL:</div>
+            <div>$<?= number_format($order['total'], 0, ',', '.') ?></div>
+        </div>
+    </div>
+    
+    <div class="notas">
+        <p><strong>Notas:</strong></p>
+        <p>Orden #<?= $this->escapeHtml($order['order_number']) ?> - Marketplace: <?= strtoupper($this->escapeHtml($order['marketplace'])) ?></p>
+        <p>Documento generado automáticamente. Esta boleta no tiene valor tributario.</p>
+    </div>
+    
+    <div class="footer">
+        <p>Gracias por su compra</p>
+        <p>Documento generado el <?= date('d/m/Y H:i', strtotime($fechaGeneracion)) ?></p>
+    </div>
+</div>
+<?php endforeach; ?>
+
+<div class="print-footer no-print">
+    <div class="container text-center py-4">
+        <p class="text-muted">Total: <?= count($orders) ?> facturas</p>
+        <button class="btn btn-primary" onclick="window.print()"><i class="fas fa-print me-2"></i> Imprimir Facturas</button>
+        <a href="javascript:history.back()" class="btn btn-outline-secondary ms-2"><i class="fas fa-arrow-left me-2"></i> Volver</a>
+    </div>
+</div>

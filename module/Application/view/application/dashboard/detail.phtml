@@ -1,0 +1,1650 @@
+<?php
+/**
+ * Detail view.
+ * @var [todas las variables documentadas en el código original]
+ */
+
+// Asegurarse de que todas las variables KPI existan
+if (!isset($ventaBrutaMensual)) $ventaBrutaMensual = 0;
+if (!isset($impuestoBrutoMensual)) $impuestoBrutoMensual = 0;
+if (!isset($totalTransaccionesMes)) $totalTransaccionesMes = 0;
+if (!isset($valorCancelado)) $valorCancelado = 0;
+if (!isset($transaccionesCanceladas)) $transaccionesCanceladas = 0;
+if (!isset($totalVentas)) $totalVentas = 0;
+if (!isset($totalRegistros)) $totalRegistros = $total ?? 0;
+if (!isset($jsonVentasAnuales)) $jsonVentasAnuales = '[]';
+if (!isset($jsonTopProductos)) $jsonTopProductos = '[]';
+
+// Establecer variables necesarias con valores predeterminados
+$table = $marketplace ?? 'Sin nombre';
+$message = $message ?? null;
+$messageType = $messageType ?? 'info';
+$processedRows = $processedRows ?? null;
+$total = $totalRegistros ?? 0;
+$page = $page ?? 1;
+$totalPages = $totalPages ?? 1;
+$limit = $limit ?? 25;
+$data = $datosRecientes ?? [];
+
+function formatColumnName($column) {
+    // Mapeo específico para ciertos campos
+    $specialCases = [
+        'id' => 'ID',
+        'id_documento' => 'ID Documento',
+        'precio_despues_descuento' => 'Precio con Descuento',
+        'nombre_estado' => 'Estado',
+        'numero_documento_cliente' => 'Documento Cliente',
+        'codigo_sku' => 'SKU',
+        'numero_boleta' => 'N° Boleta',
+        'tipo_factura_origen' => 'Tipo de Factura',
+        'base_imponible' => 'Base Imponible',
+        'precio_sin_impuesto' => 'Precio sin Impuesto',
+        'fecha_creacion' => 'Fecha de Creación',
+        'estado' => 'Estado',
+        'rut_cliente' => 'RUT Cliente',
+        'suborder_number' => 'Suborden'
+    ];
+    
+    // Si existe en casos especiales, retornar el nombre personalizado
+    if (array_key_exists($column, $specialCases)) {
+        return $specialCases[$column];
+    }
+    
+    // Convertir guiones bajos a espacios y capitalizar cada palabra
+    $words = explode('_', $column);
+    $words = array_map('ucfirst', $words);
+    return implode(' ', $words);
+}
+
+function isMarketplaceTable($tableName = null) {
+    global $table;
+    // Usar el nombre de tabla pasado o la variable global $table
+    $tableName = $tableName ?? $table;
+    // Lista de todos los marketplaces
+    $marketplaces = [
+        'MKP_WALLMART',
+        'MKP_RIPLEY',
+        'MKP_FALABELLA',
+        'MKP_MERCADO_LIBRE',
+        'MKP_PARIS',
+        'MKP_WOOCOMMERCE',
+        'Orders_WALLMART',
+        'Orders_RIPLEY',
+        'Orders_FALABELLA',
+        'Orders_MERCADO_LIBRE',
+        'Orders_PARIS',
+        'Orders_WOOCOMMERCE'
+    ];
+    
+    // Verificar si la tabla actual es un marketplace
+    return in_array($table, $marketplaces, true);
+}
+
+// Función para formatear fechas a DD/MM/AAAA
+function formatDateForDisplay($dateString) {
+    if (empty($dateString)) {
+        return '';
+    }
+    
+    // Intentar convertir la fecha con diferentes formatos posibles
+    $formats = ['Y-m-d H:i:s', 'Y-m-d H:i', 'Y-m-d'];
+    $timestamp = false;
+    
+    foreach ($formats as $format) {
+        $date = DateTime::createFromFormat($format, $dateString);
+        if ($date !== false) {
+            $timestamp = $date->getTimestamp();
+            break;
+        }
+    }
+    
+    if ($timestamp === false) {
+        // Si no se pudo parsear con los formatos anteriores, intentar con strtotime
+        $timestamp = strtotime($dateString);
+    }
+    
+    // Si se pudo convertir, formatear como DD/MM/AAAA
+    if ($timestamp !== false) {
+        return date('d/m/Y', $timestamp);
+    }
+    
+    // Si no se pudo convertir, devolver la cadena original
+    return $dateString;
+}
+
+// Función para determinar si un campo es tipo fecha basado en su nombre
+function isDateField($fieldName) {
+    return preg_match('/(fecha|date|time|created|updated|modificado|creado)/i', $fieldName);
+}
+?>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detalle de <?= $this->escapeHtml($table) ?></title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
+    
+    <!-- jQuery UI CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.13.2/themes/base/jquery-ui.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="<?= $this->basePath('css/styles.css') ?>">
+    
+    <style>
+    /* Modal z-index fix */
+    .modal {
+        z-index: 1050 !important;
+    }
+
+    .modal-backdrop {
+        z-index: 1040 !important;
+    }
+
+    .modal .btn-close {
+        position: absolute;
+        right: 1rem;
+        top: 1rem;
+        padding: 0.5rem;
+        z-index: 1055;
+    }
+
+    .modal-content {
+        position: relative;
+        z-index: 1051;
+    }
+
+    /* Asegurar que otros elementos no interfieran */
+    .dashboard-container,
+    .dashboard-content,
+    .table-card {
+        position: relative;
+        z-index: 1;
+    }
+    
+    /* Estilos adicionales */
+    body {
+        overflow-y: scroll;
+    }
+    
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+    }
+    
+    .loading-content {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+    }
+    </style>
+</head>
+<body>
+
+<div class="dashboard-container">
+    <!-- Resumen de información -->
+    <div class="info-summary">
+        <div class="summary-card">
+            <div class="summary-header">
+                <i class="fas fa-info-circle"></i>
+                <h3>Resumen de Información</h3>
+            </div>
+            <div class="summary-content">
+                <div class="summary-item">
+                    <span class="summary-label">Tabla:</span>
+                    <span class="summary-value"><?= $this->escapeHtml($table) ?></span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Total de registros:</span>
+                    <span class="summary-value"><?= $total ?></span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Página actual:</span>
+                    <span class="summary-value"><?= $page ?> de <?= $totalPages ?></span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Registros por página:</span>
+                    <span class="summary-value"><?= $limit ?></span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <?php if ($message): ?>
+        <div class="alert alert-<?= $messageType ?> alert-dismissible fade show" role="alert">
+            <?= $this->escapeHtml($message) ?>
+            <?php if ($processedRows): ?>
+                <br>Registros procesados: <?= $processedRows ?>
+            <?php endif; ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    <?php endif; ?>
+
+    <div class="dashboard-header">
+        <div class="header-content">
+            <h1 class="page-title">
+                <i class="fas fa-table"></i>
+                <span class="title-text"><?= $this->escapeHtml($table) ?></span>
+            </h1>
+
+            <div class="action-buttons">
+                <?php if ($table === 'MKP_PARIS'): ?>
+                <button class="btn btn-warning" id="upload-liquidation" onclick="openLiquidationModal()">
+                    <i class="fas fa-file-excel"></i>
+                    <span>Subir Liquidación</span>
+                </button>
+                <?php endif; ?>
+                <button class="btn btn-primary" id="toggle-filters">
+                    <i class="fas fa-filter"></i>
+                    <span>Filtros</span>
+                </button>
+                <button class="btn btn-secondary" id="clear-filters">
+                    <i class="fas fa-eraser"></i>
+                    <span>Limpiar</span>
+                </button>
+                <button class="btn btn-success" id="export-csv">
+                    <i class="fas fa-download"></i>
+                    <span>Exportar</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-content">
+        <!-- Dashboard de resumen con KPIs y gráficos -->
+        <?php /* Mostrar KPIs independientemente de si hay datos o no */ ?>
+        <?php if (isMarketplaceTable($table)): ?>
+            <!-- Tarjetas de KPIs -->
+            <div class="kpi-container">
+                <!-- Venta Bruta Mensual -->
+                <div class="kpi-card kpi-bruta">
+                    <div class="kpi-icon"><i class="fas fa-dollar-sign"></i></div>
+                    <div class="kpi-content">
+                        <h3 class="kpi-title">Venta Bruta Mensual</h3>
+                        <div class="kpi-value">$ 0</div>
+                        <div class="kpi-description">0 transacciones este mes</div>
+                    </div>
+                </div>
+
+                <!-- Impuesto -->
+                <div class="kpi-card kpi-impuesto">
+                    <div class="kpi-icon"><i class="fas fa-percentage"></i></div>
+                    <div class="kpi-content">
+                        <h3 class="kpi-title">Impuesto Bruto Mensual</h3>
+                        <div class="kpi-value">$ 0</div>
+                        <div class="kpi-description">IVA de ventas mensuales</div>
+                    </div>
+                </div>
+
+                <!-- Ventas Totales -->
+                <div class="kpi-card kpi-total">
+                    <div class="kpi-icon"><i class="fas fa-chart-line"></i></div>
+                    <div class="kpi-content">
+                        <h3 class="kpi-title">Ventas Totales Mensual</h3>
+                        <div class="kpi-value">$ 0</div>
+                        <div class="kpi-description">0 transacciones totales</div>
+                    </div>
+                </div>
+
+                <!-- Canceladas -->
+                <div class="kpi-card kpi-canceladas" style="border-left-color: #f44336;">
+                    <div class="kpi-icon" style="color: #f44336;"><i class="fas fa-ban"></i></div>
+                    <div class="kpi-content">
+                        <h3 class="kpi-title">Ventas Canceladas</h3>
+                        <div class="kpi-value">$ 0</div>
+                        <div class="kpi-description">0 pedidos cancelados</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sección de gráficos -->
+            <div class="charts-grid">
+                <!-- Gráfico de Ventas Anuales -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3>Ventas Anuales</h3>
+                    </div>
+                    <div class="chart-body">
+                        <canvas id="ventasAnualesChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Gráfico de Top 10 Productos -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3>Top 10 Productos del Mes</h3>
+                    </div>
+                    <div class="chart-body">
+                        <canvas id="topProductosChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
+
+        <?php /* Mostrar filtros y tabla de datos si hay datos */ ?>
+        <?php if (!empty($data) || !empty($datosRecientes)): ?>
+            <?php
+                // Determinar qué conjunto de datos usar
+                $dataToShow = [];
+
+                // Preferir datosRecientes si están disponibles
+                if (!empty($datosRecientes) && is_array($datosRecientes) && count($datosRecientes) > 0) {
+                    $dataToShow = $datosRecientes;
+                }
+                // Si no hay datosRecientes, intentar con data
+                else if (!empty($data) && is_array($data) && count($data) > 0) {
+                    $dataToShow = $data;
+                }
+
+                // Obtener encabezados del primer registro (si existe)
+                $allHeaders = [];
+                if (!empty($dataToShow) && isset($dataToShow[0]) && is_array($dataToShow[0])) {
+                    $allHeaders = array_keys($dataToShow[0]);
+                }
+                
+                // Definir columnas que no deben mostrarse
+                $hiddenColumns = ['id_estado', 'url_pdf_boleta', 'link_factura'];
+                
+                // Filtrar los headers para excluir las columnas ocultas
+                $headers = array_filter($allHeaders, function($header) use ($hiddenColumns) {
+                    return !in_array($header, $hiddenColumns);
+                });
+            ?>
+            
+            <!-- Panel de filtros elegante -->
+            <div id="filters-panel" class="filters-panel" style="display:none;">
+                <div class="filters-wrapper">
+                    <div class="filters-header">
+                        <h3>Filtros de búsqueda</h3>
+                        <span class="filters-subtitle">Filtra por fecha, suborden, documento, RUT o estado</span>
+                    </div>
+                    <div class="filters-grid">
+                        <?php
+                        // Definir solo los filtros que queremos mostrar
+                        $allowedFilters = [
+                            'fecha_inicio' => 'Fecha Inicio',
+                            'fecha_fin' => 'Fecha Fin',
+                            'suborder_number' => 'Suborden',
+                            'numero_documento' => 'Documento',
+                            'numero_boleta' => 'N° Boleta',
+                            'rut_cliente' => 'RUT Cliente',
+                            'estado' => 'Estado'
+                        ];
+                        
+                        // Obtener encabezados disponibles
+                        $availableHeaders = !empty($dataToShow) ? array_keys($dataToShow[0]) : [];
+                        
+                        // Índice para los filtros
+                        $filterIndex = 0;
+                        
+                        // Mostrar filtros específicos
+                        foreach ($allowedFilters as $fieldKey => $fieldLabel):
+                            // Verificar si es un campo de rango de fechas
+                            if ($fieldKey === 'fecha_inicio' || $fieldKey === 'fecha_fin'):
+                        ?>
+                            <div class="filter-cell">
+                                <label class="filter-label"><?= $fieldLabel ?></label>
+                                <div class="filter-input-group">
+                                    <i class="fas fa-calendar-alt filter-icon"></i>
+                                    <input type="text" 
+                                        class="filter-input datepicker" 
+                                        id="filter_<?= $fieldKey ?>"
+                                        data-column="<?= $this->escapeHtml($fieldKey) ?>" 
+                                        data-column-index="<?= $filterIndex ?>"
+                                        data-is-date="1"
+                                        value="<?= isset($filters[$fieldKey]) ? formatDateForDisplay($filters[$fieldKey]) : '' ?>"
+                                        placeholder="Seleccionar fecha...">
+                                    <button type="button" class="filter-btn" onclick="applyServerFilter('<?= $this->escapeJs($fieldKey) ?>')">
+                                        <i class="fas fa-search"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        <?php
+                            elseif (in_array($fieldKey, $availableHeaders) || $fieldKey === 'estado'):
+                        ?>
+                            <div class="filter-cell">
+                                <label class="filter-label"><?= $fieldLabel ?></label>
+                                <?php if ($fieldKey === 'estado'): ?>
+                                    <div class="filter-input-group">
+                                        <i class="fas fa-tags filter-icon"></i>
+                                        <select class="filter-input column-filter" 
+                                            id="filter_<?= $filterIndex ?>"
+                                            data-column="<?= $this->escapeHtml($fieldKey) ?>" 
+                                            data-column-index="<?= $filterIndex ?>" 
+                                            data-is-date="0">
+                                            <option value="">Todos los estados</option>
+                                            <option value="Nueva" <?= isset($filters[$fieldKey]) && $filters[$fieldKey] === 'Nueva' ? 'selected' : '' ?>>Nueva</option>
+                                            <option value="En Proceso" <?= isset($filters[$fieldKey]) && $filters[$fieldKey] === 'En Proceso' ? 'selected' : '' ?>>En Proceso</option>
+                                            <option value="Enviada" <?= isset($filters[$fieldKey]) && $filters[$fieldKey] === 'Enviada' ? 'selected' : '' ?>>Enviada</option>
+                                            <option value="Entregada" <?= isset($filters[$fieldKey]) && $filters[$fieldKey] === 'Entregada' ? 'selected' : '' ?>>Entregada</option>
+                                            <option value="Pendiente de Pago" <?= isset($filters[$fieldKey]) && $filters[$fieldKey] === 'Pendiente de Pago' ? 'selected' : '' ?>>Pendiente de Pago</option>
+                                            <option value="Cancelada" <?= isset($filters[$fieldKey]) && $filters[$fieldKey] === 'Cancelada' ? 'selected' : '' ?>>Cancelada</option>
+                                            <option value="Devuelta" <?= isset($filters[$fieldKey]) && $filters[$fieldKey] === 'Devuelta' ? 'selected' : '' ?>>Devuelta</option>
+                                        </select>
+                                    </div>
+                                <?php else: ?>
+                                    <div class="filter-input-group">
+                                        <i class="fas fa-search filter-icon"></i>
+                                        <input type="text" class="filter-input column-filter" 
+                                            id="filter_<?= $filterIndex ?>"
+                                            data-column="<?= $this->escapeHtml($fieldKey) ?>" 
+                                            data-column-index="<?= array_search($fieldKey, $availableHeaders) === false ? 0 : array_search($fieldKey, $availableHeaders) ?>" 
+                                            data-is-date="0"
+                                            value="<?= isset($filters[$fieldKey]) ? $this->escapeHtml($filters[$fieldKey]) : '' ?>"
+                                            placeholder="Filtrar...">
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        <?php 
+                                $filterIndex++;
+                            endif;
+                        endforeach; 
+                        ?>
+                    </div>
+                    <div class="filters-footer">
+                        <button type="button" id="apply-all-filters" class="btn btn-primary">
+                            <i class="fas fa-database"></i> Buscar en toda la base de datos
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tarjeta de tabla con scroll horizontal -->
+            <div class="table-card">
+                <div class="table-card-header">
+                    <div class="header-left">
+                        <span class="records-info">Mostrando <span id="visible-count"><?= count($dataToShow) ?></span> de <span id="total-count"><?= $total ?></span> registros</span>
+                    </div>
+                    <div class="header-right">
+                        <div class="search-box">
+                            <i class="fas fa-search search-icon"></i>
+                            <input type="text" id="global-search" class="search-input"
+                                value="<?= $this->escapeHtml($search ?? '') ?>"
+                                placeholder="Buscar en todos los campos...">
+                            <button type="button" id="global-search-btn" class="btn btn-sm btn-primary">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Contenedor con scroll horizontal -->
+                <div class="table-scroll-container">
+                    <table id="detailTable" class="data-table">
+                        <thead>
+                            <tr>
+                                <?php foreach ($headers as $header): ?>
+                                    <th data-column="<?= $header ?>"><?= formatColumnName($header) ?></th>
+                                <?php endforeach; ?>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($dataToShow as $row): ?>
+                                <tr>
+                                    <?php foreach ($headers as $header): ?>
+                                        <?php
+                                            // Obtener el valor de la celda, teniendo en cuenta posible uso de lowercase
+                                            $cellValue = $row[$header] ?? $row[strtolower($header)] ?? '';
+                                            
+                                            // Comprobar si es un campo de fecha
+                                            $isDate = isDateField($header);
+                                            
+                                            // Formatear fecha si es necesario
+                                            if ($isDate && !empty($cellValue)) {
+                                                $cellValue = formatDateForDisplay($cellValue);
+                                            }
+                                        ?>
+                                        
+                                        <?php if ($header === 'numero_boleta' && isset($row['url_pdf_boleta']) && !empty($row['url_pdf_boleta'])): ?>
+                                        <td>
+                                            <a href="<?= $this->escapeHtmlAttr($row['url_pdf_boleta']) ?>" 
+                                            target="_blank" 
+                                            class="boleta-link" 
+                                            title="Ver boleta">
+                                                <i class="fas fa-file-pdf"></i>
+                                                <?= $this->escapeHtml($cellValue) ?>
+                                            </a>
+                                        </td>
+                                        <?php elseif ($header === 'nro_solicitud_de_pago' && isset($row['link_factura']) && !empty($row['link_factura'])): ?>
+                                        <td>
+                                            <a href="<?= $this->escapeHtmlAttr($row['link_factura']) ?>" 
+                                            target="_blank" 
+                                            class="boleta-link" 
+                                            title="Ver factura">
+                                                <i class="fas fa-file-invoice-dollar"></i>
+                                                <?= $this->escapeHtml($cellValue) ?>
+                                            </a>
+                                        </td>
+                                        <?php else: ?>
+                                        <td><?= $this->escapeHtml($cellValue) ?></td>
+                                        <?php endif; ?>
+                                    <?php endforeach; ?>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="table-card-footer">
+                    <div class="footer-left">
+                        <div class="page-size">
+                            <span>Mostrar</span>
+                            <select id="page-size-select">
+                                <option value="50" <?= $limit == 50 ? 'selected' : '' ?>>50</option>
+                                <option value="100" <?= $limit == 100 ? 'selected' : '' ?>>100</option>
+                                <option value="150" <?= $limit == 150 ? 'selected' : '' ?>>150</option>
+                            </select>
+                            <span>registros</span>
+                        </div>
+                    </div>
+                    <div class="footer-right">
+                        <!-- Paginación basada en enlaces directos -->
+                        <div class="pagination-container" id="pagination-area">
+                            <?php if ($totalPages > 1): 
+                                // Construir base de URL de paginación
+                                $paginationParams = [];
+                                if ($limit != 50) {
+                                    $paginationParams['limit'] = $limit;
+                                }
+                                if (!empty($search)) {
+                                    $paginationParams['search'] = $search;
+                                }
+                                if (isset($filters) && is_array($filters)) {
+                                    foreach ($filters as $key => $value) {
+                                        if (strpos($key, 'fecha_') === 0) {
+                                            $paginationParams[$key] = $value;
+                                        } else {
+                                            $paginationParams['filter_' . $key] = $value;
+                                        }
+                                    }
+                                }
+                                $queryString = http_build_query($paginationParams);
+                                $baseUrl = $this->url('dashboard', ['action' => 'detail', 'marketplace' => $table]);
+                                $baseUrl .= empty($queryString) ? '?' : ('?' . $queryString . '&');
+                            ?>
+                                <!-- Primera página -->
+                                <a href="<?= $baseUrl ?>page=1" 
+                                class="pagination-button <?= $page <= 1 ? 'disabled' : '' ?>">
+                                    <i class="fas fa-angle-double-left"></i>
+                                </a>
+                                
+                                <!-- Página anterior -->
+                                <a href="<?= $baseUrl ?>page=<?= max(1, $page - 1) ?>" 
+                                class="pagination-button <?= $page <= 1 ? 'disabled' : '' ?>">
+                                    <i class="fas fa-angle-left"></i>
+                                </a>
+                                
+                                <!-- Páginas numeradas -->
+                                <?php
+                                    $startPage = max(1, $page - 1);
+                                    $endPage = min($totalPages, $page + 1);
+                                    
+                                    if ($startPage > 1):
+                                ?>
+                                    <a href="<?= $baseUrl ?>page=1" 
+                                    class="pagination-button">1</a>
+                                    
+                                    <?php if ($startPage > 2): ?>
+                                        <span class="pagination-button disabled">...</span>
+                                    <?php endif; ?>
+                                <?php endif; ?>
+                                
+                                <?php for ($i = $startPage; $i <= $endPage; $i++): ?>
+                                    <a href="<?= $baseUrl ?>page=<?= $i ?>" 
+                                    class="pagination-button <?= $i == $page ? 'active' : '' ?>">
+                                        <?= $i ?>
+                                    </a>
+                                <?php endfor; ?>
+                                
+                                <?php if ($endPage < $totalPages): ?>
+                                    <?php if ($endPage < $totalPages - 1): ?>
+                                        <span class="pagination-button disabled">...</span>
+                                    <?php endif; ?>
+                                    
+                                    <a href="<?= $baseUrl ?>page=<?= $totalPages ?>" 
+                                    class="pagination-button">
+                                        <?= $totalPages ?>
+                                    </a>
+                                <?php endif; ?>
+                                
+                                <!-- Página siguiente -->
+                                <a href="<?= $baseUrl ?>page=<?= min($totalPages, $page + 1) ?>" 
+                                class="pagination-button <?= $page >= $totalPages ? 'disabled' : '' ?>">
+                                    <i class="fas fa-angle-right"></i>
+                                </a>
+                                
+                                <!-- Última página -->
+                                <a href="<?= $baseUrl ?>page=<?= $totalPages ?>" 
+                                class="pagination-button <?= $page >= $totalPages ? 'disabled' : '' ?>">
+                                    <i class="fas fa-angle-double-right"></i>
+                                </a>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+        <?php else: ?>
+            <div class="empty-state">
+                <div class="empty-state-icon">
+                    <i class="fas fa-database"></i>
+                </div>
+                <h2>No hay datos disponibles</h2>
+                <p>No se encontraron registros en la tabla <?= $this->escapeHtml($table) ?>.</p>
+                <p class="small text-muted">Asegúrate de que la tabla existe y contiene datos.</p>
+            </div>
+        <?php endif; ?>
+
+        <!-- Formulario oculto para manejar filtros y paginación -->
+        <form id="tableForm" method="GET" action="<?= $this->url('dashboard', ['action' => 'detail', 'marketplace' => $table]) ?>">
+            <input type="hidden" name="page" id="page-input" value="<?= $page ?>">
+            <input type="hidden" name="limit" id="limit-input" value="<?= $limit ?>">
+            <input type="hidden" name="search" id="search-input" value="<?= $this->escapeHtml($search ?? '') ?>">
+            
+            <!-- Los filtros se agregarán dinámicamente con JavaScript -->
+            <?php foreach ($filters ?? [] as $filterKey => $filterValue): ?>
+                <?php if (strpos($filterKey, 'fecha_') === 0): ?>
+                    <input type="hidden" name="<?= $this->escapeHtml($filterKey) ?>" value="<?= $this->escapeHtml($filterValue) ?>">
+                <?php else: ?>
+                    <input type="hidden" name="filter_<?= $this->escapeHtml($filterKey) ?>" value="<?= $this->escapeHtml($filterValue) ?>">
+                <?php endif; ?>
+            <?php endforeach; ?>
+        </form>
+
+        <div class="dashboard-footer">
+            <a href="<?= $this->url('application', ['action' => 'dashboard']) ?>" class="btn btn-back">
+                <i class="fas fa-arrow-left"></i>
+                <span>Volver al Dashboard</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Modal correcto para Bootstrap 5 -->
+    <div id="liquidationModal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="liquidationModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="liquidationModalLabel">Subir Liquidación MKP París</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="liquidationForm" method="POST" enctype="multipart/form-data" action="<?= $this->url('application', ['action' => 'upload-liquidation']) ?>">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="liquidationFile" class="form-label">Seleccionar archivo Excel:</label>
+                            <input type="file" class="form-control" id="liquidationFile" name="liquidationFile" accept=".xlsx, .xls" required>
+                            <div class="form-text">Solo archivos Excel (.xlsx, .xls)</div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="processInBackground" name="processInBackground" checked>
+                                <label class="form-check-label" for="processInBackground">Procesar en segundo plano</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-upload"></i> Subir Archivo
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts al final del body -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+<script>
+
+
+function openLiquidationModal() {
+    // Forzar limpieza de todos los modales abiertos
+    document.querySelectorAll('.modal-backdrop').forEach(e => e.remove());
+    document.querySelectorAll('.modal.show').forEach(e => {
+        e.classList.remove('show');
+        e.style.display = 'none';
+        e.setAttribute('aria-hidden', 'true');
+    });
+
+    // Buscar y abrir el modal correcto
+    const modalEl = document.getElementById('liquidationModal');
+    if (!modalEl) return;
+
+    const modal = new bootstrap.Modal(modalEl, {
+        backdrop: false
+    });
+    modal.show();
+}
+
+function closeLiquidationModal() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('liquidationModal'));
+    if (modal) modal.hide();
+
+    // Limpia backdrop extra manualmente
+    document.querySelectorAll('.modal-backdrop').forEach(e => e.remove());
+}
+
+
+
+document.getElementById('liquidationForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const fileInput = document.getElementById('liquidationFile');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert('Por favor selecciona un archivo');
+        return;
+    }
+
+    const formData = new FormData(this);
+    
+    // Show loading indicator
+    showLoading();
+    
+    // Disable submit button
+    const submitBtn = this.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+    
+    // Close modal
+    closeLiquidationModal();
+
+    fetch(this.action, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        console.log('Response status:', response.status);
+        console.log('Response headers:', response.headers.get('Content-Type'));
+        
+        // Check if response is OK
+        if (!response.ok) {
+            throw new Error('Error HTTP: ' + response.status);
+        }
+        
+        // Try to parse as JSON
+        return response.text().then(text => {
+            console.log('Response text:', text);
+            try {
+                // Try to parse as JSON
+                return JSON.parse(text);
+            } catch (e) {
+                console.error('Error parsing JSON:', e);
+                // If not valid JSON, throw error with text
+                throw new Error('Respuesta inválida del servidor: ' + text);
+            }
+        });
+    })
+    .then(data => {
+        console.log('Parsed data:', data);
+        hideLoading();
+        
+        if (data.success) {
+            alert('Archivo subido correctamente. ' + (data.message || ''));
+            
+            // If we have a job ID, redirect to status page
+            if (data.jobId) {
+                window.location.href = '/liquidation-status/' + data.jobId;
+            } else {
+                // Otherwise reload the page
+                window.location.reload();
+            }
+        } else {
+            alert('Error: ' + (data.message || 'Error desconocido'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        hideLoading();
+        alert('Error al procesar el archivo: ' + error.message);
+    })
+    .finally(() => {
+        // Re-enable submit button
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-upload"></i> Subir Archivo';
+    });
+});
+
+function hideLoading() {
+    const overlay = document.querySelector('.loading-overlay');
+    if (overlay) overlay.remove();
+}
+
+console.log(JSON.parse('<?= $jsonVentasAnuales ?>'));
+
+function showLoading() {
+    // Crear overlay de carga
+    const loadingOverlay = document.createElement('div');
+    loadingOverlay.className = 'loading-overlay';
+    
+    const loadingContent = document.createElement('div');
+    loadingContent.className = 'loading-content';
+    loadingContent.innerHTML = `
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Procesando...</span>
+        </div>
+        <p class="mt-2">Subiendo archivo...</p>
+    `;
+    
+    loadingOverlay.appendChild(loadingContent);
+    document.body.appendChild(loadingOverlay);
+}
+</script>
+<script>
+
+(function($) {
+    'use strict';
+    
+    // Variables globales
+    var jsonData = <?= json_encode($dataToShow) ?>;
+    var jsonVentasAnuales = <?= $jsonVentasAnuales ?>;
+    var jsonTopProductos = <?= $jsonTopProductos ?>;
+    
+    // Función para formatear fecha para mostrar
+    function formatDateForDisplay(dateString) {
+        if (!dateString) return '';
+        
+        // Crear un objeto Date a partir de la cadena
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return dateString; // Si no es una fecha válida, devolver original
+        
+        // Formatear como DD/MM/YYYY
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0'); // Mes es base 0
+        const year = date.getFullYear();
+        
+        return `${day}/${month}/${year}`;
+    }
+    
+    // Función para formatear fecha para el servidor
+    function formatDateForServer(dateString) {
+        if (!dateString) return '';
+        
+        // Si está en formato DD/MM/YYYY, convertir a YYYY-MM-DD
+        if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateString)) {
+            const parts = dateString.split('/');
+            return `${parts[2]}-${String(parts[1]).padStart(2, '0')}-${String(parts[0]).padStart(2, '0')}`;
+        }
+        
+        return dateString;
+    }
+    
+    // Función para obtener la fecha del registro
+    function getFechaCreacion(row) {
+        const fechaKeys = [
+            'fecha_creacion', 'fecha_venta', 'date_created', 'created_at',
+            'order_date', 'purchase_date', 'sale_date', 'fecha_compra',
+            'fecha_orden', 'fecha_pedido', 'fecha_emision', 'fecha_solicitud',
+            'created', 'dateCreated', 'creation_date', 'fecha_hora_creacion'
+        ];
+        
+        for (const key of fechaKeys) {
+            if (row[key]) {
+                return row[key];
+            }
+            // Intentar con la versión en minúsculas
+            const lowerKey = key.toLowerCase();
+            if (row[lowerKey]) {
+                return row[lowerKey];
+            }
+            // Intentar con la versión en mayúsculas
+            const upperKey = key.toUpperCase();
+            if (row[upperKey]) {
+                return row[upperKey];
+            }
+        }
+        
+        return null;
+    }
+    
+    // Función para obtener el número de orden
+    function getNumeroOrden(row) {
+        const numOrderKeys = [
+            'numero_boleta', 'num_boleta', 'orden_id', 'order_id', 'id_factura',
+            'numero_suborden', 'suborder_number', 'id', 'ID', 'ID del pedido',
+            'ID Documento', 'order_number', 'invoice_number', 'factura_id',
+            'doc_number', 'document_id'
+        ];
+        
+        for (const key of numOrderKeys) {
+            if (row[key]) {
+                return row[key];
+            }
+        }
+        
+        return null;
+    }
+    
+    // Función para obtener el monto total
+    function getMontoTotal(row) {
+        const montoKeys = [
+            'monto_total_boleta', 'monto_total', 'total_boleta', 'precio_con_descuento',
+            'Precio con Descuento', 'Total', 'Monto Total Factura', 'total_amount',
+            'grand_total', 'final_amount', 'total_price', 'total_value',
+            'precio_total'
+        ];
+        
+        for (const key of montoKeys) {
+            if (row[key]) {
+                return row[key];
+            }
+        }
+        
+        return 0;
+    }
+    
+    // Función para verificar si un estado está cancelado
+    function isStatusCancelado(estado) {
+        if (!estado) return false;
+        
+        const estadoLower = estado.toString().toLowerCase();
+        const estadosCancelados = [
+            'cancel', 'anulad', 'rechaz', 'delet', 'void', 'return', 'devuel',
+            'cancelled', 'canceled', 'anulated', 'rejected', 'deleted', 'void',
+            'returned', 'refunded', 'invalidated', 'nullified'
+        ];
+        
+        return estadosCancelados.some(term => estadoLower.includes(term));
+    }
+    
+    // Función para verificar si estamos en una tabla de marketplace
+    function isMarketplaceTable() {
+        const currentTable = "<?= $table ?>";
+        const marketplaces = [
+            'MKP_WALLMART', 'MKP_RIPLEY', 'MKP_FALABELLA', 'MKP_MERCADO_LIBRE', 'MKP_PARIS', 'MKP_WOOCOMMERCE',
+            'Orders_WALLMART', 'Orders_RIPLEY', 'Orders_FALABELLA', 'Orders_MERCADO_LIBRE', 'Orders_PARIS', 'Orders_WOOCOMMERCE'
+        ];
+        return marketplaces.some(mp => currentTable.indexOf(mp) !== -1);
+    }
+    
+    // Inicialización de KPIs
+    function initializeKPIs() {
+        if (!isMarketplaceTable()) {
+            console.log("No es una tabla de marketplace, omitiendo KPIs");
+            return;
+        }
+        
+        console.log("Iniciando cálculo de KPIs...");
+        console.log("Tabla actual:", "<?= $table ?>");
+        
+        const data = jsonData;
+        console.log("Datos cargados:", data.length, "registros");
+        
+        if (!data || data.length === 0) {
+            console.warn("No hay datos disponibles para procesar");
+            updateKPIDisplay(0, 0, 0, 0, 0, 0);
+            return;
+        }
+        
+        // Debug de las columnas del primer registro (si hay datos)
+        if (data && data.length > 0 && data[0]) {
+            console.log("Columnas disponibles:", Object.keys(data[0]));
+
+            // Buscar específicamente columnas que contengan "fecha" o "date"
+            const fechaCols = Object.keys(data[0]).filter(key => 
+                key.toLowerCase().includes('fecha') || 
+                key.toLowerCase().includes('date') ||
+                key.toLowerCase().includes('created')
+            );
+            console.log("Columnas de fecha encontradas:", fechaCols);
+        }
+        
+        const hoy = new Date();
+        const mesActual = hoy.getMonth() + 1;
+        const anioActual = hoy.getFullYear();
+        console.log(`Mes actual: ${mesActual}, Año actual: ${anioActual}`);
+        
+        // Contadores
+        const boletasUnicas = new Map();
+        const boletasCanceladas = new Map();
+        let totalVentas = 0;
+        let totalBase = 0;
+        let totalImpuesto = 0;
+        
+        // Contadores para debug
+        let registrosDelMes = 0;
+        let registrosCancelados = 0;
+        let registrosSinFecha = 0;
+        let registrosSinNumeroOrden = 0;
+        
+        data.forEach((row, index) => {
+            const fechaString = getFechaCreacion(row);
+            const numeroOrden = getNumeroOrden(row);
+            const montoTotal = getMontoTotal(row);
+            
+            // Log para los primeros 3 registros
+            if (index < 3) {
+                console.log(`Registro ${index}:`, {
+                    fecha_creacion: fechaString,
+                    numero_orden: numeroOrden,
+                    monto_total: montoTotal,
+                    columnas: Object.keys(row)
+                });
+            }
+            
+            if (!numeroOrden) {
+                registrosSinNumeroOrden++;
+                return;
+            }
+            
+            let fecha;
+            if (fechaString) {
+                try {
+                    if (typeof fechaString === 'string') {
+                        fecha = fechaString.includes('T') ? 
+                               new Date(fechaString) : 
+                               (fechaString.includes('-') ?
+                                new Date(fechaString.replace(' ', 'T')) :
+                                new Date(fechaString));
+                    } else if (fechaString instanceof Date) {
+                        fecha = fechaString;
+                    }
+                } catch (e) {
+                    console.log(`Error al parsear fecha en registro ${index}:`, fechaString);
+                }
+            }
+            
+            if (!fecha || isNaN(fecha.getTime())) {
+                registrosSinFecha++;
+                console.log(`Registro ${index} sin fecha válida:`, fechaString);
+                return;
+            }
+            
+            const mesFecha = fecha.getMonth() + 1;
+            const anioFecha = fecha.getFullYear();
+            const mismoMes = mesFecha === mesActual && anioFecha === anioActual;
+            
+            if (!mismoMes) {
+                return;
+            }
+            
+            registrosDelMes++;
+            
+            const estado = row.estado || row.Estado || row.status || row.STATUS || '';
+            const isCancelado = isStatusCancelado(estado);
+            if (isCancelado) {
+                registrosCancelados++;
+            }
+            
+            let monto = parseFloat(montoTotal || 0);
+            let base = parseFloat(row.precio_base || row['Precio sin Impuesto'] || row.base_imponible || monto / 1.19);
+            let impuesto = parseFloat(row.monto_impuesto_boleta || row.impuesto || row.IVA || monto - base);
+            
+            monto = isNaN(monto) ? 0 : monto;
+            base = isNaN(base) ? 0 : base;
+            impuesto = isNaN(impuesto) ? 0 : impuesto;
+            
+            if (monto > 0 && base === 0) {
+                base = Math.round(monto / 1.19);
+                impuesto = monto - base;
+            }
+            
+            const numeroOrdenKey = String(numeroOrden);
+            
+            if (!isCancelado) {
+                if (!boletasUnicas.has(numeroOrdenKey)) {
+                    boletasUnicas.set(numeroOrdenKey, {
+                        monto: monto,
+                        base: base,
+                        impuesto: impuesto
+                    });
+                    
+                    totalVentas += monto;
+                    totalBase += base;
+                    totalImpuesto += impuesto;
+                }
+            } else {
+                if (!boletasCanceladas.has(numeroOrdenKey)) {
+                    boletasCanceladas.set(numeroOrdenKey, monto);
+                }
+            }
+        });
+        
+        console.log("Resumen de procesamiento:", {
+            totalRegistros: data.length,
+            registrosDelMes: registrosDelMes,
+            registrosCancelados: registrosCancelados,
+            registrosSinFecha: registrosSinFecha,
+            registrosSinNumeroOrden: registrosSinNumeroOrden,
+            boletasUnicas: boletasUnicas.size,
+            boletasCanceladas: boletasCanceladas.size,
+            totalVentas: totalVentas,
+            totalBase: totalBase,
+            totalImpuesto: totalImpuesto
+        });
+        
+        const valorCancelado = [...boletasCanceladas.values()].reduce((acc, val) => acc + val, 0);
+        updateKPIDisplay(totalBase, totalImpuesto, totalVentas, valorCancelado, boletasUnicas.size, boletasCanceladas.size);
+    }
+    
+    // Función para actualizar display de KPIs
+    function updateKPIDisplay(totalBase, totalImpuesto, totalVentas, valorCancelado, numTransacciones, numCanceladas) {
+        try {
+            const kpiBruta = document.querySelector(".kpi-bruta");
+            if (kpiBruta) {
+                kpiBruta.querySelector(".kpi-value").textContent = "$ " + formatCLP(totalBase);
+                kpiBruta.querySelector(".kpi-description").textContent = `${numTransacciones} transacciones este mes`;
+            }
+            
+            const kpiImpuesto = document.querySelector(".kpi-impuesto");
+            if (kpiImpuesto) {
+                kpiImpuesto.querySelector(".kpi-value").textContent = "$ " + formatCLP(totalImpuesto);
+            }
+            
+            const kpiTotal = document.querySelector(".kpi-total");
+            if (kpiTotal) {
+                kpiTotal.querySelector(".kpi-value").textContent = "$ " + formatCLP(totalVentas);
+                kpiTotal.querySelector(".kpi-description").textContent = `${numTransacciones} transacciones totales`;
+            }
+            
+            const kpiCanceladas = document.querySelector(".kpi-canceladas");
+            if (kpiCanceladas) {
+                kpiCanceladas.querySelector(".kpi-value").textContent = "$ " + formatCLP(valorCancelado);
+                kpiCanceladas.querySelector(".kpi-description").textContent = `${numCanceladas} pedidos cancelados`;
+            }
+        } catch (error) {
+            console.error("Error al actualizar KPIs:", error);
+        }
+    }
+    
+    // Formatear valores numéricos
+    function formatCLP(num) {
+        return new Intl.NumberFormat('es-CL').format(Math.round(num));
+    }
+    
+    // Inicialización de gráficos
+    function initializeCharts() {
+        if (!isMarketplaceTable()) {
+            return;
+        }
+        
+        if (typeof Chart === 'undefined') {
+            console.error("Chart.js no está disponible");
+            return;
+        }
+        
+        try {
+            const ventasAnualesElement = document.getElementById('ventasAnualesChart');
+            const topProductosElement = document.getElementById('topProductosChart');
+            
+            if (!ventasAnualesElement || !topProductosElement) {
+                return;
+            }
+            
+            // Gráfico de ventas anuales
+            if (jsonVentasAnuales && jsonVentasAnuales.length > 0) {
+                const ventasCtx = ventasAnualesElement.getContext('2d');
+                new Chart(ventasCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: jsonVentasAnuales.map(item => item.mes),
+                        datasets: [{
+                            label: 'Ventas',
+                            data: jsonVentasAnuales.map(item => item.ventas),
+                            backgroundColor: 'rgba(67, 97, 238, 0.7)',
+                            borderColor: 'rgba(67, 97, 238, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.y !== null) {
+                                            label += new Intl.NumberFormat('es-CL', { 
+                                                style: 'currency', 
+                                                currency: 'CLP',
+                                                maximumFractionDigits: 0
+                                            }).format(context.parsed.y);
+                                        }
+                                        return label;
+                                    },
+                                    afterLabel: function(context) {
+                                        const index = context.dataIndex;
+                                        const boletas = jsonVentasAnuales[index].cantidad || 0;
+                                        return `Boletas: ${boletas}`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return new Intl.NumberFormat('es-CL', { 
+                                            style: 'currency', 
+                                            currency: 'CLP',
+                                            maximumFractionDigits: 0
+                                        }).format(value);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } else {
+                ventasAnualesElement.parentNode.innerHTML = '<div class="no-data-message">No hay datos disponibles para mostrar</div>';
+            }
+            
+            // Gráfico de top 10 productos
+            if (jsonTopProductos && jsonTopProductos.length > 0) {
+                const productosCtx = topProductosElement.getContext('2d');
+                new Chart(productosCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: jsonTopProductos.map(item => {
+                            const nombre = item.nombre || '';
+                            return nombre.length > 20 ? nombre.substring(0, 18) + '...' : nombre;
+                        }),
+                        datasets: [{
+                            label: 'Ventas',
+                            data: jsonTopProductos.map(item => item.ventas),
+                            backgroundColor: 'rgba(76, 175, 80, 0.7)',
+                            borderColor: 'rgba(76, 175, 80, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    title: function(tooltipItems) {
+                                        const index = tooltipItems[0].dataIndex;
+                                        return jsonTopProductos[index].nombre;
+                                    },
+                                    label: function(context) {
+                                        let label = "Ventas: ";
+                                        if (context.parsed.x !== null) {
+                                            label += new Intl.NumberFormat('es-CL', { 
+                                                style: 'currency', 
+                                                currency: 'CLP',
+                                                maximumFractionDigits: 0
+                                            }).format(context.parsed.x);
+                                        }
+                                        return label;
+                                    },
+                                    afterLabel: function(context) {
+                                        const index = context.dataIndex;
+                                        const cantidad = jsonTopProductos[index].cantidad || 0;
+                                        return "Cantidad: " + cantidad;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return new Intl.NumberFormat('es-CL', { 
+                                            style: 'currency', 
+                                            currency: 'CLP',
+                                            maximumFractionDigits: 0
+                                        }).format(value);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } else {
+                topProductosElement.parentNode.innerHTML = '<div class="no-data-message">No hay datos disponibles para mostrar</div>';
+            }
+        } catch (error) {
+            console.error("Error al inicializar los gráficos:", error);
+        }
+    }
+    
+    // Filtrado en tiempo real
+    function filterTableInRealTime() {
+        var globalSearchTerm = $('#global-search').val().toLowerCase();
+        $('#detailTable tbody tr').show();
+        
+        if (globalSearchTerm) {
+            $('#detailTable tbody tr').each(function() {
+                var rowText = $(this).text().toLowerCase();
+                if (rowText.indexOf(globalSearchTerm) === -1) {
+                    $(this).hide();
+                }
+            });
+        }
+        
+        $('.column-filter').each(function() {
+            var columnIndex = $(this).data('column-index');
+            var filterValue = $(this).val().toLowerCase();
+            
+            if (filterValue) {
+                $(this).addClass('active-filter');
+                $('#detailTable tbody tr:visible').each(function() {
+                    var cellText = $(this).find('td').eq(columnIndex).text().toLowerCase();
+                    if (cellText.indexOf(filterValue) === -1) {
+                        $(this).hide();
+                    }
+                });
+            } else {
+                $(this).removeClass('active-filter');
+            }
+        });
+        
+        $('#visible-count').text($('#detailTable tbody tr:visible').length);
+    }
+    
+    // Obtener filtros actuales
+    function getCurrentFilters() {
+        var filters = {};
+        
+        $('.column-filter').each(function() {
+            var value = $(this).val();
+            if (value) {
+                var column = $(this).data('column');
+                filters['filter_' + column] = value;
+            }
+        });
+        
+        $('.datepicker').each(function() {
+            var value = $(this).val();
+            if (value) {
+                var column = $(this).data('column');
+                // Las fechas se envían sin el prefijo filter_
+                filters[column] = formatDateForServer(value);
+            }
+        });
+        
+        var searchTerm = $('#global-search').val();
+        if (searchTerm) {
+            filters.search = searchTerm;
+        }
+        
+        filters.page = $('#page-input').val();
+        filters.limit = $('#limit-input').val();
+        
+        return filters;
+    }
+    
+    // Enviar al servidor
+    function sendToServer(params) {
+        var currentParams = getCurrentFilters();
+        for (var key in params) {
+            currentParams[key] = params[key];
+        }
+        
+        var form = $('<form>', {
+            'method': 'GET',
+            'action': window.location.pathname
+        });
+        
+        for (var key in currentParams) {
+            $('<input>').attr({
+                'type': 'hidden',
+                'name': key,
+                'value': currentParams[key]
+            }).appendTo(form);
+        }
+        
+        form.appendTo('body').submit();
+    }
+    
+    // Inicialización principal
+    $(document).ready(function() {
+        console.log("Documento cargado, inicializando...");
+        console.log("Tabla actual:", "<?= $table ?>");
+        console.log("Es marketplace:", isMarketplaceTable());
+        
+        // Inicializar datepicker
+        $(".datepicker").datepicker({
+            dateFormat: "dd/mm/yy",
+            changeMonth: true,
+            changeYear: true,
+            yearRange: "1900:2100",
+            showOtherMonths: true,
+            selectOtherMonths: true,
+            onSelect: function(dateText) {
+                $(this).val(dateText);
+                filterTableInRealTime();
+            }
+        });
+        
+        $(".datepicker").each(function() {
+            const val = $(this).val();
+            if (val) {
+                $(this).val(formatDateForDisplay(val));
+            }
+        });
+        
+        // Solo inicializar KPIs y gráficos para tablas de marketplace
+        if (isMarketplaceTable()) {
+            console.log("Inicializando KPIs y gráficos...");
+            initializeKPIs();
+            initializeCharts();
+        } else {
+            console.log("No es tabla de marketplace, omitiendo KPIs y gráficos");
+        }
+        
+        if ($('.column-filter[value!=""]').length > 0 || $('#global-search').val() || $('.datepicker[value!=""]').length > 0) {
+            $('#filters-panel').show();
+        }
+
+        $('#toggle-filters').on('click', function() {
+            $('#filters-panel').slideToggle(300);
+        });
+
+        $('.column-filter').on('input', function() {
+            filterTableInRealTime();
+        });
+
+        $('#global-search').on('input', function() {
+            filterTableInRealTime();
+        });
+
+        $('#clear-filters').on('click', function(e) {
+            e.preventDefault();
+            
+            var hasServerFilters = $('.column-filter[value!=""]').length > 0 || 
+                                $('#global-search').val() || 
+                                $('.datepicker[value!=""]').length > 0;
+            
+            $('.column-filter').val('').removeClass('active-filter');
+            $('.datepicker').val('').removeClass('active-filter');
+            $('#global-search').val('');
+            
+            if (hasServerFilters) {
+                window.location.href = '<?= $this->url('application', ['action' => 'detail', 'table' => $table]) ?>?limit=50';
+            } else {
+                $('#detailTable tbody tr').show();
+                $('#visible-count').text($('#detailTable tbody tr').length);
+            }
+            
+            return false;
+        });
+
+        $('#global-search-btn').on('click', function() {
+            var searchTerm = $('#global-search').val();
+            sendToServer({search: searchTerm});
+        });
+
+        $('#global-search').on('keypress', function(e) {
+            if (e.which === 13) {
+                var searchTerm = $(this).val();
+                sendToServer({search: searchTerm});
+                return false;
+            }
+        });
+
+        $('#apply-all-filters').on('click', function() {
+            var filters = {};
+            var hasFilters = false;
+            
+            $('.column-filter').each(function() {
+                var value = $(this).val();
+                if (value) {
+                    hasFilters = true;
+                    var column = $(this).data('column');
+                    filters['filter_' + column] = value;
+                }
+            });
+            
+            $('.datepicker').each(function() {
+                var value = $(this).val();
+                if (value) {
+                    hasFilters = true;
+                    var column = $(this).data('column');
+                    filters[column] = formatDateForServer(value);
+                }
+            });
+            
+            var searchTerm = $('#global-search').val();
+            if (searchTerm) {
+                hasFilters = true;
+                filters.search = searchTerm;
+            }
+            
+            if (hasFilters) {
+                sendToServer(filters);
+            } else {
+                alert("No hay filtros aplicados para buscar.");
+            }
+        });
+
+        $('#page-size-select').on('change', function() {
+            var filters = getCurrentFilters();
+            filters.limit = $(this).val();
+            filters.page = 1;
+            sendToServer(filters);
+        });
+
+        $('#export-csv').on('click', function() {
+            var filters = getCurrentFilters();
+            filters.export = 'csv';
+            filters.hidden_columns = 'id_estado,url_pdf_boleta,link_factura';
+            sendToServer(filters);
+        });
+
+        filterTableInRealTime();
+    });
+    
+    // Función global para buscar en el servidor con un filtro específico
+    window.applyServerFilter = function(column) {
+        console.log("Aplicando filtro para columna:", column);
+        
+        var input = $('input[data-column="' + column + '"]');
+        var value = input.val();
+        
+        if (value) {
+            if (input.hasClass('datepicker')) {
+                value = formatDateForServer(value);
+            }
+            
+            var filters = {};
+            // Las fechas no llevan el prefijo filter_
+            if (column.startsWith('fecha_')) {
+                filters[column] = value;
+            } else {
+                filters['filter_' + column] = value;
+            }
+            
+            var form = $('<form>', {
+                'method': 'GET',
+                'action': window.location.pathname
+            });
+            
+            // Añadir filtro
+            for (var key in filters) {
+                $('<input>').attr({
+                    'type': 'hidden',
+                    'name': key,
+                    'value': filters[key]
+                }).appendTo(form);
+            }
+            
+            // Añadir parámetros de paginación
+            $('<input>').attr({
+                'type': 'hidden',
+                'name': 'limit',
+                'value': $('#limit-input').val()
+            }).appendTo(form);
+            
+            // Añadir otros filtros activos
+            $('.column-filter').not(input).each(function() {
+                var val = $(this).val();
+                if (val) {
+                    var col = $(this).data('column');
+                    $('<input>').attr({
+                        'type': 'hidden',
+                        'name': 'filter_' + col,
+                        'value': val
+                    }).appendTo(form);
+                }
+            });
+            
+            // Añadir otros datepickers activos
+            $('.datepicker').not(input).each(function() {
+                var val = $(this).val();
+                if (val) {
+                    var col = $(this).data('column');
+                    $('<input>').attr({
+                        'type': 'hidden',
+                        'name': col,
+                        'value': formatDateForServer(val)
+                    }).appendTo(form);
+                }
+            });
+            
+            // Búsqueda global
+            var searchTerm = $('#global-search').val();
+            if (searchTerm) {
+                $('<input>').attr({
+                    'type': 'hidden',
+                    'name': 'search',
+                    'value': searchTerm
+                }).appendTo(form);
+            }
+            
+            // Enviar formulario
+            form.appendTo('body').submit();
+        }
+    };
+    
+})(jQuery);
+</script>
+</body>
+</html>

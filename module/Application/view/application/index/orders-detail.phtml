@@ -129,7 +129,15 @@ $currentStatus = $statusFilter ?? '';
                                     <option value="1" <?= isset($printedFilter) && $printedFilter === '1' ? 'selected' : '' ?>>Impresos</option>
                                 </select>
                                 
-
+                                <!-- Filtro por estado de procesamiento -->
+                                <select class="form-select" name="status" id="statusFilter">
+                                    <option value="">Todos los estados</option>
+                                    <option value="Nueva" <?= isset($statusFilter) && $statusFilter === 'Nueva' ? 'selected' : '' ?>>Nueva</option>
+                                    <option value="En Proceso" <?= isset($statusFilter) && $statusFilter === 'En Proceso' ? 'selected' : '' ?>>En Proceso</option>
+                                    <option value="Enviada" <?= isset($statusFilter) && $statusFilter === 'Enviada' ? 'selected' : '' ?>>Enviada</option>
+                                    <option value="Entregada" <?= isset($statusFilter) && $statusFilter === 'Entregada' ? 'selected' : '' ?>>Entregada</option>
+                                    <option value="Cancelada" <?= isset($statusFilter) && $statusFilter === 'Cancelada' ? 'selected' : '' ?>>Cancelada</option>
+                                </select>
                             </div>
                         </div>
                           
@@ -141,28 +149,31 @@ $currentStatus = $statusFilter ?? '';
                             <button type="button" class="btn btn-outline-danger" id="clearFiltersBtn">
                                 <i class="fas fa-eraser me-1"></i> Limpiar Filtros
                             </button>
+
+                            <!-- BOTÓN DE ACCIONES MASIVAS - MOVIDO AQUÍ -->
+                            <div class="dropdown orders-dropdown">
+                                <button class="btn btn-primary dropdown-toggle" type="button" id="bulkActionsBtn" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fas fa-cog me-1"></i> Acciones
+                                </button>
+                                <ul class="dropdown-menu orders-dropdown-menu">
+                                    <li><a class="dropdown-item" href="#" id="printLabelsBtn"><i class="fas fa-print me-2"></i>Imprimir etiquetas</a></li>
+                                    <li><a class="dropdown-item" href="#" id="generateInvoiceBtn"><i class="fas fa-file-invoice me-2"></i>Imprimir boletas</a></li>
+                                    <li><a class="dropdown-item" href="#" id="generatePackingBtn"><i class="fas fa-box me-2"></i>Picking List</a></li>
+                                    <li><a class="dropdown-item" href="#" id="generatePickingBtn"><i class="fas fa-clipboard-list me-2"></i>Packing List</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item mark-as-printed" href="#" id="markAsPrintedBtn"><i class="fas fa-check-circle me-2"></i>Marcar como impreso</a></li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-                                <!-- BOTÓN DE ACCIONES MASIVAS - MOVIDO AQUÍ -->
-                                <div class="dropdown orders-dropdown">
-                                    <button class="btn btn-primary dropdown-toggle" type="button" id="bulkActionsBtn" data-bs-toggle="dropdown" aria-expanded="false">
-                                        <i class="fas fa-cog me-1"></i> Acciones
-                                    </button>
-                                    <ul class="dropdown-menu orders-dropdown-menu">
-                                        <li><a class="dropdown-item" href="#" id="printLabelsBtn"><i class="fas fa-print me-2"></i>Imprimir etiquetas</a></li>
-                                        <li><a class="dropdown-item" href="#" id="generateInvoiceBtn"><i class="fas fa-file-invoice me-2"></i>Imprimir boletas</a></li>
-                                        <li><a class="dropdown-item" href="#" id="generatePackingBtn"><i class="fas fa-box me-2"></i>Picking List</a></li>
-                                        <li><a class="dropdown-item" href="#" id="generatePickingBtn"><i class="fas fa-clipboard-list me-2"></i>Packing List</a></li>
-                                        <li><hr class="dropdown-divider"></li>
-                                        <li><a class="dropdown-item mark-as-printed" href="#" id="markAsPrintedBtn"><i class="fas fa-check-circle me-2"></i>Marcar como impreso</a></li>
-                                    </ul>
-                                </div>
+
     <!-- Tabla de órdenes mejorada -->
     <div class="row">
+
         <div class="col-md-12">
             <div class="card">
                 <div class="card-body">
@@ -434,10 +445,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const refreshListBtn = document.getElementById('refreshListBtn');
     const clearFiltersBtn = document.getElementById('clearFiltersBtn');
     const selectAllOrders = document.getElementById('selectAllOrders');
-    const orderCheckboxes = document.querySelectorAll('.order-checkbox');
     const bulkActionsBtn = document.getElementById('bulkActionsBtn');
     
+    // Inicializar filtros
+    initializeFilters();
+    
     // Manejar cambios en filtros (estado y printed)
+    if (statusFilter) {
+        statusFilter.addEventListener('change', function() {
+            updateFilterUrl();
+        });
+    }
+    
     if (printedFilter) {
         printedFilter.addEventListener('change', function() {
             updateFilterUrl();
@@ -468,7 +487,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Seleccionar todos los pedidos
     if (selectAllOrders) {
         selectAllOrders.addEventListener('change', function() {
-            orderCheckboxes.forEach(checkbox => {
+            document.querySelectorAll('.order-checkbox').forEach(checkbox => {
                 checkbox.checked = this.checked;
             });
             updateBulkActionsButton();
@@ -476,7 +495,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Actualizar estado de botón de acciones masivas al seleccionar/deseleccionar pedidos
-    orderCheckboxes.forEach(checkbox => {
+    document.querySelectorAll('.order-checkbox').forEach(checkbox => {
         checkbox.addEventListener('change', function() {
             updateBulkActionsButton();
             
@@ -484,11 +503,32 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!this.checked && selectAllOrders && selectAllOrders.checked) {
                 selectAllOrders.checked = false;
             } else if (selectAllOrders) {
-                const allChecked = Array.from(orderCheckboxes).every(cb => cb.checked);
+                const allChecked = Array.from(document.querySelectorAll('.order-checkbox')).every(cb => cb.checked);
                 selectAllOrders.checked = allChecked;
             }
         });
     });
+    
+    // Función para inicializar filtros
+    function initializeFilters() {
+        // Verificar si hay filtros activos en la URL
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        // Aplicar filtro de printed si existe
+        if (urlParams.has('printed') && printedFilter) {
+            const printedValue = urlParams.get('printed');
+            printedFilter.value = printedValue;
+        }
+        
+        // Aplicar filtro de estado si existe
+        if (urlParams.has('status') && statusFilter) {
+            const statusValue = urlParams.get('status');
+            statusFilter.value = statusValue;
+        }
+        
+        // Verificar si hay órdenes seleccionadas al iniciar
+        updateBulkActionsButton();
+    }
     
     // Actualizar botón de acciones masivas
     function updateBulkActionsButton() {
@@ -523,7 +563,8 @@ document.addEventListener('DOMContentLoaded', function() {
             currentUrl.searchParams.delete('status');
         }
         
-        if (printed !== '') {
+        // IMPORTANTE: Conservar el valor de printed aunque sea vacío
+        if (printed !== null && printed !== undefined) {
             currentUrl.searchParams.set('printed', printed);
         } else {
             currentUrl.searchParams.delete('printed');

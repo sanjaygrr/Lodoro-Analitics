@@ -1,0 +1,1745 @@
+<!-- module/Application/view/application/orders/order-detail.phtml -->
+<?php
+/**
+ * @var Laminas\View\Renderer\PhpRenderer $this
+ */
+
+$this->headTitle('Detalle de Orden #' . ($order['suborder_number'] ?? $order['id'] ?? 'N/A'));
+
+// Agregar estilos
+$this->headLink()
+    ->prependStylesheet($this->basePath('css/bootstrap.min.css'))
+    ->prependStylesheet($this->basePath('css/custom.css'))
+    ->prependStylesheet($this->basePath('css/style.css'));
+
+// Agregar scripts
+$this->headScript()
+    ->appendFile($this->basePath('js/bootstrap.bundle.min.js'));
+
+// Configuración de colores por marketplace
+$marketplaceColors = [
+    'WALLMART' => '#0071ce',
+    'RIPLEY' => '#e60000',
+    'FALABELLA' => '#0a4a90',
+    'MERCADO_LIBRE' => '#ffe600',
+    'PARIS' => '#e71785',
+    'WOOCOMMERCE' => '#7f54b3'
+];
+
+$marketplaceColor = $marketplaceColors[$marketplace] ?? '#4361ee';
+
+// Preparar productos para JSON
+$productsJson = [];
+foreach ($products as $product) {
+    $productsJson[] = [
+        'id'        => $product['id']        ?? null,
+        'sku'       => $product['sku']       ?? '',
+        'nombre'    => $product['nombre']    ?? '',
+        'procesado' => $product['procesado'] ?? 0,
+    ];
+}
+
+?>
+
+<!-- Botón de acciones flotante con menú desplegable -->
+<style>
+.floating-action-btn {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background-color: #4361ee;
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 0 3px rgba(255,255,255,0.6);
+    cursor: pointer;
+    z-index: 1000000; /* Valor extremadamente alto para asegurar que esté por encima de todo */
+    transition: all 0.3s ease;
+}
+
+.floating-action-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.2), 0 0 0 3px rgba(255,255,255,0.8);
+}
+
+.floating-action-btn i {
+    font-size: 24px;
+    transition: transform 0.3s ease;
+}
+
+.floating-action-menu {
+    position: fixed;
+    bottom: 100px;
+    right: 30px;
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2), 0 0 0 2px rgba(67, 97, 238, 0.1);
+    width: 220px;
+    max-height: 80vh; /* Altura máxima para evitar que se salga de la pantalla */
+    overflow-y: auto; /* Permitir scroll si el menú es muy largo */
+    z-index: 999999; /* Valor extremadamente alto para asegurar que esté por encima de todo */
+    transform: translateY(20px) scale(0.95);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Transición mejorada */
+}
+
+.floating-action-menu.active {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto; /* Asegura que los clics funcionen */
+}
+
+.action-menu-header {
+    background-color: #f8f9fa;
+    padding: 12px 15px;
+    font-weight: bold;
+    border-bottom: 1px solid #e9ecef;
+    text-align: center;
+    color: #495057;
+}
+
+.action-menu-items {
+    padding: 8px 0;
+}
+
+.action-menu-item {
+    display: block;
+    width: 100%;
+    padding: 12px 20px;
+    text-align: left;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: #495057;
+    transition: background 0.2s;
+    border-bottom: 1px solid #f1f3f5;
+}
+
+.action-menu-item:hover {
+    background-color: #f8f9fa;
+}
+
+.action-menu-item:last-child {
+    border-bottom: none;
+}
+
+.action-menu-item i {
+    width: 25px;
+    text-align: center;
+    margin-right: 12px;
+}
+
+.action-menu-item.print {
+    color: #0d6efd;
+}
+
+.action-menu-item.process {
+    color: #198754;
+}
+
+.action-menu-section {
+    padding: 6px 20px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    color: #6c757d;
+    background-color: #f8f9fa;
+}
+</style>
+
+<div class="floating-action-btn" id="floatingActionBtn">
+    <i class="fas fa-bolt"></i>
+</div>
+
+<div class="floating-action-menu" id="floatingActionMenu">
+    <div class="action-menu-header">
+        Acciones Rápidas
+    </div>
+    <div class="action-menu-items">
+        <div class="action-menu-section">Impresión</div>
+        <?php if ($order['printed'] == '0'): ?>
+        <button class="action-menu-item print" id="printLabelBtn2">
+            <i class="fas fa-tag"></i> Imprimir Etiqueta
+        </button>
+        <?php endif; ?>
+        
+        <button class="action-menu-item print" onclick="window.print()">
+            <i class="fas fa-print"></i> Imprimir Resumen
+        </button>
+        
+        <div class="action-menu-section">Procesamiento</div>
+        <?php if ($order['estado'] == 'Nueva' && $order['printed'] == '1'): ?>
+        <button class="action-menu-item process" id="processOrderBtn2">
+            <i class="fas fa-tasks"></i> Procesar Orden
+        </button>
+        <?php endif; ?>
+        
+        <?php if ($order['estado'] == 'En Proceso'): ?>
+        <button class="action-menu-item process" id="scheduleDeliveryBtn2">
+            <i class="fas fa-truck"></i> Programar Entrega
+        </button>
+        <?php endif; ?>
+        
+        <?php if ($order['procesado'] == '0'): ?>
+        <button class="action-menu-item process" id="markOrderProcessedBtn2">
+            <i class="fas fa-check-circle"></i> Marcar Procesada
+        </button>
+        <?php endif; ?>
+    </div>
+</div>
+
+<div class="container-fluid py-4">
+    <!-- Cabecera -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <h1 class="h3 mb-0">
+                Orden #<?= $this->escapeHtml($order['suborder_number'] ?? $order['id'] ?? 'N/A') ?>
+                <span class="badge ms-2" style="background-color: <?= $marketplaceColor ?>">
+                    <?= $this->escapeHtml($marketplace) ?>
+                </span>
+            </h1>
+            <p class="text-muted mb-0">
+                Creada el <?= isset($order['fecha_creacion']) ? date('d/m/Y H:i', strtotime($order['fecha_creacion'])) : 'N/A' ?>
+            </p>
+        </div>
+        <div class="col-md-6 text-end">
+            <a href="<?= $this->url('orders', ['action' => 'orders-detail', 'table' => $table]) ?>" 
+               class="btn btn-outline-secondary me-2">
+                <i class="fas fa-arrow-left me-1"></i> Volver a Órdenes
+            </a>
+            
+            <?php if (!empty($order['url_pdf_boleta'])): ?>
+            <a href="<?= $this->escapeHtmlAttr($order['url_pdf_boleta']) ?>" 
+               target="_blank" class="btn btn-outline-primary me-2">
+                <i class="fas fa-file-pdf me-1"></i> Ver Boleta
+            </a>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Información Principal -->
+        <div class="col-lg-8">
+            <!-- Estado de la Orden -->
+            <div class="card mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="card-title mb-0">Estado de la Orden</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label text-muted">Estado de Impresión</label>
+                                <div>
+                                    <?php
+                                    $printed = $order['printed'] ?? '0';
+                                    $printedClass = ($printed == '1') ? 'bg-success' : 'bg-warning';
+                                    ?>
+                                    <span class="badge <?= $printedClass ?> fs-6">
+                                        <?= ($printed == '1') ? 'Impreso' : 'Sin Imprimir' ?>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label text-muted">Estado de Procesado</label>
+                                <div>
+                                    <?php
+                                    $procesado = $order['procesado'] ?? '0';
+                                    $procesadoClass = ($procesado == '1') ? 'bg-success' : 'bg-warning';
+                                    ?>
+                                    <span class="badge <?= $procesadoClass ?> fs-6">
+                                        <?= ($procesado == '1') ? 'Procesado' : 'Pendiente' ?>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Información del Cliente -->
+            <div class="card mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="card-title mb-0">Información del Cliente</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p class="mb-2">
+                                <strong>Nombre:</strong> <?= $this->escapeHtml($clientInfo['nombre']) ?>
+                            </p>
+                            <p class="mb-2">
+                                <strong>RUT:</strong> <?= $this->escapeHtml($clientInfo['rut']) ?>
+                            </p>
+                            <p class="mb-2">
+                                <strong>Teléfono:</strong> 
+                                <a href="tel:<?= $this->escapeHtmlAttr($clientInfo['telefono']) ?>">
+                                    <?= $this->escapeHtml($clientInfo['telefono']) ?>
+                                </a>
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-2">
+                                <strong>Dirección:</strong><br>
+                                <?= nl2br($this->escapeHtml($clientInfo['direccion'])) ?>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Productos -->
+            <div class="card mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="card-title mb-0">Productos</h5>
+                </div>
+                <div class="card-body">
+                    <!-- NUEVO: Buscador de EAN -->
+
+                    <!-- SECCIÓN MEJORADA: Buscador de EAN -->
+            <div class="card mb-4">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-barcode me-2"></i>Escáner de Códigos EAN
+                    </h5>
+                    <span class="badge bg-primary" id="scanCounter">0</span>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="input-group mb-3">
+                                <span class="input-group-text"><i class="fas fa-barcode"></i></span>
+                                <input type="text" class="form-control form-control-lg" id="eanScanner" 
+                                    placeholder="Escanear código EAN..." autocomplete="off">
+                                <button class="btn btn-primary" id="scanEanBtn" type="button">
+                                    <i class="fas fa-search"></i> Buscar
+                                </button>
+                            </div>
+                            <div id="eanResult" class="mt-2" style="display:none;"></div>
+                            
+                            <!-- Progreso -->
+                            <div class="progress mt-3">
+                                <div class="progress-bar" id="scanProgress" role="progressbar" style="width: 0%;" 
+                                    aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                            </div>
+                            <div class="d-flex justify-content-between mt-2">
+                                <small>Procesados: <span id="processedCount">0</span>/<span id="totalProducts">0</span></small>
+                                <small>Progreso: <span id="progressPercentage">0%</span></small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card h-100 bg-light">
+                                <div class="card-body">
+                                    <h6 class="card-subtitle mb-2 text-muted">Último producto escaneado</h6>
+                                    <div id="lastScannedProduct">
+                                        <p class="text-muted font-italic">Ningún producto escaneado aún</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Lista de productos escaneados -->
+                    <div class="mt-4">
+                        <h6>Productos Escaneados</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>EAN</th>
+                                        <th>SKU</th>
+                                        <th>Producto</th>
+                                        <th>Estado</th>
+                                        <th>Hora</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="scannedProductsList">
+                                    <!-- Los productos escaneados aparecerán aquí -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Estado</th>
+                                    <th>Producto</th>
+                                    <th>SKU</th>
+                                    <th class="text-center">Cantidad</th>
+                                    <th class="text-end">Precio</th>
+                                    <th class="text-end">Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($products as $product): ?>
+                                <tr data-sku="<?= $this->escapeHtmlAttr($product['sku']) ?>">
+                                    <td>
+                                        <?php 
+                                        // Verificar estado procesado para este producto específico
+                                        $procesado = 0;
+                                        if (isset($product['procesado'])) {
+                                            $procesado = $product['procesado'];
+                                        }
+                                        ?>
+                                        <span class="badge <?= $procesado ? 'bg-success' : 'bg-warning' ?>">
+                                            <?= $procesado ? 'Procesado' : 'Pendiente' ?>
+                                        </span>
+                                    </td>
+                                    <td><strong><?= $this->escapeHtml($product['nombre']) ?></strong></td>
+                                    <td>
+                                        <span class="badge bg-light text-dark">
+                                            <?= $this->escapeHtml($product['sku']) ?>
+                                        </span>
+                                    </td>
+                                    <td class="text-center"><?= $product['cantidad'] ?></td>
+                                    <td class="text-end">$<?= number_format($product['precio_unitario'], 0, ',', '.') ?></td>
+                                    <td class="text-end">$<?= number_format($product['subtotal'], 0, ',', '.') ?></td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="5" class="text-end"><strong>Subtotal:</strong></td>
+                                    <td class="text-end"><strong>$<?= number_format($subtotal, 0, ',', '.') ?></strong></td>
+                                </tr>
+                                <?php if ($envio > 0): ?>
+                                <tr>
+                                    <td colspan="5" class="text-end">Envío:</td>
+                                    <td class="text-end">$<?= number_format($envio, 0, ',', '.') ?></td>
+                                </tr>
+                                <?php endif; ?>
+                                <?php if ($impuesto > 0): ?>
+                                <tr>
+                                    <td colspan="5" class="text-end">IVA:</td>
+                                    <td class="text-end">$<?= number_format($impuesto, 0, ',', '.') ?></td>
+                                </tr>
+                                <?php endif; ?>
+                                <tr class="table-active">
+                                    <td colspan="5" class="text-end"><strong>Total:</strong></td>
+                                    <td class="text-end"><strong>$<?= number_format($total, 0, ',', '.') ?></strong></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Timeline -->
+            <div class="card mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="card-title mb-0">Historial de Estados</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="timeline">
+                        <li class="timeline-item">
+                            <span class="timeline-badge bg-primary"><i class="fas fa-plus"></i></span>
+                            <div class="timeline-panel">
+                                <div class="timeline-heading">
+                                    <h6 class="timeline-title">Orden Creada</h6>
+                                    <p class="text-muted"><small><?= date('d/m/Y H:i', strtotime($order['fecha_creacion'])) ?></small></p>
+                                </div>
+                            </div>
+                        </li>
+                        <?php if ($order['printed'] == '1'): ?>
+                        <li class="timeline-item">
+                            <span class="timeline-badge bg-info"><i class="fas fa-print"></i></span>
+                            <div class="timeline-panel">
+                                <div class="timeline-heading">
+                                    <h6 class="timeline-title">Etiqueta Impresa</h6>
+                                </div>
+                            </div>
+                        </li>
+                        <?php endif; ?>
+                        <?php if ($order['estado'] != 'Nueva'): ?>
+                        <li class="timeline-item">
+                            <span class="timeline-badge bg-success"><i class="fas fa-check"></i></span>
+                            <div class="timeline-panel">
+                                <div class="timeline-heading">
+                                    <h6 class="timeline-title">Estado: <?= $this->escapeHtml($order['estado']) ?></h6>
+                                </div>
+                            </div>
+                        </li>
+                        <?php endif; ?>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel Lateral -->
+        <div class="col-lg-4">
+            <!-- Acciones Rápidas -->
+            <div class="card mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="card-title mb-0">Acciones Rápidas</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <?php if ($order['printed'] == '0'): ?>
+                        <button class="btn btn-primary" id="printLabelBtn">
+                            <i class="fas fa-print me-2"></i> Imprimir Etiqueta
+                        </button>
+                        <?php endif; ?>
+                        
+                        <?php if ($order['estado'] == 'Nueva' && $order['printed'] == '1'): ?>
+                        <button class="btn btn-info" id="processOrderBtn">
+                            <i class="fas fa-tasks me-2"></i> Procesar Orden
+                        </button>
+                        <?php endif; ?>
+                        
+                        <?php if ($order['estado'] == 'En Proceso'): ?>
+                        <button class="btn btn-success" id="scheduleDeliveryBtn">
+                            <i class="fas fa-truck me-2"></i> Programar Entrega
+                        </button>
+                        <?php endif; ?>
+                        
+                        <button class="btn btn-outline-secondary" onclick="window.print()">
+                            <i class="fas fa-print me-2"></i> Imprimir Resumen
+                        </button>
+
+
+                        <!-- Añadir en la sección "Acciones Rápidas" dentro del <div class="d-grid gap-2"> -->
+                        <?php if ($order['printed'] == '0'): ?>
+                        <button class="btn btn-info mb-2" id="markAsPrintedBtn">
+                            <i class="fas fa-print me-2"></i> Marcar Orden como Impresa
+                        </button>
+                        <?php endif; ?>
+                        
+                        <?php if ($order['procesado'] == '0'): ?>
+                        <button class="btn btn-success" id="markOrderProcessedBtn">
+                            <i class="fas fa-check-circle me-2"></i> Marcar Orden como Procesada
+                        </button>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Información de Entrega -->
+            <div class="card mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="card-title mb-0">Información de Entrega</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label text-muted">Transportista</label>
+                        <p class="mb-0">
+                            <?php if ($deliveryInfo['transportista'] != 'Sin asignar'): ?>
+                                <span class="badge bg-info text-white">
+                                    <?= $this->escapeHtml($deliveryInfo['transportista']) ?>
+                                </span>
+                            <?php else: ?>
+                                <span class="text-muted">Sin asignar</span>
+                            <?php endif; ?>
+                        </p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label text-muted">Número de Seguimiento</label>
+                        <p class="mb-0">
+                            <?php if (!empty($deliveryInfo['numero_seguimiento'])): ?>
+                                <code><?= $this->escapeHtml($deliveryInfo['numero_seguimiento']) ?></code>
+                            <?php else: ?>
+                                <span class="text-muted">N/A</span>
+                            <?php endif; ?>
+                        </p>
+                    </div>
+                    
+                    <div class="mb-0">
+                        <label class="form-label text-muted">Fecha de Entrega</label>
+                        <p class="mb-0">
+                            <?php if (!empty($deliveryInfo['fecha_entrega'])): ?>
+                                <?= date('d/m/Y H:i', strtotime($deliveryInfo['fecha_entrega'])) ?>
+                            <?php else: ?>
+                                <span class="text-muted">N/A</span>
+                            <?php endif; ?>
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detalles de la Transacción -->
+            <div class="card mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="card-title mb-0">Detalles de la Transacción</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label text-muted">Número de Boleta</label>
+                        <p class="mb-0">
+                            <?php if (!empty($order['numero_boleta'])): ?>
+                                <code><?= $this->escapeHtml($order['numero_boleta']) ?></code>
+                            <?php else: ?>
+                                <span class="text-muted">N/A</span>
+                            <?php endif; ?>
+                        </p>
+                    </div>
+                    
+                </div>
+            </div>
+
+            <!-- Datos Adicionales -->
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="card-title mb-0">Datos Adicionales</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label text-muted">Origen</label>
+                        <p class="mb-0"><?= $this->escapeHtml($order['origen'] ?? 'N/A') ?></p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label text-muted">Tipo de Documento</label>
+                        <p class="mb-0"><?= $this->escapeHtml($order['tipo_documento'] ?? 'N/A') ?></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para programar entrega -->
+<div class="modal fade" id="scheduleDeliveryModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Programar Entrega</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Transportista</label>
+                    <input type="text" class="form-control" id="deliveryTransportista" placeholder="Nombre del transportista">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Número de seguimiento</label>
+                    <input type="text" class="form-control" id="deliveryTracking">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirmDelivery">Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// CONFIGURACIÓN DEL ESCÁNER EAN MEJORADO
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("Inicializando escáner EAN...");
+    
+    // Obtener referencias a elementos DOM
+    const orderId = '<?= $this->escapeJs($order["suborder_number"] ?? $order["id"] ?? "") ?>';
+    const table = '<?= $this->escapeJs($table) ?>';
+    
+    // Datos de productos
+    const products = <?= json_encode($productsJson) ?>;
+    console.log("Productos encontrados:", products.length);
+    
+    // Contadores
+    let scanCount = 0;
+    const scannedProducts = new Map(); // Para rastrear productos ya escaneados
+    
+    // Elementos del DOM
+    const eanScanner = document.getElementById('eanScanner');
+    const scanEanBtn = document.getElementById('scanEanBtn');
+    const eanResult = document.getElementById('eanResult');
+    const scanCounter = document.getElementById('scanCounter');
+    const scanProgress = document.getElementById('scanProgress');
+    const processedCount = document.getElementById('processedCount');
+    const totalProducts = document.getElementById('totalProducts');
+    const progressPercentage = document.getElementById('progressPercentage');
+    const lastScannedProduct = document.getElementById('lastScannedProduct');
+    const scannedProductsList = document.getElementById('scannedProductsList');
+    
+    // Verificar elementos críticos
+    if (!eanScanner) {
+        console.error("Campo de escáner EAN no encontrado en el DOM");
+    }
+    if (!eanResult) {
+        console.error("Contenedor de resultados no encontrado en el DOM");
+    }
+    
+    // Inicializar contadores
+    let processedProductsCount = 0;
+    const totalProductsCount = products.length;
+    
+    // Actualizar contadores iniciales
+    if (totalProducts) totalProducts.textContent = totalProductsCount;
+    
+    // Contar productos ya procesados
+    products.forEach(product => {
+        if (product.procesado == 1) {
+            processedProductsCount++;
+        }
+    });
+    
+    if (processedCount) processedCount.textContent = processedProductsCount;
+    updateProgressBar();
+    
+    // Enfocar automáticamente el input del escáner
+    if (eanScanner) {
+        eanScanner.focus();
+    }
+    
+    // Configurar evento de tecla para el escáner
+    if (eanScanner) {
+        eanScanner.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                console.log("Tecla Enter detectada, buscando EAN...");
+                searchEAN();
+            }
+        });
+    }
+    
+    // Configurar botón de búsqueda
+    if (scanEanBtn) {
+        scanEanBtn.addEventListener('click', function() {
+            console.log("Botón de búsqueda clickeado");
+            searchEAN();
+        });
+    }
+    
+    function searchEAN() {
+        if (!eanScanner) {
+            console.error("Campo de escáner no disponible");
+            return;
+        }
+        
+        const ean = eanScanner.value.trim();
+        console.log("Buscando EAN:", ean);
+        
+        if (!ean) {
+            showEanResult('warning', 'Por favor ingresa un código EAN');
+            return;
+        }
+        
+        // Deshabilitar input mientras busca
+        eanScanner.disabled = true;
+        if (scanEanBtn) scanEanBtn.disabled = true;
+        
+        // Actualizar contador de escaneos
+        scanCount++;
+        if (scanCounter) scanCounter.textContent = scanCount;
+        
+        // Mostrar estado de búsqueda
+        showEanResult('info', '<div class="d-flex align-items-center"><div class="spinner-border spinner-border-sm me-2" role="status"></div> Buscando código EAN...</div>');
+        
+        // Verificar parámetros de la petición
+        console.log("Parámetros de búsqueda:", {
+            ean: ean,
+            orderId: orderId,
+            table: table
+        });
+        
+        // Hacer petición AJAX para buscar el EAN
+        fetch('<?= $this->url('application', ['action' => 'search-ean']) ?>', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest' // Añadir este encabezado para identificar como AJAX
+            },
+            body: JSON.stringify({
+                ean: ean,
+                orderId: orderId,
+                table: table
+            })
+        })
+        .then(response => {
+            console.log("Respuesta recibida, estado:", response.status, response.statusText);
+            
+            // Verificar si la respuesta es válida
+            if (!response.ok) {
+                throw new Error(`Error HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            // Obtener el tipo de contenido
+            const contentType = response.headers.get('content-type');
+            console.log("Tipo de contenido:", contentType);
+            
+            // Verificar si es JSON
+            if (!contentType || !contentType.includes('application/json')) {
+                // No es JSON, mostrar cabeceras de respuesta para depuración
+                console.log("Cabeceras de respuesta:", 
+                    Array.from(response.headers.entries())
+                        .map(([key, value]) => `${key}: ${value}`)
+                        .join('\n')
+                );
+                
+                // Clonar la respuesta para examinarla como texto
+                return response.text().then(text => {
+                    console.error("Respuesta no-JSON recibida:", text.substring(0, 500));
+                    throw new Error("La respuesta no es JSON. Tipo de contenido: " + (contentType || 'no especificado'));
+                });
+            }
+            
+            // Es JSON, proceder normalmente
+            return response.json();
+        })
+        .then(data => {
+            console.log("Datos recibidos:", data);
+            
+            if (data.success) {
+                if (data.found) {
+                    // Verificar si el SKU existe en esta orden
+                    const product = products.find(p => p.sku === data.sku);
+                    
+                    if (product) {
+                        const isAlreadyProcessed = product.procesado == 1;
+                        
+                        if (isAlreadyProcessed) {
+                            // Producto ya procesado anteriormente
+                            showEanResult('warning', `
+                                <strong>⚠ Producto ya procesado:</strong> ${data.productName}<br>
+                                <strong>SKU:</strong> ${data.sku}<br>
+                                <strong>EAN:</strong> ${data.ean}
+                            `);
+                            
+                            // Actualizar último producto escaneado
+                            updateLastScannedProduct(data.ean, data.sku, data.productName, true);
+                            
+                            // Añadir a la lista de escaneados
+                            addToScannedList(data.ean, data.sku, data.productName, 'Ya procesado');
+                            
+                            // Resaltar la fila del producto
+                            highlightProductRow(data.sku, 'warning');
+                        } else {
+                            // Producto encontrado y no procesado
+                            showEanResult('success', `
+                                <strong>✓ Producto encontrado:</strong> ${data.productName}<br>
+                                <strong>SKU:</strong> ${data.sku}<br>
+                                <strong>EAN:</strong> ${data.ean}<br>
+                                <button class="btn btn-sm btn-success mt-2 process-product-btn" 
+                                        data-sku="${data.sku}">
+                                    Marcar como Procesado
+                                </button>
+                            `);
+                            
+                            // Actualizar último producto escaneado
+                            updateLastScannedProduct(data.ean, data.sku, data.productName, false);
+                            
+                            // Añadir a la lista de escaneados
+                            addToScannedList(data.ean, data.sku, data.productName, 'Encontrado');
+                            
+                            // Resaltar la fila del producto
+                            highlightProductRow(data.sku, 'success');
+                        }
+                    } else {
+                        // Producto encontrado pero no está en esta orden
+                        showEanResult('warning', `
+                            <strong>⚠ Producto no pertenece a esta orden:</strong> ${data.productName}<br>
+                            <strong>SKU:</strong> ${data.sku}<br>
+                            <strong>EAN:</strong> ${data.ean}
+                        `);
+                        
+                        // Actualizar último producto escaneado
+                        updateLastScannedProduct(data.ean, data.sku, data.productName, false, true);
+                        
+                        // Añadir a la lista de escaneados
+                        addToScannedList(data.ean, data.sku, data.productName, 'No en orden');
+                    }
+                } else {
+                    // EAN no encontrado en el sistema
+                    showEanResult('danger', `
+                        <strong>❌ EAN no encontrado:</strong> ${ean}<br>
+                        No se encontró ningún producto con este código.
+                    `);
+                    
+                    // Añadir a la lista de escaneados como no encontrado
+                    addToScannedList(ean, 'N/A', 'No encontrado', 'No existe');
+                }
+            } else {
+                // Error en la búsqueda
+                showEanResult('danger', `Error: ${data.message || 'Error desconocido'}`);
+            }
+        })
+        .catch(error => {
+            console.error('Error en la búsqueda:', error);
+            
+            // Para buscar errores más específicos
+            if (error.message.includes('<')) {
+                showEanResult('danger', `Error: Recibiendo HTML en lugar de JSON. Es posible que la ruta de la API esté mal configurada.`);
+            } else {
+                showEanResult('danger', `Error al buscar EAN: ${error.message}`);
+            }
+        })
+        .finally(() => {
+            // Habilitar input después de la búsqueda
+            eanScanner.disabled = false;
+            if (scanEanBtn) scanEanBtn.disabled = false;
+            
+            // Limpiar campo de búsqueda y regresar focus
+            eanScanner.value = '';
+            setTimeout(() => {
+                eanScanner.focus();
+            }, 100);
+        });
+    }
+    
+    // Función para mostrar resultados del escaneo
+    function showEanResult(type, message) {
+        console.log(`Mostrando resultado: ${type}`, message);
+        
+        if (!eanResult) {
+            console.error("Elemento eanResult no encontrado");
+            return;
+        }
+        
+        eanResult.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+        eanResult.style.display = 'block';
+        
+        // Agregar manejador de eventos para el botón de procesamiento si existe
+        const processBtn = eanResult.querySelector('.process-product-btn');
+        if (processBtn) {
+            processBtn.addEventListener('click', function() {
+                const sku = this.getAttribute('data-sku');
+                console.log("Marcando como procesado SKU:", sku);
+                markAsProcessed(sku);
+            });
+        }
+    }
+    
+    // Función para actualizar el último producto escaneado
+    function updateLastScannedProduct(ean, sku, name, isProcessed, notInOrder = false) {
+        if (!lastScannedProduct) return;
+        
+        console.log("Actualizando último producto escaneado:", { ean, sku, name });
+        
+        const statusClass = isProcessed ? 'success' : (notInOrder ? 'danger' : 'warning');
+        const statusText = isProcessed ? 'Procesado' : (notInOrder ? 'No en orden' : 'Pendiente');
+        
+        lastScannedProduct.innerHTML = `
+            <div class="mb-2">
+                <strong>EAN:</strong> ${ean}<br>
+                <strong>SKU:</strong> ${sku}<br>
+                <strong>Producto:</strong> ${name}
+            </div>
+            <span class="badge bg-${statusClass}">${statusText}</span>
+            <small class="d-block mt-2 text-muted">Escaneado a las ${new Date().toLocaleTimeString()}</small>
+        `;
+    }
+    
+    // Función para añadir a la lista de productos escaneados
+    function addToScannedList(ean, sku, name, status) {
+        if (!scannedProductsList) return;
+        
+        console.log("Añadiendo a la lista de escaneados:", { ean, sku, name, status });
+        
+        const now = new Date();
+        const timeString = now.toLocaleTimeString();
+        
+        // Determinar clase CSS según estado
+        let statusClass;
+        switch(status.toLowerCase()) {
+            case 'encontrado':
+            case 'pendiente':
+                statusClass = 'bg-warning text-dark';
+                break;
+            case 'procesado':
+            case 'ya procesado':
+                statusClass = 'bg-success';
+                break;
+            case 'no en orden':
+            case 'no existe':
+                statusClass = 'bg-danger';
+                break;
+            default:
+                statusClass = 'bg-secondary';
+        }
+        
+        // Crear nueva fila
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${ean}</td>
+            <td>${sku}</td>
+            <td>${name}</td>
+            <td><span class="badge ${statusClass}">${status}</span></td>
+            <td>${timeString}</td>
+        `;
+        
+        // Añadir al inicio de la tabla
+        if (scannedProductsList.firstChild) {
+            scannedProductsList.insertBefore(row, scannedProductsList.firstChild);
+        } else {
+            scannedProductsList.appendChild(row);
+        }
+        
+        // Limitar a 20 elementos en la lista
+        const rows = scannedProductsList.querySelectorAll('tr');
+        if (rows.length > 20) {
+            scannedProductsList.removeChild(rows[rows.length - 1]);
+        }
+    }
+    
+    // Función para resaltar fila de producto
+    function highlightProductRow(sku, type) {
+        console.log("Resaltando fila de producto:", { sku, type });
+        
+        const rows = document.querySelectorAll('tr[data-sku]');
+        
+        // Remover clases previas de todas las filas
+        rows.forEach(row => {
+            row.classList.remove('table-success', 'table-warning', 'table-danger');
+        });
+        
+        // Aplicar clase a la fila específica
+        rows.forEach(row => {
+            if (row.dataset.sku === sku) {
+                console.log("Fila encontrada para SKU:", sku);
+                
+                if (type === 'success') {
+                    row.classList.add('table-success');
+                } else if (type === 'warning') {
+                    row.classList.add('table-warning');
+                } else {
+                    row.classList.add('table-danger');
+                }
+                
+                // Hacer scroll hasta la fila resaltada
+                try {
+                    row.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center'
+                    });
+                } catch (error) {
+                    console.error("Error al hacer scroll:", error);
+                }
+            }
+        });
+    }
+    
+    // Función para actualizar la barra de progreso
+    function updateProgressBar() {
+        if (!scanProgress || !progressPercentage) return;
+        
+        const percent = totalProductsCount > 0 
+            ? Math.round((processedProductsCount / totalProductsCount) * 100) 
+            : 0;
+        
+        console.log("Actualizando barra de progreso:", { 
+            processed: processedProductsCount, 
+            total: totalProductsCount, 
+            percent 
+        });
+        
+        scanProgress.style.width = `${percent}%`;
+        scanProgress.setAttribute('aria-valuenow', percent);
+        scanProgress.textContent = `${percent}%`;
+        
+        if (progressPercentage) {
+            progressPercentage.textContent = `${percent}%`;
+        }
+        
+        // Cambiar color según progreso
+        scanProgress.classList.remove('bg-danger', 'bg-warning', 'bg-info', 'bg-success');
+        
+        if (percent < 25) {
+            scanProgress.classList.add('bg-danger');
+        } else if (percent < 50) {
+            scanProgress.classList.add('bg-warning');
+        } else if (percent < 100) {
+            scanProgress.classList.add('bg-info');
+        } else {
+            scanProgress.classList.add('bg-success');
+        }
+    }
+    
+
+    // Marcar orden como procesada
+const markOrderProcessedBtn = document.getElementById('markOrderProcessedBtn');
+if (markOrderProcessedBtn) {
+    markOrderProcessedBtn.addEventListener('click', function() {
+        if (!confirm('¿Confirmas que deseas marcar esta orden como procesada?')) {
+            return;
+        }
+        
+        console.log("Marcando orden como procesada:", orderId, "tabla:", table);
+
+        // Asegurarse de que la tabla comience con 'Orders_'
+        if (!table.startsWith('Orders_')) {
+            table = 'Orders_' + table;
+        }
+        
+        // Si es Paris, usar la URL directa
+        let fetchPromise;
+        if (table === 'Orders_PARIS') {
+            fetchPromise = fetch('/paris-order-action.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({
+                    id: orderId,
+                    action: 'mark-as-processed'
+                })
+            });
+        } else {
+            fetchPromise = fetch('<?= $this->url('mark-as-processed') ?>', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({
+                    id: orderId,
+                    table: table
+                })
+            });
+        }
+        
+        fetchPromise
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Éxito', 'Orden marcada como procesada correctamente', 'success');
+                // Recargar la página para mostrar el nuevo estado
+                setTimeout(() => {
+                    location.reload();
+                }, 1500);
+            } else {
+                showToast('Error', data.message || 'No se pudo marcar la orden como procesada', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('Error', 'Ocurrió un error al procesar la solicitud', 'error');
+        });
+
+        // Añadir log para depuración
+        console.log("Enviando request para marcar como procesada orden:", orderId, "tabla:", table);
+
+        fetch('<?= $this->url('application', ['action' => 'update-order-processed-status']) ?>', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+                orderId: orderId,
+                table: table
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Error HTTP ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log("Respuesta del servidor:", data);
+            if (data.success) {
+                alert(data.message || 'Orden marcada como procesada correctamente');
+                location.reload();
+            } else {
+                alert(data.message || 'Error al marcar la orden como procesada');
+                console.error("Error del servidor:", data);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error de comunicación: ' + error.message);
+        });
+    });
+}
+    // Función para marcar producto como procesado
+    window.markAsProcessed = function(sku) {
+        console.log("Enviando solicitud para marcar como procesado:", sku);
+
+        // Asegurarse de que la tabla comience con 'Orders_'
+        let tableToUse = table;
+        if (!tableToUse.startsWith('Orders_')) {
+            tableToUse = 'Orders_' + tableToUse;
+        }
+
+        fetch('<?= $this->url('application', ['action' => 'mark-product-processed']) ?>', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest' // Añadir este encabezado para identificar como AJAX
+            },
+            body: JSON.stringify({
+                orderId: orderId,
+                table: tableToUse,
+                sku: sku
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Error HTTP ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log("Respuesta de procesamiento:", data);
+            
+            if (data.success) {
+                // Actualizar badge de estado en la tabla de productos
+                updateProductStatus(sku, true);
+                
+                // Actualizar array de productos local
+                const productIndex = products.findIndex(p => p.sku === sku);
+                if (productIndex > -1) {
+                    products[productIndex].procesado = 1;
+                    processedProductsCount++;
+                    
+                    if (processedCount) {
+                        processedCount.textContent = processedProductsCount;
+                    }
+                    
+                    updateProgressBar();
+                }
+                
+                // Mostrar mensaje de éxito
+                showEanResult('success', 'Producto marcado como procesado correctamente.');
+                
+                // Actualizar la lista de productos escaneados
+                updateScannedListItem(sku, 'Procesado');
+                
+                // Verificar si todos los productos están procesados
+                if (data.allProcessed || processedProductsCount >= totalProductsCount) {
+                    showEanResult('success', '¡Todos los productos han sido procesados!');
+                    
+                    // Actualizar badge de estado de procesado en la página
+                    const procesadoContainer = document.querySelector('.col-md-4:nth-child(3) .badge');
+                    if (procesadoContainer) {
+                        procesadoContainer.className = 'badge bg-success fs-6';
+                        procesadoContainer.textContent = 'Procesado';
+                    }
+                    
+                    checkAllProductsProcessed();
+                }
+                
+                // Reenfocar en el input de escaneo
+                setTimeout(() => {
+                    if (eanScanner) {
+                        eanScanner.focus();
+                    }
+                }, 500);
+            } else {
+                showEanResult('danger', 'Error al marcar producto como procesado: ' + (data.message || 'Error desconocido'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showEanResult('danger', `Error de comunicación al procesar producto: ${error.message}`);
+        });
+    };
+    
+    // Actualizar estado en la tabla de productos
+    function updateProductStatus(sku, processed) {
+        console.log("Actualizando estado en tabla:", { sku, processed });
+        
+        const rows = document.querySelectorAll('tr[data-sku]');
+        rows.forEach(row => {
+            if (row.dataset.sku === sku) {
+                const badge = row.querySelector('.badge');
+                if (badge) {
+                    badge.className = processed ? 'badge bg-success' : 'badge bg-warning';
+                    badge.textContent = processed ? 'Procesado' : 'Pendiente';
+                }
+            }
+        });
+    }
+    
+    // Actualizar elemento en la lista de escaneados
+    function updateScannedListItem(sku, newStatus) {
+        if (!scannedProductsList) return;
+        
+        console.log("Actualizando estado en lista de escaneados:", { sku, newStatus });
+        
+        const rows = scannedProductsList.querySelectorAll('tr');
+        rows.forEach(row => {
+            const skuCell = row.querySelector('td:nth-child(2)');
+            if (skuCell && skuCell.textContent === sku) {
+                const statusCell = row.querySelector('td:nth-child(4) .badge');
+                if (statusCell) {
+                    statusCell.className = 'badge bg-success';
+                    statusCell.textContent = newStatus;
+                }
+            }
+        });
+    }
+    
+    // Agregar soporte para escáner de código de barras (timeout entre caracteres)
+    let lastCharTime = 0;
+    let barcodeParts = [];
+    const MAX_SCAN_GAP = 50; // máximo tiempo entre caracteres en ms
+    
+    if (eanScanner) {
+        // Usar keydown en lugar de keypress para mayor compatibilidad
+        eanScanner.addEventListener('keydown', function(e) {
+            // Solo procesa si no es Enter (ese ya lo manejamos arriba)
+            if (e.key !== 'Enter') {
+                const nowTime = new Date().getTime();
+                
+                if (nowTime - lastCharTime > MAX_SCAN_GAP) {
+                    // Si pasó mucho tiempo, resetear la captura del código
+                    barcodeParts = [];
+                }
+                
+                // Agregar carácter al código
+                barcodeParts.push(e.key);
+                lastCharTime = nowTime;
+                
+                // Para depuración
+                console.log("Carácter capturado:", e.key, "Total:", barcodeParts.length);
+                
+                // Si el escáner envía Enter al final, entrará al otro manejador
+                // Si no, procesamos después de un delay cuando se complete el escaneo
+                setTimeout(function() {
+                    const newTime = new Date().getTime();
+                    // Si pasó suficiente tiempo y tenemos caracteres, asumimos que terminó el escaneo
+                    if (newTime - lastCharTime >= MAX_SCAN_GAP && barcodeParts.length > 8) {
+                        console.log("Detección automática de escaneo completo:", barcodeParts.join(''));
+                        eanScanner.value = barcodeParts.join('');
+                        barcodeParts = [];
+                        searchEAN();
+                    }
+                }, MAX_SCAN_GAP + 5);
+            }
+        });
+    }
+    
+    // Función para verificar si todos los productos están procesados
+    function checkAllProductsProcessed() {
+        const allProcessed = products.every(p => p.procesado == 1);
+        
+        if (allProcessed) {
+            console.log("Todos los productos están procesados, actualizando estado de la orden");
+            
+            // Asegurarse de que la tabla comience con 'Orders_'
+            let tableToUse = table;
+            if (!tableToUse.startsWith('Orders_')) {
+                tableToUse = 'Orders_' + tableToUse;
+            }
+
+            // Actualizar estado general de la orden
+            fetch('<?= $this->url('application', ['action' => 'update-order-processed-status']) ?>', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest' // Añadir este encabezado para identificar como AJAX
+                },
+                body: JSON.stringify({
+                    orderId: orderId,
+                    table: tableToUse
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log("Respuesta del servidor (todos los productos):", data);
+                if (data.success) {
+                    // Actualizar badge de estado de procesado en la página
+                    const procesadoContainer = document.querySelector('.col-md-4:nth-child(3) .badge');
+                    if (procesadoContainer) {
+                        procesadoContainer.className = 'badge bg-success fs-6';
+                        procesadoContainer.textContent = 'Procesado';
+                    }
+
+                    // Mostrar mensaje
+                    if (eanResult) {
+                        eanResult.innerHTML = '<div class="alert alert-success">' +
+                            (data.message || '¡Todos los productos han sido procesados!') + '</div>';
+                        eanResult.style.display = 'block';
+
+                        setTimeout(() => {
+                            eanResult.style.display = 'none';
+                        }, 3000);
+                    }
+                } else if (eanResult) {
+                    // Mostrar error si hay
+                    eanResult.innerHTML = '<div class="alert alert-danger">' +
+                        (data.message || 'Error al marcar la orden como procesada') + '</div>';
+                    eanResult.style.display = 'block';
+                    console.error("Error del servidor:", data);
+                }
+            })
+            .catch(error => {
+                console.error("Error al actualizar estado de la orden:", error);
+            });
+        }
+    }
+    
+    console.log("Inicialización del escáner EAN completada");
+});
+
+// Resto de listeners para botones de acción
+document.addEventListener('DOMContentLoaded', function() {
+    const orderId = '<?= $this->escapeJs($order["suborder_number"] ?? $order["id"] ?? "") ?>';
+    const table = '<?= $this->escapeJs($table) ?>';
+    
+    // Inicializar el botón flotante
+    const floatingBtn = document.getElementById('floatingActionBtn');
+    const actionMenu = document.getElementById('floatingActionMenu');
+
+    if (floatingBtn && actionMenu) {
+        // Función para abrir el menú
+        function openMenu() {
+            actionMenu.classList.add('active');
+            const icon = floatingBtn.querySelector('i');
+            icon.classList.remove('fa-bolt');
+            icon.classList.add('fa-times');
+            // Forzar el repintado para asegurar que la transición se ejecuta
+            actionMenu.offsetHeight;
+        }
+
+        // Función para cerrar el menú
+        function closeMenu() {
+            actionMenu.classList.remove('active');
+            const icon = floatingBtn.querySelector('i');
+            icon.classList.remove('fa-times');
+            icon.classList.add('fa-bolt');
+        }
+
+        // Mostrar/ocultar menú al hacer clic en el botón flotante
+        floatingBtn.addEventListener('click', function(e) {
+            e.stopPropagation(); // Evitar que el clic se propague
+            if (actionMenu.classList.contains('active')) {
+                closeMenu();
+            } else {
+                openMenu();
+            }
+        });
+
+        // Cerrar menú al hacer clic fuera (utilizando captura para asegurar que se ejecuta primero)
+        document.addEventListener('click', function(event) {
+            if (actionMenu.classList.contains('active') &&
+                !floatingBtn.contains(event.target) &&
+                !actionMenu.contains(event.target)) {
+                closeMenu();
+            }
+        }, true);
+
+        // Cerrar menú después de seleccionar una acción con retardo cero
+        const actionItems = document.querySelectorAll('.action-menu-item');
+        actionItems.forEach(item => {
+            item.addEventListener('click', function(e) {
+                // Ejecutamos inmediatamente para evitar problemas con eventos asincrónicos
+                closeMenu();
+            });
+        });
+
+        // Asegurarnos que el menú está cerrado al cargar la página
+        closeMenu();
+    }
+    
+    // Imprimir etiqueta (botón original)
+    const printLabelBtn = document.getElementById('printLabelBtn');
+    if (printLabelBtn) {
+        printLabelBtn.addEventListener('click', function() {
+            printSingleLabel(orderId, table);
+        });
+    }
+    
+    // Imprimir etiqueta (botón en menú flotante)
+    const printLabelBtn2 = document.getElementById('printLabelBtn2');
+    if (printLabelBtn2) {
+        printLabelBtn2.addEventListener('click', function() {
+            printSingleLabel(orderId, table);
+        });
+    }
+    
+    // Procesar orden (botón original)
+    const processOrderBtn = document.getElementById('processOrderBtn');
+    if (processOrderBtn) {
+        processOrderBtn.addEventListener('click', function() {
+            processOrder(orderId, table);
+        });
+    }
+    
+    // Procesar orden (botón en menú flotante)
+    const processOrderBtn2 = document.getElementById('processOrderBtn2');
+    if (processOrderBtn2) {
+        processOrderBtn2.addEventListener('click', function() {
+            processOrder(orderId, table);
+        });
+    }
+    
+    // Programar entrega (botón original)
+    const scheduleDeliveryBtn = document.getElementById('scheduleDeliveryBtn');
+    if (scheduleDeliveryBtn) {
+        scheduleDeliveryBtn.addEventListener('click', function() {
+            const scheduleDeliveryModal = document.getElementById('scheduleDeliveryModal');
+            if (scheduleDeliveryModal) {
+                const modal = new bootstrap.Modal(scheduleDeliveryModal);
+                modal.show();
+            }
+        });
+    }
+    
+    // Programar entrega (botón en menú flotante)
+    const scheduleDeliveryBtn2 = document.getElementById('scheduleDeliveryBtn2');
+    if (scheduleDeliveryBtn2) {
+        scheduleDeliveryBtn2.addEventListener('click', function() {
+            const scheduleDeliveryModal = document.getElementById('scheduleDeliveryModal');
+            if (scheduleDeliveryModal) {
+                const modal = new bootstrap.Modal(scheduleDeliveryModal);
+                modal.show();
+            }
+        });
+    }
+    
+    // Marcar como procesada (botón en menú flotante)
+    const markOrderProcessedBtn2 = document.getElementById('markOrderProcessedBtn2');
+    if (markOrderProcessedBtn2) {
+        markOrderProcessedBtn2.addEventListener('click', function() {
+            if (!confirm('¿Confirmas que deseas marcar esta orden como procesada?')) {
+                return;
+            }
+            
+            // Si existe el botón original, reutilizar la funcionalidad
+            const originalBtn = document.getElementById('markOrderProcessedBtn');
+            if (originalBtn) {
+                originalBtn.click();
+            } else {
+                // Implementación directa
+                // Asegurarse de que la tabla comience con 'Orders_'
+                if (!table.startsWith('Orders_')) {
+                    table = 'Orders_' + table;
+                }
+
+                fetch('<?= $this->url('mark-as-processed') ?>', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({
+                        orderId: orderId,
+                        table: table
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Error HTTP ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("Respuesta del servidor (menú flotante):", data);
+                    if (data.success) {
+                        alert(data.message || 'Orden marcada como procesada correctamente');
+                        location.reload();
+                    } else {
+                        alert(data.message || 'Error al marcar la orden como procesada');
+                        console.error("Error del servidor:", data);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error de comunicación: ' + error.message);
+                });
+            }
+        });
+    }
+    
+    // Confirmar entrega
+    const confirmDeliveryBtn = document.getElementById('confirmDelivery');
+    if (confirmDeliveryBtn) {
+        confirmDeliveryBtn.addEventListener('click', function() {
+            const transportista = document.getElementById('deliveryTransportista').value;
+            const tracking = document.getElementById('deliveryTracking').value;
+            
+            if (!transportista) {
+                alert('Por favor ingresa un transportista');
+                return;
+            }
+            
+            scheduleOrderDelivery(orderId, table, transportista, tracking);
+        });
+    }
+    
+    function printSingleLabel(orderId, table) {
+        console.log("Imprimiendo etiqueta para orden:", orderId, "tabla:", table);
+        
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '<?= $this->url('application', ['action' => 'bulk-orders']) ?>';
+        form.target = '_blank';
+        
+        const orderIdInput = document.createElement('input');
+        orderIdInput.type = 'hidden';
+        orderIdInput.name = 'orderIds[]';
+        orderIdInput.value = orderId;
+        form.appendChild(orderIdInput);
+        
+        const tableInput = document.createElement('input');
+        tableInput.type = 'hidden';
+        tableInput.name = 'table';
+        tableInput.value = table;
+        form.appendChild(tableInput);
+        
+        const actionInput = document.createElement('input');
+        actionInput.type = 'hidden';
+        actionInput.name = 'action';
+        actionInput.value = 'print-labels';
+        form.appendChild(actionInput);
+        
+        document.body.appendChild(form);
+        form.submit();
+        document.body.removeChild(form);
+        
+        setTimeout(() => location.reload(), 2000);
+    }
+    
+    function processOrder(orderId, table) {
+        if (!confirm('¿Confirmas que deseas procesar esta orden?')) {
+            return;
+        }
+        
+        console.log("Procesando orden:", orderId, "tabla:", table);
+        
+        fetch('<?= $this->url('application', ['action' => 'update-order-status']) ?>', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest' // Añadir este encabezado para identificar como AJAX
+            },
+            body: JSON.stringify({
+                orderId: orderId,
+                table: table,
+                newStatus: 'En Proceso'
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Error HTTP ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                alert('Orden procesada correctamente');
+                location.reload();
+            } else {
+                alert('Error al procesar orden');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error de comunicación');
+        });
+    }
+    
+    function scheduleOrderDelivery(orderId, table, transportista, tracking) {
+        console.log("Programando entrega para orden:", orderId, "tabla:", table);
+        
+        fetch('<?= $this->url('application', ['action' => 'update-order-carrier']) ?>', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest' // Añadir este encabezado para identificar como AJAX
+            },
+            body: JSON.stringify({
+                orderId: orderId,
+                table: table,
+                newCarrier: transportista,
+                trackingNumber: tracking,
+                updateStatus: true
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Error HTTP ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                alert('Entrega programada correctamente');
+                location.reload();
+            } else {
+                alert('Error al programar entrega');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error de comunicación');
+        });
+    }
+});
+
+// Añadir función para marcar como impresa
+function markAsPrinted() {
+    if (!confirm('¿Confirmas que deseas marcar esta orden como impresa?')) {
+        return;
+    }
+    
+    console.log("Marcando orden como impresa:", orderId, "tabla:", table);
+    
+    // Asegurarse de que la tabla comience con 'Orders_'
+    if (!table.startsWith('Orders_')) {
+        table = 'Orders_' + table;
+    }
+    
+    // Si es Paris, usar la URL directa
+    let fetchPromise;
+    if (table === 'Orders_PARIS') {
+        fetchPromise = fetch('/paris-order-action.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+                id: orderId,
+                action: 'mark-as-printed'
+            })
+        });
+    } else {
+        fetchPromise = fetch('<?= $this->url('mark-as-printed') ?>', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+                id: orderId,
+                table: table
+            })
+        });
+    }
+    
+    fetchPromise
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Éxito', 'Orden marcada como impresa correctamente', 'success');
+            // Recargar la página para mostrar el nuevo estado
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
+        } else {
+            showToast('Error', data.message || 'No se pudo marcar la orden como impresa', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('Error', 'Ocurrió un error al procesar la solicitud', 'error');
+    });
+}
+
+// Añadir botón para marcar como impresa si no existe
+if (document.getElementById('printLabelBtn2')) {
+    document.getElementById('printLabelBtn2').addEventListener('click', markAsPrinted);
+}
+
+// También añadir a un botón en la UI principal si existe
+if (document.getElementById('markAsPrintedBtn')) {
+    document.getElementById('markAsPrintedBtn').addEventListener('click', markAsPrinted);
+}
+</script>

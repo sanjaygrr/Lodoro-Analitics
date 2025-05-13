@@ -1,0 +1,1872 @@
+<?php
+/**
+ * @var Laminas\View\Renderer\PhpRenderer $this
+ */
+$this->headTitle('Gestión de Órdenes');
+
+// Configuración de marketplaces
+$marketplaceDetails = [
+    'WALLMART' => ['name' => 'Walmart', 'color' => '#0071ce'],
+    'RIPLEY' => ['name' => 'Ripley', 'color' => '#e60000'],
+    'FALABELLA' => ['name' => 'Falabella', 'color' => '#0a4a90'],
+    'MERCADO_LIBRE' => ['name' => 'Mercado Libre', 'color' => '#ffe600'],
+    'PARIS' => ['name' => 'Paris', 'color' => '#e71785'],
+    'WOOCOMMERCE' => ['name' => 'WooCommerce', 'color' => '#7f54b3']
+];
+
+// Asegurar que las variables estén definidas
+$search = $search ?? '';
+$statusFilter = $statusFilter ?? '';
+$printedFilter = $printedFilter ?? '';
+$sinImprimir = $sinImprimir ?? 0;
+$impresosNoProcesados = $impresosNoProcesados ?? 0;
+$procesados = $procesados ?? 0;
+$total = $total ?? 0;
+
+// Asegurar que $table esté definido
+$table = $table ?? '';
+
+// Obtener marketplace actual
+$marketplace = isset($table) && $table !== 'all' ? str_replace('Orders_', '', $table) : 'TODOS';
+$marketplace = strtoupper($marketplace);
+
+// Configurar nombre y color del marketplace
+$displayName = isset($marketplaceDetails[$marketplace]) ? $marketplaceDetails[$marketplace]['name'] : 'Todos los Marketplaces';
+$marketColor = isset($marketplaceDetails[$marketplace]) ? $marketplaceDetails[$marketplace]['color'] : '#4361ee';
+
+// Asegurar que $orders esté definido como un array
+$orders = $orders ?? [];
+
+// Cálculos para la paginación
+$page = $page ?? 1;
+$limit = $limit ?? 25;
+$totalPages = $totalPages ?? 1;
+$totalItems = $totalItems ?? 0;
+?>
+
+<!-- Panel de acciones lateral -->
+<style>
+.action-panel-container {
+    position: fixed;
+    top: 0;
+    right: -350px;
+    width: 350px;
+    height: 100vh;
+    background: linear-gradient(to right, #ffffff, #f8f9fa);
+    box-shadow: -5px 0 20px rgba(0,0,0,0.15);
+    z-index: 99999;
+    transition: right 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.action-panel-container.open {
+    right: 0;
+}
+
+.action-panel-header {
+    padding: 20px;
+    border-bottom: 1px solid #e9ecef;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.action-panel-header h3 {
+    margin: 0;
+    font-size: 20px;
+    color: #495057;
+    font-weight: 600;
+}
+
+.action-panel-close {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: #6c757d;
+}
+
+.action-panel-close:hover {
+    color: #343a40;
+}
+
+.action-panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 0;
+}
+
+.action-category {
+    margin-bottom: 24px;
+    padding: 0 20px;
+}
+
+.action-category-title {
+    color: #6c757d;
+    text-transform: uppercase;
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 16px;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+}
+
+.action-category-title::after {
+    content: '';
+    flex: 1;
+    margin-left: 10px;
+    height: 1px;
+    background-color: #dee2e6;
+}
+
+.action-btn {
+    display: flex;
+    align-items: center;
+    padding: 14px 20px;
+    margin-bottom: 10px;
+    border: none;
+    background-color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    width: 100%;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    text-align: left;
+}
+
+.action-btn:hover {
+    background-color: #f0f4ff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.action-btn i {
+    font-size: 20px;
+    margin-right: 15px;
+    width: 28px;
+    text-align: center;
+}
+
+.action-btn span {
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.action-print {
+    color: #0d6efd;
+}
+
+.action-export {
+    color: #198754;
+}
+
+.action-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.3);
+    opacity: 0;
+    visibility: hidden;
+    z-index: 99990;
+    transition: opacity 0.3s ease;
+}
+
+.action-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Animación de los botones al abrir el panel */
+.action-btn {
+    transform: translateX(50px);
+    opacity: 0;
+    transition: transform 0.4s ease, opacity 0.4s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.action-panel-container.open .action-btn {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+/* Retraso escalonado para la animación de los botones */
+.action-panel-container.open .action-btn:nth-child(1) { transition-delay: 0.05s; }
+.action-panel-container.open .action-btn:nth-child(2) { transition-delay: 0.1s; }
+.action-panel-container.open .action-btn:nth-child(3) { transition-delay: 0.15s; }
+.action-panel-container.open .action-btn:nth-child(4) { transition-delay: 0.2s; }
+.action-panel-container.open .action-btn:nth-child(5) { transition-delay: 0.25s; }
+
+/* Botón principal para abrir el panel */
+.action-button {
+    position: relative;
+    overflow: hidden;
+}
+
+.action-button::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.5);
+    opacity: 0;
+    border-radius: 100%;
+    transform: scale(1, 1) translate(-50%);
+    transform-origin: 50% 50%;
+}
+
+.action-button:focus:not(:active)::after {
+    animation: ripple 1s ease-out;
+}
+
+@keyframes ripple {
+    0% {
+        transform: scale(0, 0);
+        opacity: 0.5;
+    }
+    100% {
+        transform: scale(30, 30);
+        opacity: 0;
+    }
+}
+</style>
+
+<div class="action-panel-container" id="actionPanelContainer">
+    <div class="action-panel-header">
+        <h3><i class="fas fa-cog me-2"></i> Acciones Disponibles</h3>
+        <button class="action-panel-close" id="actionPanelClose">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    <div class="action-panel-body">
+        <div class="action-category">
+            <div class="action-category-title">Imprimir</div>
+            <button class="action-btn action-print bulk-action" data-action="print-labels">
+                <i class="fas fa-tag"></i>
+                <span>Imprimir Etiquetas</span>
+            </button>
+            <button class="action-btn action-print bulk-action" data-action="print-invoice">
+                <i class="fas fa-file-invoice"></i>
+                <span>Imprimir Facturas</span>
+            </button>
+            <button class="action-btn action-print bulk-action" data-action="print-packing">
+                <i class="fas fa-list"></i>
+                <span>Lista de Picking</span>
+            </button>
+            <button class="action-btn action-print bulk-action" data-action="print-picking">
+                <i class="fas fa-box"></i>
+                <span>Lista de Packing</span>
+            </button>
+        </div>
+        <div class="action-category">
+            <div class="action-category-title">Exportar</div>
+            <button class="action-btn action-export bulk-action" data-action="export-csv">
+                <i class="fas fa-file-csv"></i>
+                <span>Exportar a CSV</span>
+            </button>
+        </div>
+
+        <div class="action-category">
+            <div class="action-category-title">Acciones</div>
+            <button class="action-btn action-print bulk-action-status" data-action="mark-printed">
+                <i class="fas fa-print"></i>
+                <span>Marcar como Impresas</span>
+            </button>
+            <!-- El procesamiento de órdenes solo está disponible en la vista detalle -->
+        </div>
+    </div>
+</div>
+
+<div class="action-overlay" id="actionOverlay"></div>
+
+<script>
+// Script para el panel de acciones
+document.addEventListener('DOMContentLoaded', function() {
+    const actionButton = document.getElementById('actionButton');
+    const actionPanelContainer = document.getElementById('actionPanelContainer');
+    const actionPanelClose = document.getElementById('actionPanelClose');
+    const actionOverlay = document.getElementById('actionOverlay');
+    const actionButtons = document.querySelectorAll('.action-btn');
+
+    // Función para abrir el panel
+    function openPanel() {
+        actionPanelContainer.classList.add('open');
+        actionOverlay.classList.add('visible');
+        document.body.style.overflow = 'hidden'; // Evitar scroll
+    }
+
+    // Función para cerrar el panel
+    function closePanel() {
+        actionPanelContainer.classList.remove('open');
+        actionOverlay.classList.remove('visible');
+        document.body.style.overflow = ''; // Permitir scroll nuevamente
+    }
+
+    // Comprobar si el panel está abierto
+    function isPanelOpen() {
+        return actionPanelContainer.classList.contains('open');
+    }
+
+    // Alternar el panel
+    function togglePanel() {
+        if (isPanelOpen()) {
+            closePanel();
+        } else {
+            openPanel();
+        }
+    }
+
+    // Abrir/cerrar panel al hacer clic en el botón de acción
+    if (actionButton) {
+        actionButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            togglePanel();
+            actionButton.classList.add('action-button');
+        });
+    }
+
+    // Cerrar panel al hacer clic en el botón de cerrar
+    if (actionPanelClose) {
+        actionPanelClose.addEventListener('click', function(e) {
+            e.preventDefault();
+            closePanel();
+        });
+    }
+
+    // Cerrar panel al hacer clic en el overlay
+    if (actionOverlay) {
+        actionOverlay.addEventListener('click', function() {
+            closePanel();
+        });
+    }
+
+    // Cerrar panel tras seleccionar una acción
+    if (actionButtons) {
+        actionButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Cerramos con un pequeño retraso para que se vea el efecto de clic
+                setTimeout(closePanel, 200);
+            });
+        });
+    }
+
+    // Cerrar con Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && isPanelOpen()) {
+            closePanel();
+        }
+    });
+});
+</script>
+
+<div class="container-fluid">
+    <!-- Cabecera de la página con título y botones principales -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <h1 class="h3 mb-2">Gestión de Órdenes: <?= $this->escapeHtml($displayName) ?></h1>
+            <p class="text-muted">Administra todas las órdenes de tus diferentes marketplaces en un solo lugar.</p>
+        </div>
+        <div class="col-md-6">
+            <div class="d-flex justify-content-md-end gap-2 mb-2">
+                <button type="button" id="actionButton" class="btn btn-primary me-2">
+                    <i class="fas fa-cog me-1"></i> Acciones
+                </button>
+
+                <a href="<?= $this->url('marketplace') ?>" class="btn btn-outline-secondary">
+                    <i class="fas fa-cogs me-1"></i> Configuración
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- KPI Cards -->
+    <div class="row mb-4">
+        <!-- Sin Imprimir -->
+        <div class="col-md-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body py-4">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <div class="small text-muted text-uppercase">Sin Imprimir</div>
+                            <div class="mt-1">
+                                <h5 class="fw-semibold mb-1 text-primary"><?= number_format($sinImprimir ?? 0) ?></h5>
+                                <div class="small text-muted">
+                                    <span class="<?= $sinImprimir > 0 ? 'text-danger' : 'text-success' ?>">
+                                        <i class="fas <?= $sinImprimir > 0 ? 'fa-arrow-up' : 'fa-arrow-down' ?>"></i> <?= $sinImprimir ?>
+                                    </span> Órdenes sin imprimir
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-primary bg-opacity-25 rounded p-3">
+                            <i class="fas fa-print text-primary fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Pendientes a Procesar -->
+        <div class="col-md-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body py-4">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <div class="small text-muted text-uppercase">Pendientes a Procesar</div>
+                            <div class="mt-1">
+                                <h5 class="fw-semibold mb-1 text-warning"><?= number_format($impresosNoProcesados ?? 0) ?></h5>
+                                <div class="small text-muted">
+                                    <span class="<?= $impresosNoProcesados > 0 ? 'text-danger' : 'text-success' ?>">
+                                        <i class="fas <?= $impresosNoProcesados > 0 ? 'fa-arrow-up' : 'fa-arrow-down' ?>"></i> <?= $impresosNoProcesados ?>
+                                    </span> Órdenes impresas pendientes
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-warning bg-opacity-25 rounded p-3">
+                            <i class="fas fa-clock text-warning fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Procesados -->
+        <div class="col-md-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body py-4">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <div class="small text-muted text-uppercase">Procesados</div>
+                            <div class="mt-1">
+                                <h5 class="fw-semibold mb-1 text-success"><?= number_format($procesados ?? 0) ?></h5>
+                                <div class="small text-muted">
+                                    <span class="text-success">
+                                        <i class="fas fa-check"></i> <?= $procesados ?>
+                                    </span> Órdenes completadas
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-success bg-opacity-25 rounded p-3">
+                            <i class="fas fa-check-circle text-success fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Filtros y acciones -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white py-3">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h5 class="mb-0">Filtros de búsqueda</h5>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <div class="d-flex justify-content-md-end gap-2">
+                        <button type="button" id="toggle-filters" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-sliders-h me-1"></i> Mostrar filtros
+                        </button>
+                        <button type="button" id="clear-filters" class="btn btn-sm btn-outline-secondary">
+                            <i class="fas fa-eraser me-1"></i> Limpiar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <form id="order-filters" method="GET" action="<?= $this->url('orders', ['action' => 'orders-detail', 'table' => $table]) ?>">
+                <!-- Filtros básicos siempre visibles -->
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="search" class="form-label">Buscar órdenes...</label>
+                            <input type="text" class="form-control" id="search" placeholder="N° de orden, cliente, RUT..."
+                                       name="search" value="<?= isset($search) ? $this->escapeHtml($search) : '' ?>">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="printed" class="form-label">Impresión</label>
+                            <select class="form-select" id="printed" name="printed">
+                                <?php
+                                    // Si no está definida la variable, extráela directamente del request
+                                    $printedValue = isset($printedFilter) ? $printedFilter : (isset($_GET['printed']) ? $_GET['printed'] : '0');
+                                ?>
+                                <option value="0" <?= $printedValue === '0' || $printedValue === '' ? 'selected' : '' ?>>Solo No impresas</option>
+                                <option value="1" <?= $printedValue === '1' ? 'selected' : '' ?>>Solo Impresas</option>
+                                <option value="" <?= $printedValue !== '0' && $printedValue !== '1' && !empty($printedValue) ? 'selected' : '' ?>>todas</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="procesado" class="form-label">Procesamiento</label>
+                            <select class="form-select" id="procesado" name="procesado">
+                                <?php
+                                    // Si no está definida la variable, extráela directamente del request
+                                    $procesadoValue = isset($procesadoFilter) ? $procesadoFilter : (isset($_GET['procesado']) ? $_GET['procesado'] : '0');
+                                ?>
+                                <option value="0" <?= $procesadoValue === '0' || $procesadoValue === '' ? 'selected' : '' ?>>Solo No procesadas</option>
+                                <option value="1" <?= $procesadoValue === '1' ? 'selected' : '' ?>>Solo Procesadas</option>
+                                <option value="" <?= $procesadoValue !== '0' && $procesadoValue !== '1' && !empty($procesadoValue) ? 'selected' : '' ?>>Todas</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Filtros avanzados (ocultos por defecto) -->
+                <div id="advanced-filters" class="row mt-3" style="display: none;">
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label for="date_from" class="form-label">Fecha desde</label>
+                            <input type="date" class="form-control" id="date_from" name="date_from">
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label for="date_to" class="form-label">Fecha hasta</label>
+                            <input type="date" class="form-control" id="date_to" name="date_to">
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label for="transportista" class="form-label">Transportista</label>
+                            <select class="form-select" id="transportista" name="transportista">
+                                <option value="">Todos</option>
+                                <option value="chilexpress">Chilexpress</option>
+                                <option value="correos_chile">Correos Chile</option>
+                                <option value="starken">Starken</option>
+                                <option value="dhl">DHL</option>
+                                <option value="otro">Otro</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <!-- Procesamiento se movió a los filtros básicos -->
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-end mt-3">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search me-1"></i> Aplicar filtros
+                    </button>
+                    <?php if ((isset($printedValue) && $printedValue !== '0') || (isset($procesadoValue) && $procesadoValue !== '0') || !empty($search)): ?>
+                    <a href="<?= $this->url('orders', ['action' => 'orders-detail', 'table' => $table]) ?>" class="btn btn-outline-secondary ms-2">
+                        <i class="fas fa-undo me-1"></i> Reiniciar filtros
+                    </a>
+                    <?php endif; ?>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Los botones de acción se movieron a la cabecera principal -->
+
+    <!-- Tabla de órdenes -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white py-3">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h5 class="mb-0">Mostrando 25 de <?= $total ?? 0 ?> resultados</h5>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <!-- Se movieron los botones de impresión y exportación arriba de la tabla -->
+                </div>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th style="width: 40px;">
+                                <div class="form-check align-items-center">
+                                    <label for="select-all" class="d-flex align-items-center cursor-pointer">
+                                        <input class="form-check-input cursor-pointer" type="checkbox" id="select-all">
+                                        <span class="ms-1 small"></span>
+                                    </label>
+                                </div>
+                            </th>
+                            <th>N° Orden</th>
+                            <th>Fecha</th>
+                            <th>Fecha Entrega</th>
+                            <th>Cliente</th>
+                            <th>Productos</th>
+                            <th>Estado</th>
+                            <th>Transportista</th>
+                            <th>Total</th>
+                            <th class="text-center">Impreso</th>
+                            <th class="text-center">Procesado</th>
+                            <th class="text-end">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($orders)): ?>
+                            <tr>
+                                <td colspan="9" class="text-center py-5">
+                                    <div class="empty-state">
+                                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                                        <h4>No se encontraron órdenes</h4>
+                                        <p class="text-muted">Intenta ajustar los filtros de búsqueda</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php else: ?>
+                            <?php foreach ($orders as $order): ?>
+                                <tr>
+                                    <td>
+                                        <div class="form-check">
+                                            <input class="form-check-input order-checkbox" type="checkbox"
+                                                   value="<?= $order['id'] ?>" data-table="<?= $table ?>" name="orderCheckbox[]">
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <?php if ($table === 'Orders_PARIS'): ?>
+                                        <a href="/paris-order.php?id=<?= $order['suborden'] ?? $order['id'] ?>" class="fw-semibold">
+                                            <?= $this->escapeHtml($order['suborden'] ?? $order['suborder_number'] ?? $order['id']) ?>
+                                        </a>
+                                        <?php else: ?>
+                                        <a href="<?= $this->url('order-detail', ['id' => $order['id'], 'table' => $table]) ?>" class="fw-semibold">
+                                            <?= $this->escapeHtml($order['suborder_number'] ?? $order['id']) ?>
+                                        </a>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><?= isset($order['fecha_creacion']) ? date('d/m/Y', strtotime($order['fecha_creacion'])) : 'N/A' ?></td>
+                                    <td>
+                                        <?php
+                                            echo isset($order['fecha_entrega']) && !empty($order['fecha_entrega']) 
+                                                ? date('d/m/Y', strtotime($order['fecha_entrega'])) 
+                                                : 'No disponible';
+                                        ?>
+                                    </td>
+                                    <td>
+                                        <?php
+                                            $cliente = $order['cliente'] ?? $order['nombre_cliente'] ?? 'Consumidor final';
+                                            $rut = isset($order['rut_cliente']) ? ' - ' . $order['rut_cliente'] : '';
+                                            $telefono = isset($order['telefono']) ? '<br><small><i class="fas fa-phone me-1"></i>' . $order['telefono'] . '</small>' : '';
+                                            echo $this->escapeHtml($cliente . $rut) . $telefono;
+                                        ?>
+                                    </td>
+                                    <td>
+                                        <?php
+                                            // Mostrar productos si están disponibles
+                                            $productosMostrar = [];
+
+                                            // Primero verificar si hay nombre_producto en la orden (agregado desde MKP_PARIS)
+                                            if (isset($order['nombre_producto']) && !empty($order['nombre_producto'])) {
+                                                // Mostrar el nombre del producto directamente desde la tabla de marketplace
+                                                $nombre = $order['nombre_producto'];
+                                                $productosMostrar[] = "<small><strong>" . $this->escapeHtml(substr($nombre, 0, 60)) .
+                                                                     (strlen($nombre) > 60 ? '...' : '') . "</strong></small>";
+                                            }
+                                            // Si no hay nombre_producto, verificar si hay SKU directo en la orden
+                                            else if (isset($order['sku']) && !empty($order['sku'])) {
+                                                $skus = $order['sku'];
+                                                if (is_string($skus)) {
+                                                    // Buscar nombres de productos en la base de datos si es posible
+                                                    $skuNames = [];
+                                                    try {
+                                                        // Intentar obtener información de productos desde la tabla productos
+                                                        $productsTable = 'productos';
+                                                        $skuList = explode(',', $skus);
+                                                        if (count($skuList) > 0) {
+                                                            // Construir consulta con placeholders para cada SKU
+                                                            $placeholders = implode(',', array_fill(0, count($skuList), '?'));
+                                                            $productList = [];
+
+                                                            // Usar fetch para obtener datos si DatabaseService está disponible
+                                                            if (isset($this->layout()->databaseService)) {
+                                                                $productList = $this->layout()->databaseService->fetchAll(
+                                                                    "SELECT sku, nombre, descripcion FROM $productsTable WHERE sku IN ($placeholders)",
+                                                                    $skuList
+                                                                );
+                                                            }
+
+                                                            // Crear mapa de SKU -> nombre
+                                                            foreach ($productList as $product) {
+                                                                $skuNames[$product['sku']] = $product['nombre'] ?? ($product['descripcion'] ?? '');
+                                                            }
+                                                        }
+                                                    } catch (\Exception $e) {
+                                                        // No hay tabla de productos o error al consultar
+                                                    }
+
+                                                    // Intentar decodificar como JSON
+                                                    $skuArray = json_decode($skus, true);
+                                                    if (json_last_error() !== JSON_ERROR_NONE) {
+                                                        // Si no es JSON, podría ser una lista separada por comas
+                                                        $skuList = explode(',', $skus);
+                                                        foreach (array_slice($skuList, 0, 2) as $sku) {
+                                                            $sku = trim($sku);
+                                                            if (!empty($sku)) {
+                                                                // Si tenemos el nombre del producto desde el controlador, usarlo
+                                                                if (isset($productInfo[$sku]) && !empty($productInfo[$sku]['nombre'])) {
+                                                                    $nombre = $productInfo[$sku]['nombre'];
+                                                                    // Verificar si el nombre NO es genérico (no comienza con "Producto")
+                                                                    if (strpos($nombre, 'Producto') !== 0) {
+                                                                        $productosMostrar[] = "<small>" . $this->escapeHtml(substr($nombre, 0, 30)) .
+                                                                                       (strlen($nombre) > 30 ? '...' : '') .
+                                                                                       " <span class='badge bg-light text-dark'>" . $this->escapeHtml($sku) . "</span></small>";
+                                                                    } else if (isset($skuNames[$sku]) && !empty($skuNames[$sku])) {
+                                                                        // Segundo intento: usar nombre de la consulta local si disponible
+                                                                        $productosMostrar[] = "<small><strong>SKU:</strong> " . $this->escapeHtml($sku) . " - " .
+                                                                                         $this->escapeHtml(substr($skuNames[$sku], 0, 30)) .
+                                                                                         (strlen($skuNames[$sku]) > 30 ? '...' : '') . "</small>";
+                                                                    } else {
+                                                                        // Si solo tenemos el nombre genérico, mostrarlo igual
+                                                                        $productosMostrar[] = "<small>" . $this->escapeHtml(substr($nombre, 0, 30)) .
+                                                                                       (strlen($nombre) > 30 ? '...' : '') .
+                                                                                       " <span class='badge bg-light text-dark'>" . $this->escapeHtml($sku) . "</span></small>";
+                                                                    }
+                                                                } else if (isset($skuNames[$sku]) && !empty($skuNames[$sku])) {
+                                                                    // Usar nombre de la consulta local si el controlador no proporcionó uno
+                                                                    $productosMostrar[] = "<small><strong>SKU:</strong> " . $this->escapeHtml($sku) . " - " .
+                                                                                     $this->escapeHtml(substr($skuNames[$sku], 0, 30)) .
+                                                                                     (strlen($skuNames[$sku]) > 30 ? '...' : '') . "</small>";
+                                                                } else {
+                                                                    // Si no tenemos nombre, mostrar solo el SKU
+                                                                    $productosMostrar[] = "<small><strong>SKU:</strong> " . $this->escapeHtml($sku) . "</small>";
+                                                                }
+                                                            }
+                                                        }
+
+                                                        if (count($skuList) > 2) {
+                                                            $productosMostrar[] = "<small class='text-muted'>+" . (count($skuList) - 2) . " más</small>";
+                                                        }
+                                                    } else {
+                                                        // Es JSON, mostrar los primeros 2 SKUs
+                                                        if (is_array($skuArray)) {
+                                                            foreach (array_slice($skuArray, 0, 2) as $sku) {
+                                                                if (is_string($sku) && !empty($sku)) {
+                                                                    // Si tenemos el nombre del producto desde el controlador, usarlo
+                                                                    if (isset($productInfo[$sku]) && !empty($productInfo[$sku]['nombre'])) {
+                                                                        $nombre = $productInfo[$sku]['nombre'];
+                                                                        // Verificar si el nombre NO es genérico (no comienza con "Producto")
+                                                                        if (strpos($nombre, 'Producto') !== 0) {
+                                                                            $productosMostrar[] = "<small><strong>" . $this->escapeHtml(substr($nombre, 0, 40)) .
+                                                                                            (strlen($nombre) > 40 ? '...' : '') . "</strong></small>";
+                                                                        } else if (isset($skuNames[$sku]) && !empty($skuNames[$sku])) {
+                                                                            // Segundo intento: usar nombre de la consulta local si disponible
+                                                                            $productosMostrar[] = "<small><strong>" . $this->escapeHtml(substr($skuNames[$sku], 0, 40)) .
+                                                                                            (strlen($skuNames[$sku]) > 40 ? '...' : '') . "</strong></small>";
+                                                                        } else {
+                                                                            // Si solo tenemos el nombre genérico, mostrarlo igual
+                                                                            $productosMostrar[] = "<small><strong>" . $this->escapeHtml(substr($nombre, 0, 40)) .
+                                                                                            (strlen($nombre) > 40 ? '...' : '') . "</strong></small>";
+                                                                        }
+                                                                    } else if (isset($skuNames[$sku]) && !empty($skuNames[$sku])) {
+                                                                        // Usar nombre de la consulta local si el controlador no proporcionó uno
+                                                                        $productosMostrar[] = "<small><strong>" . $this->escapeHtml(substr($skuNames[$sku], 0, 40)) .
+                                                                                        (strlen($skuNames[$sku]) > 40 ? '...' : '') . "</strong></small>";
+                                                                    } else {
+                                                                        // Aunque no tengamos nombre, mostrar un nombre genérico
+                                                                        $productosMostrar[] = "<small>Producto: " . $this->escapeHtml($sku) . "</small>";
+                                                                    }
+                                                                } else if (is_array($sku) && isset($sku['sku'])) {
+                                                                    // Si es un objeto con SKU
+                                                                    $skuValue = $sku['sku'];
+                                                                    $nombre = $sku['nombre'] ?? '';
+
+                                                                    // Primero buscar en productos del controlador
+                                                                    if (empty($nombre) && isset($productInfo[$skuValue]) && !empty($productInfo[$skuValue]['nombre'])) {
+                                                                        $nombreProducto = $productInfo[$skuValue]['nombre'];
+                                                                        if (strpos($nombreProducto, 'Producto') !== 0) {
+                                                                            $nombre = $nombreProducto;
+                                                                        }
+                                                                    }
+
+                                                                    // Luego buscar en datos locales si sigue vacío
+                                                                    if (empty($nombre) && isset($skuNames[$skuValue]) && !empty($skuNames[$skuValue])) {
+                                                                        $nombre = $skuNames[$skuValue];
+                                                                    }
+
+                                                                    if (!empty($nombre)) {
+                                                                        $productosMostrar[] = "<small>" . $this->escapeHtml(substr($nombre, 0, 40)) .
+                                                                                        (strlen($nombre) > 40 ? '...' : '') . "</small>";
+                                                                    } else {
+                                                                        // Intento final: mostrar nombre genérico en lugar del SKU
+                                                                        $productosMostrar[] = "<small>Producto: " . $this->escapeHtml($skuValue) . "</small>";
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            if (count($skuArray) > 2) {
+                                                                $productosMostrar[] = "<small class='text-muted'>+" . (count($skuArray) - 2) . " más</small>";
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            // Verificación genérica para mostrar productos concatenados (funciona con cualquier marketplace)
+                                            if (!empty($order['productos_bsale']) || !empty($order['product_names']) || !empty($order['product_list'])) {
+                                                $productosMostrar = []; // Reset to show marketplace products
+                                                // Buscar en varios campos posibles según el marketplace
+                                                $productNames = [];
+                                                $skus = [];
+                                                
+                                                // Obtener nombres de productos
+                                                if (!empty($order['productos_bsale'])) {
+                                                    $productNames = explode(' | ', $order['productos_bsale']);
+                                                    if (!empty($order['skus_bsale'])) {
+                                                        $skus = explode(', ', $order['skus_bsale']);
+                                                    }
+                                                } elseif (!empty($order['product_names'])) {
+                                                    $productNames = is_array($order['product_names']) ? $order['product_names'] : explode(',', $order['product_names']);
+                                                    if (!empty($order['product_skus'])) {
+                                                        $skus = is_array($order['product_skus']) ? $order['product_skus'] : explode(',', $order['product_skus']);
+                                                    }
+                                                } elseif (!empty($order['product_list'])) {
+                                                    $productList = is_array($order['product_list']) ? $order['product_list'] : json_decode($order['product_list'], true);
+                                                    if (is_array($productList)) {
+                                                        foreach ($productList as $product) {
+                                                            $productNames[] = $product['name'] ?? $product['nombre'] ?? '';
+                                                            $skus[] = $product['sku'] ?? $product['codigo'] ?? '';
+                                                        }
+                                                    }
+                                                }
+                                                
+                                                // Mostrar los productos encontrados
+                                                foreach (array_slice($productNames, 0, 2) as $index => $productName) {
+                                                    if (empty($productName)) continue;
+                                                    $sku = isset($skus[$index]) ? $skus[$index] : '';
+                                                    $productosMostrar[] = "<small><strong>" . $this->escapeHtml(substr($productName, 0, 40)) .
+                                                                    (strlen($productName) > 40 ? '...' : '') . "</strong>" . 
+                                                                    (!empty($sku) ? " <span class='badge bg-light text-dark'>" . $this->escapeHtml($sku) . "</span>" : "") . 
+                                                                    "</small>";
+                                                }
+                                                
+                                                if (count($productNames) > 2) {
+                                                    $productosMostrar[] = "<small class='text-muted'>+" . (count($productNames) - 2) . " más</small>";
+                                                }
+                                            }
+
+                                            // Luego verificar el campo productos para información detallada
+                                            if (isset($order['productos']) && (empty($productosMostrar) || count($productosMostrar) < 2)) {
+                                                $productos = $order['productos'];
+                                                if (is_string($productos)) {
+                                                    $productos = json_decode($productos, true);
+                                                }
+
+                                                if (is_array($productos)) {
+                                                    // Si ya tenemos SKUs de la columna sku, mostrar solo los productos restantes
+                                                    $maxToShow = empty($productosMostrar) ? 2 : 1;
+
+                                                    foreach (array_slice($productos, 0, $maxToShow) as $producto) {
+                                                        $nombre = $producto['nombre'] ?? $producto['name'] ?? '';
+                                                        $sku = $producto['sku'] ?? '';
+                                                        $cantidad = $producto['cantidad'] ?? 1;
+
+                                                        // Verificar si el nombre actual es genérico o está vacío
+                                                        $isGenericName = empty($nombre) || strpos($nombre, 'Producto') === 0;
+
+                                                        // Si tenemos SKU, intentar obtener un nombre mejor
+                                                        if (!empty($sku)) {
+                                                            // Primero buscar en datos del controlador
+                                                            if ($isGenericName && isset($productInfo[$sku]) && !empty($productInfo[$sku]['nombre'])) {
+                                                                $dbName = $productInfo[$sku]['nombre'];
+                                                                // Usar el nombre de la BD solo si no es genérico
+                                                                if (strpos($dbName, 'Producto') !== 0) {
+                                                                    $nombre = $dbName;
+                                                                    $isGenericName = false;
+                                                                }
+                                                            }
+
+                                                            // Luego intentar con los datos locales
+                                                            if ($isGenericName && isset($skuNames[$sku]) && !empty($skuNames[$sku])) {
+                                                                $nombre = $skuNames[$sku];
+                                                                $isGenericName = false;
+                                                            }
+
+                                                            $productosMostrar[] = "<small>" . $cantidad . "x <strong>" . $this->escapeHtml(substr($nombre, 0, 40)) .
+                                                                (strlen($nombre) > 40 ? '...' : '') . "</strong></small>";
+                                                        } else if (!empty($nombre)) {
+                                                            $productosMostrar[] = "<small>" . $cantidad . "x <strong>" .
+                                                                $this->escapeHtml(substr($nombre, 0, 40)) . (strlen($nombre) > 40 ? '...' : '') . "</strong></small>";
+                                                        }
+                                                    }
+
+                                                    // Mensaje de "más productos" solo si no lo hemos añadido ya
+                                                    if (count($productos) > $maxToShow && strpos(end($productosMostrar), 'más') === false) {
+                                                        $productosMostrar[] = "<small class='text-muted'>+" . (count($productos) - $maxToShow) . " más</small>";
+                                                    }
+                                                }
+                                            }
+
+                                            if (empty($productosMostrar)) {
+                                                echo "<span class='text-muted'>No disponible</span>";
+                                            } else {
+                                                echo implode('<br>', $productosMostrar);
+                                            }
+                                        ?>
+                                    </td>
+                                    <td>
+                                        <?php 
+                                            $estado = $order['estado'] ?? 'pendiente';
+                                            $badgeClass = 'bg-secondary';
+                                            
+                                            if ($estado == 'pendiente') {
+                                                $badgeClass = 'bg-warning';
+                                            } elseif ($estado == 'en_proceso' || $estado == 'en proceso') {
+                                                $badgeClass = 'bg-info';
+                                            } elseif ($estado == 'enviado') {
+                                                $badgeClass = 'bg-primary';
+                                            } elseif ($estado == 'entregado') {
+                                                $badgeClass = 'bg-success';
+                                            } elseif ($estado == 'cancelado') {
+                                                $badgeClass = 'bg-danger';
+                                            }
+                                        ?>
+                                        <span class="badge <?= $badgeClass ?>"><?= ucfirst($this->escapeHtml($estado)) ?></span>
+                                    </td>
+                                    <td>
+                                        <?php
+                                            $transportista = $order['transportista'] ?? '';
+                                            $fulfillment = $order['fulfillment'] ?? '';
+                                            
+                                            if (!empty($transportista)) {
+                                                echo $this->escapeHtml($transportista);
+                                                
+                                                if (!empty($fulfillment)) {
+                                                    echo '<br><small class="text-muted">Fulfillment: ' . $this->escapeHtml($fulfillment) . '</small>';
+                                                }
+                                            } else {
+                                                echo 'N/A';
+                                            }
+                                        ?>
+                                    </td>
+                                    <td>
+                                        <?php 
+                                            // Buscar el total en varios campos posibles
+                                            $totalAmount = $order['totalAmount'] ?? $order['total'] ?? $order['order_total'] ?? 0;
+                                            echo '$' . number_format((float)$totalAmount, 0, ',', '.');
+                                        ?>
+                                    </td>
+                                    <td class="text-center">
+                                        <?php if (isset($order['printed']) && $order['printed']): ?>
+                                            <span class="badge bg-success"><i class="fas fa-check"></i></span>
+                                        <?php else: ?>
+                                            <span class="badge bg-danger"><i class="fas fa-times"></i></span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="text-center">
+                                        <?php
+                                        // SOLUCIÓN SIMPLIFICADA para mostrar el estado procesado correctamente
+
+                                        // Obtener valor de procesado, considerando cualquier tipo de dato
+                                        $procesadoValue = isset($order['procesado']) ? $order['procesado'] : null;
+
+                                        // Mostrar para debug (descomentar si es necesario)
+                                        // echo "<small>Valor: " . var_export($procesadoValue, true) . ", Tipo: " . gettype($procesadoValue) . "</small>";
+
+                                        // Convertir explícitamente a entero
+                                        if (is_numeric($procesadoValue)) {
+                                            $isProcessed = (int)$procesadoValue > 0;
+                                        } else if (is_string($procesadoValue)) {
+                                            // Convertir strings como '1', 'true', 'yes' a verdadero
+                                            $procesadoValue = strtolower(trim($procesadoValue));
+                                            $isProcessed = in_array($procesadoValue, ['1', 'true', 'yes', 'si', 's', 'y', 't']);
+                                        } else if (is_bool($procesadoValue)) {
+                                            // Si es booleano, usar directamente
+                                            $isProcessed = $procesadoValue === true;
+                                        } else {
+                                            // Valor nulo o cualquier otro tipo
+                                            $isProcessed = false;
+                                        }
+                                        ?>
+
+                                        <?php if ($isProcessed): ?>
+                                            <span class="badge bg-success"><i class="fas fa-check"></i></span>
+                                        <?php else: ?>
+                                            <span class="badge bg-danger"><i class="fas fa-times"></i></span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="text-end position-relative">
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                                                    id="actionDropdown<?= $order['id'] ?>" data-bs-toggle="dropdown" aria-expanded="false">
+                                                <i class="fas fa-ellipsis-v"></i>
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="actionDropdown<?= $order['id'] ?>" style="z-index: 1050;">
+                                                <li>
+                                                    <?php if ($table === 'Orders_PARIS'): ?>
+                                                    <a class="dropdown-item" href="/paris-order.php?id=<?= $order['suborden'] ?? $order['id'] ?>">
+                                                        <i class="fas fa-eye me-2 text-primary"></i> Ver detalle
+                                                    </a>
+                                                    <?php else: ?>
+                                                    <a class="dropdown-item" href="<?= $this->url('order-detail', ['id' => $order['id'], 'table' => $table]) ?>">
+                                                        <i class="fas fa-eye me-2 text-primary"></i> Ver detalle
+                                                    </a>
+                                                    <?php endif; ?>
+                                                </li>
+                                                <li>
+                                                    <button class="dropdown-item mark-as-printed" data-id="<?= $order['id'] ?>" data-table="<?= $table ?>">
+                                                        <i class="fas fa-print me-2 text-success"></i> Marcar como impreso
+                                                    </button>
+                                                </li>
+                                                <!-- Procesamiento de órdenes solo disponible en la vista detalle de orden -->
+                                                <li><hr class="dropdown-divider"></li>
+                                                <?php if (!empty($order['labelUrl'])): ?>
+                                                <li>
+                                                    <a class="dropdown-item" href="<?= $order['labelUrl'] ?>" target="_blank">
+                                                        <i class="fas fa-tag me-2 text-warning"></i> Ver Etiqueta de Envío
+                                                    </a>
+                                                </li>
+                                                <?php endif; ?>
+                                                <li>
+                                                    <button class="dropdown-item print-action" data-id="<?= $order['id'] ?>" data-table="<?= $table ?>" data-action="print-invoice">
+                                                        <i class="fas fa-file-invoice me-2 text-info"></i> Imprimir factura
+                                                    </button>
+                                                </li>
+                                                <li>
+                                                    <button class="dropdown-item print-action" data-id="<?= $order['id'] ?>" data-table="<?= $table ?>" data-action="print-label">
+                                                        <i class="fas fa-tag me-2 text-info"></i> Imprimir etiqueta
+                                                    </button>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer bg-white py-3">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <div class="d-flex align-items-center gap-2">
+                        <span>Mostrar</span>
+                        <form id="limiter-form" method="GET" action="<?= $this->url('orders', ['action' => 'orders-detail', 'table' => $table]) ?>" style="display: inline;">
+                            <!-- Mantener todos los parámetros actuales excepto limit y page -->
+                            <?php foreach ($_GET as $key => $value): ?>
+                                <?php if ($key !== 'limit' && $key !== 'page'): ?>
+                                <input type="hidden" name="<?= $key ?>" value="<?= $this->escapeHtml($value) ?>">
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                            <input type="hidden" name="page" value="1">
+                            <select id="per-page" name="limit" class="form-select form-select-sm w-auto" onchange="document.getElementById('limiter-form').submit();">
+                                <option value="10" <?= $limit == 10 ? 'selected' : '' ?>>10</option>
+                                <option value="25" <?= $limit == 25 ? 'selected' : '' ?>>25</option>
+                                <option value="50" <?= $limit == 50 ? 'selected' : '' ?>>50</option>
+                                <option value="100" <?= $limit == 100 ? 'selected' : '' ?>>100</option>
+                            </select>
+                        </form>
+                        <span>registros</span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <!-- Paginación basada en enlaces directos -->
+                    <div class="pagination-container">
+                        <?php if ($totalPages > 1): 
+                            // Construir base de URL de paginación usando todos los parámetros actuales
+                            // Obtener todos los parámetros actuales de la URL
+                            $currentParams = [];
+                            foreach ($_GET as $key => $value) {
+                                if ($key !== 'page') { // Excluir 'page' que se agregará después
+                                    $currentParams[$key] = $value;
+                                }
+                            }
+
+                            // Asegurar que los parámetros más importantes estén definidos
+                            // Si no están en la URL actual pero están disponibles como variables
+                            if (!isset($currentParams['limit']) && $limit != 25) {
+                                $currentParams['limit'] = $limit;
+                            }
+
+                            if (!isset($currentParams['search']) && !empty($search)) {
+                                $currentParams['search'] = $search;
+                            }
+
+                            if (!isset($currentParams['printed']) && isset($printedValue)) {
+                                $currentParams['printed'] = $printedValue;
+                            }
+
+                            if (!isset($currentParams['procesado']) && isset($procesadoValue)) {
+                                $currentParams['procesado'] = $procesadoValue;
+                            }
+
+                            if (!isset($currentParams['status']) && isset($statusFilter) && $statusFilter !== '') {
+                                $currentParams['status'] = $statusFilter;
+                            }
+
+                            // Si hay filtros adicionales, asegurarse de incluirlos
+                            if (isset($filters) && is_array($filters)) {
+                                foreach ($filters as $key => $value) {
+                                    if (!isset($currentParams[$key]) && !in_array($key, ['search', 'printed', 'procesado', 'status'])) {
+                                        $currentParams[$key] = $value;
+                                    }
+                                }
+                            }
+
+                            $queryString = http_build_query($currentParams);
+                            $baseUrl = $this->url('orders', ['action' => 'orders-detail', 'table' => $table]);
+                            $baseUrl .= empty($queryString) ? '?' : ('?' . $queryString . '&');
+                        ?>
+                            <!-- Primera página -->
+                            <a href="<?= $baseUrl ?>page=1" 
+                               class="btn btn-sm btn-outline-secondary <?= $page <= 1 ? 'disabled' : '' ?>">
+                                <i class="fas fa-angle-double-left"></i>
+                            </a>
+                            
+                            <!-- Página anterior -->
+                            <a href="<?= $baseUrl ?>page=<?= max(1, $page - 1) ?>" 
+                               class="btn btn-sm btn-outline-secondary <?= $page <= 1 ? 'disabled' : '' ?>">
+                                <i class="fas fa-angle-left"></i>
+                            </a>
+                            
+                            <!-- Mostrar páginas cercanas -->
+                            <?php 
+                                $start = max(1, $page - 2);
+                                $end = min($totalPages, $page + 2);
+                                
+                                if ($start > 1) {
+                                    echo '<span class="pagination-text mx-1">...</span>';
+                                }
+                                
+                                for ($i = $start; $i <= $end; $i++): 
+                            ?>
+                                <a href="<?= $baseUrl ?>page=<?= $i ?>" 
+                                   class="btn btn-sm <?= $i == $page ? 'btn-primary' : 'btn-outline-secondary' ?>">
+                                    <?= $i ?>
+                                </a>
+                            <?php 
+                                endfor;
+                                
+                                if ($end < $totalPages) {
+                                    echo '<span class="pagination-text mx-1">...</span>';
+                                }
+                            ?>
+                            
+                            <!-- Página siguiente -->
+                            <a href="<?= $baseUrl ?>page=<?= min($totalPages, $page + 1) ?>" 
+                               class="btn btn-sm btn-outline-secondary <?= $page >= $totalPages ? 'disabled' : '' ?>">
+                                <i class="fas fa-angle-right"></i>
+                            </a>
+                            
+                            <!-- Última página -->
+                            <a href="<?= $baseUrl ?>page=<?= $totalPages ?>" 
+                               class="btn btn-sm btn-outline-secondary <?= $page >= $totalPages ? 'disabled' : '' ?>">
+                                <i class="fas fa-angle-double-right"></i>
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+            
+            <?php if (!empty($orders)): ?>
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <?php if (!empty($search) || (isset($printedValue) && $printedValue !== '0') || (isset($procesadoValue) && $procesadoValue !== '0')): ?>
+                            <a href="<?= $this->url('orders', ['action' => 'orders-detail', 'table' => $table]) ?>" class="btn btn-outline-primary">
+                                <i class="fas fa-eraser me-2"></i> Limpiar filtros
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+
+<!-- Script para funcionalidades de la página -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Corrección para los dropdowns que se ocultan tras la tabla
+    const fixDropdownZIndex = () => {
+        // Asegurarse de que todos los dropdowns tengan z-index adecuado
+        document.querySelectorAll('.dropdown-menu').forEach(menu => {
+            menu.style.zIndex = '1050';
+        });
+
+        // Asegurarse de que el contenedor de la tabla tenga overflow visible
+        document.querySelectorAll('.table-responsive, .card-body, .card').forEach(el => {
+            el.style.overflow = 'visible';
+        });
+    };
+
+    // Ejecutar al cargar y cuando se abra un dropdown
+    fixDropdownZIndex();
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('dropdown-toggle') ||
+            e.target.closest('.dropdown-toggle')) {
+            setTimeout(fixDropdownZIndex, 10);
+        }
+    });
+
+    // Procesamiento para acciones en bulk
+    function processAction(selectedOrders, action) {
+        // Implementar lógica para manejar acciones en bulk
+        console.log('Procesando acción:', action, 'para órdenes:', selectedOrders);
+
+        // Para acciones de impresión y exportación, abrir en nueva ventana
+        if (['print-labels', 'print-invoice', 'print-picking', 'print-packing', 'export-csv'].includes(action)) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '<?= $this->url('bulk-orders') ?>';
+            form.target = '_blank';
+
+            // Agregar campo de acción
+            const actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'action';
+            actionInput.value = action;
+            form.appendChild(actionInput);
+
+            // Agregar IDs y tablas
+            selectedOrders.forEach(order => {
+                const idInput = document.createElement('input');
+                idInput.type = 'hidden';
+                idInput.name = 'orderIds[]';
+                idInput.value = order.id;
+                form.appendChild(idInput);
+
+                const tableInput = document.createElement('input');
+                tableInput.type = 'hidden';
+                tableInput.name = 'orderTables[]';
+                tableInput.value = order.table;
+                form.appendChild(tableInput);
+            });
+
+            document.body.appendChild(form);
+            form.submit();
+            document.body.removeChild(form);
+
+            // Mostrar mensaje de carga
+            const loadingMsg = document.createElement('div');
+            loadingMsg.className = 'fixed-top w-100 bg-info text-white text-center py-2';
+            loadingMsg.style.zIndex = '9999';
+            loadingMsg.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Generando documento... Espere por favor.';
+            document.body.appendChild(loadingMsg);
+
+            // Quitar mensaje después de un tiempo
+            setTimeout(() => {
+                document.body.removeChild(loadingMsg);
+            }, 3000);
+        }
+    }
+
+    // Acciones en bulk desde el panel y botones originales
+    document.querySelectorAll('.bulk-action').forEach(button => {
+        button.addEventListener('click', function() {
+            const selectedOrders = [];
+            document.querySelectorAll('.order-checkbox:checked').forEach(checkbox => {
+                selectedOrders.push({
+                    id: checkbox.value,
+                    table: checkbox.getAttribute('data-table')
+                });
+            });
+
+            if (selectedOrders.length === 0) {
+                alert('Por favor, selecciona al menos una orden');
+                return;
+            }
+
+            const action = this.getAttribute('data-action');
+            processAction(selectedOrders, action);
+        });
+    });
+
+    // Acciones en bulk para marcar como impreso o procesado
+    document.querySelectorAll('.bulk-action-status').forEach(button => {
+        button.addEventListener('click', function() {
+            const selectedOrders = [];
+            document.querySelectorAll('.order-checkbox:checked').forEach(checkbox => {
+                selectedOrders.push({
+                    id: checkbox.value,
+                    table: checkbox.getAttribute('data-table')
+                });
+            });
+
+            if (selectedOrders.length === 0) {
+                alert('Por favor, selecciona al menos una orden');
+                return;
+            }
+
+            const action = this.getAttribute('data-action');
+
+            if (action === 'mark-printed') {
+                if (confirm('¿Confirmas que deseas marcar ' + selectedOrders.length + ' órdenes como impresas?')) {
+                    processBulkOrderStatus(selectedOrders, 'printed');
+                }
+            }
+            }
+        });
+    });
+
+    // Toggle filtros avanzados - SOLUCIÓN MEJORADA
+    const toggleFiltersBtn = document.getElementById('toggle-filters');
+    const advancedFilters = document.getElementById('advanced-filters');
+
+    // Asegurarse de que ambos elementos existen
+    if (toggleFiltersBtn && advancedFilters) {
+        toggleFiltersBtn.addEventListener('click', function() {
+            // Obtener el estado actual y cambiarlo
+            const isVisible = advancedFilters.style.display !== 'none';
+
+            // Cambiar visibilidad con un método más directo
+            if (isVisible) {
+                advancedFilters.style.display = 'none';
+                this.innerHTML = '<i class="fas fa-sliders-h me-1"></i> Mostrar filtros';
+            } else {
+                advancedFilters.style.display = 'flex';
+                this.innerHTML = '<i class="fas fa-minus me-1"></i> Ocultar filtros';
+            }
+
+            // Para debug
+            console.log('Filtros avanzados: ' + (isVisible ? 'ocultos' : 'visibles'));
+        });
+    } else {
+        console.warn('No se encontraron elementos de filtro avanzado');
+    }
+
+    // SOLUCIÓN MEJORADA para asegurar que los filtros funcionen correctamente
+    const orderFiltersForm = document.getElementById('order-filters');
+
+    if (orderFiltersForm) {
+        // Primero, cargar valores de la URL para mostrar correctamente el estado actual
+        const urlParams = new URLSearchParams(window.location.search);
+
+        // Aplicar valores de URL a los campos de filtro
+        const searchInput = document.getElementById('search');
+        const printedSelect = document.getElementById('printed');
+        const procesadoSelect = document.getElementById('procesado');
+        const dateFromInput = document.getElementById('date_from');
+        const dateToInput = document.getElementById('date_to');
+        const transportistaSelect = document.getElementById('transportista');
+
+        // Establecer valores de acuerdo a la URL
+        if (searchInput) searchInput.value = urlParams.get('search') || '';
+        if (printedSelect) printedSelect.value = urlParams.get('printed') || '';
+        if (procesadoSelect) procesadoSelect.value = urlParams.get('procesado') || '';
+        if (dateFromInput) dateFromInput.value = urlParams.get('date_from') || '';
+        if (dateToInput) dateToInput.value = urlParams.get('date_to') || '';
+        if (transportistaSelect) transportistaSelect.value = urlParams.get('transportista') || '';
+
+        // Si hay filtros avanzados con valores, mostrar la sección
+        if (
+            (urlParams.get('date_from') && dateFromInput) ||
+            (urlParams.get('date_to') && dateToInput) ||
+            (urlParams.get('transportista') && transportistaSelect)
+        ) {
+            const advancedFilters = document.getElementById('advanced-filters');
+            if (advancedFilters) {
+                advancedFilters.style.display = 'flex';
+                const toggleButton = document.getElementById('toggle-filters');
+                if (toggleButton) {
+                    toggleButton.innerHTML = '<i class="fas fa-minus me-1"></i> Ocultar filtros';
+                }
+            }
+        }
+
+        orderFiltersForm.addEventListener('submit', function(e) {
+            // Prevenir el envío estándar del formulario
+            e.preventDefault();
+
+            console.log('Procesando filtros...');
+
+            // Construir los parámetros manualmente para mayor control
+            const params = new URLSearchParams();
+
+            // Obtener los valores de los campos principales
+            const searchValue = searchInput?.value || '';
+            const printedValue = printedSelect?.value || '';
+            const procesadoValue = procesadoSelect?.value || '';
+
+            // Registrar para debug
+            console.log('Filtros aplicados:', {
+                search: searchValue,
+                printed: printedValue,
+                procesado: procesadoValue
+            });
+
+            // Agregar parámetros (solo search si tiene valor, los otros siempre)
+            if (searchValue) params.set('search', searchValue);
+            params.set('printed', printedValue);
+            params.set('procesado', procesadoValue);
+
+            // Incluir filtros avanzados si están visibles y tienen valor
+            const advancedFilters = document.getElementById('advanced-filters');
+            if (advancedFilters && advancedFilters.style.display !== 'none') {
+                const dateFrom = dateFromInput?.value;
+                const dateTo = dateToInput?.value;
+                const transportista = transportistaSelect?.value;
+
+                // Agregar filtros avanzados si tienen valor
+                if (dateFrom) params.set('date_from', dateFrom);
+                if (dateTo) params.set('date_to', dateTo);
+                if (transportista) params.set('transportista', transportista);
+            }
+
+            // Resetear a la primera página
+            params.set('page', '1');
+
+            // Navegar a la URL con los filtros
+            const url = '<?= $this->url('orders', ['action' => 'orders-detail', 'table' => $table]) ?>';
+            const queryString = params.toString();
+
+            // Mostrar URL de depuración
+            console.log('URL de filtro:', url + (queryString ? '?' + queryString : ''));
+
+            // Navegar
+            window.location.href = url + (queryString ? '?' + queryString : '');
+        });
+    } else {
+        console.warn('No se encontró el formulario de filtros');
+    }
+
+    // Ya no necesitamos este evento porque usamos el formulario HTML con onchange
+    /*document.getElementById('per-page').addEventListener('change', function() {
+        // Obtener todos los parámetros actuales
+        const params = new URLSearchParams(window.location.search);
+
+        // Actualizar el límite y resetear a la primera página
+        params.set('limit', this.value);
+        params.set('page', 1);
+
+        // Asegurar que los parámetros principales están siempre presentes
+        // Obtener valores de los campos de filtro actuales
+        const searchValue = document.getElementById('search')?.value || '';
+        const printedValue = document.getElementById('printed')?.value || '';
+        const procesadoValue = document.getElementById('procesado')?.value || '';
+
+        // Solo agregar search si tiene valor, los otros siempre
+        if (searchValue) params.set('search', searchValue);
+        params.set('printed', printedValue);
+        params.set('procesado', procesadoValue);
+
+        // Capturar filtros avanzados si están visibles
+        const advancedFilters = document.getElementById('advanced-filters');
+        if (advancedFilters && advancedFilters.style.display !== 'none') {
+            const dateFrom = document.getElementById('date_from')?.value;
+            const dateTo = document.getElementById('date_to')?.value;
+            const transportista = document.getElementById('transportista')?.value;
+
+            if (dateFrom) params.set('date_from', dateFrom);
+            if (dateTo) params.set('date_to', dateTo);
+            if (transportista) params.set('transportista', transportista);
+        }
+
+        // Redireccionar con todos los parámetros
+        window.location.href = '<?= $this->url('orders', ['action' => 'orders-detail', 'table' => $table]) ?>?' + params.toString();
+    });*/
+
+    // SOLUCIÓN DIRECTA para selección múltiple
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('Inicializando selección múltiple...');
+
+        // MÉTODO DIRECTO EXTREMADAMENTE SIMPLE PARA SELECCIONAR TODOS
+        const selectAllCheckbox = document.getElementById('select-all');
+
+        if (selectAllCheckbox) {
+            selectAllCheckbox.onclick = function() {
+                // Obtener el estado actual
+                var isChecked = this.checked;
+
+                // Aplicar a todos los checkboxes
+                var checkboxes = document.querySelectorAll('.order-checkbox');
+                for (var i = 0; i < checkboxes.length; i++) {
+                    checkboxes[i].checked = isChecked;
+                }
+
+                console.log('Selección ' + (isChecked ? 'activada' : 'desactivada') + ' para ' + checkboxes.length + ' elementos');
+            };
+        } else {
+            console.warn('No se encontró el checkbox "select-all"');
+        }
+    });
+    
+    // Acciones individuales
+    document.querySelectorAll('.print-action').forEach(button => {
+        button.addEventListener('click', function() {
+            const id = this.getAttribute('data-id');
+            const table = this.getAttribute('data-table');
+            const action = this.getAttribute('data-action');
+            
+            const selectedOrder = [{
+                id: id,
+                table: table
+            }];
+            
+            processAction(selectedOrder, action);
+        });
+    });
+    
+    // Marcar como impreso
+    document.querySelectorAll('.mark-as-printed').forEach(button => {
+        button.addEventListener('click', function() {
+            const id = this.getAttribute('data-id');
+            const table = this.getAttribute('data-table');
+            
+            if (!confirm('¿Confirmas que deseas marcar esta orden como impresa?')) {
+                return;
+            }
+            
+            markAsPrinted(id, table);
+        });
+    });
+    
+    // El procesamiento individual de órdenes solo está disponible en la vista de detalle de orden
+    
+    function markAsPrinted(id, table) {
+        // Asegurarse de que la tabla comience con 'Orders_'
+        if (!table.startsWith('Orders_')) {
+            table = 'Orders_' + table;
+        }
+        
+        fetch('<?= $this->url('mark-as-printed') ?>', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                id: id,
+                table: table
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Orden marcada como impresa correctamente');
+                window.location.reload();
+            } else {
+                alert('Error: ' + (data.message || 'No se pudo marcar la orden como impresa'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al procesar la solicitud. Por favor, inténtalo de nuevo.');
+        });
+    }
+    
+    function processOrder(id, table) {
+        // Asegurarse de que la tabla comience con 'Orders_'
+        if (!table.startsWith('Orders_')) {
+            table = 'Orders_' + table;
+        }
+
+        fetch('<?= $this->url('process-all-products') ?>', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                id: id,
+                table: table
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Orden procesada correctamente');
+                window.location.reload();
+            } else {
+                alert('Error: ' + (data.message || 'No se pudo procesar la orden'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al procesar la solicitud. Por favor, inténtalo de nuevo.');
+        });
+    }
+
+    function processBulkOrderStatus(orders, statusType) {
+        let completedCount = 0;
+        let errorCount = 0;
+        const totalOrders = orders.length;
+
+        const updateProgress = () => {
+            if (completedCount + errorCount === totalOrders) {
+                if (errorCount > 0) {
+                    alert(`Operación completada con ${errorCount} errores. Se actualizaron ${completedCount} órdenes correctamente.`);
+                } else {
+                    alert('Todas las órdenes fueron actualizadas correctamente.');
+                }
+                window.location.reload();
+            }
+        };
+
+        // Muestra mensaje de carga
+        const loadingMsg = document.createElement('div');
+        loadingMsg.className = 'fixed-top w-100 bg-info text-white text-center py-2';
+        loadingMsg.style.zIndex = '9999';
+        loadingMsg.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Procesando órdenes... Espere por favor.';
+        document.body.appendChild(loadingMsg);
+
+        // Procesar cada orden
+        orders.forEach(order => {
+            // Asegurarse de que la tabla comience con 'Orders_'
+            let table = order.table;
+            if (!table.startsWith('Orders_')) {
+                table = 'Orders_' + table;
+            }
+
+            // Determinar la URL y datos según el tipo de acción
+            let url, data;
+            if (statusType === 'printed') {
+                url = '<?= $this->url('mark-as-printed') ?>';
+                data = {
+                    id: order.id,
+                    table: table
+                };
+            } else if (statusType === 'processed') {
+                url = '<?= $this->url('process-all-products') ?>';
+                data = {
+                    id: order.id,
+                    table: table
+                };
+            }
+
+            // Realizar la solicitud
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    completedCount++;
+                } else {
+                    errorCount++;
+                    console.error('Error en orden ID:', order.id, result.message || 'Error desconocido');
+                }
+                updateProgress();
+            })
+            .catch(error => {
+                errorCount++;
+                console.error('Error al procesar orden ID:', order.id, error);
+                updateProgress();
+            });
+        });
+
+        // Quitar mensaje después de un tiempo máximo
+        setTimeout(() => {
+            if (document.body.contains(loadingMsg)) {
+                document.body.removeChild(loadingMsg);
+            }
+        }, 10000);
+    }
+});
+</script>
+
+<!-- Insertar el script de emergencia al principio -->
+<script>
+// URL de la acción de procesamiento masivo de órdenes
+window.bulkOrdersUrl = '<?= $this->url('bulk-orders') ?>';
+
+// Script de emergencia - solución directa y simple para los problemas
+function emergencyFix() {
+    console.log('Inicializando soluciones de emergencia...');
+
+    // 1. SOLUCIÓN PARA SELECCIONAR TODOS
+    // Método extremadamente simple y directo
+    var selectAllCheckbox = document.getElementById('select-all');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.onclick = function() {
+            // Obtener estado actual
+            var isChecked = this.checked;
+            // Seleccionar todos los checkboxes de órdenes
+            var orderCheckboxes = document.querySelectorAll('.order-checkbox');
+            console.log('Marcando ' + orderCheckboxes.length + ' checkboxes como: ' + isChecked);
+
+            // Aplicar estado a todos los checkboxes
+            for (var i = 0; i < orderCheckboxes.length; i++) {
+                orderCheckboxes[i].checked = isChecked;
+            }
+        };
+    }
+
+    // 2. SOLUCIÓN MEJORADA PARA PROCESAR FILTROS
+    // Reemplazar el comportamiento del formulario para garantizar que los filtros funcionen
+    var filterForm = document.getElementById('order-filters');
+    if (filterForm) {
+        // Primero, verificar si hay valores en la URL actual
+        var urlParams = new URLSearchParams(window.location.search);
+        var urlSearch = urlParams.get('search') || '';
+        var urlPrinted = urlParams.get('printed') || '';
+        var urlProcesado = urlParams.get('procesado') || '';
+
+        // Asegurarse de que los campos reflejen los valores de la URL actual
+        var searchInput = document.getElementById('search');
+        var printedSelect = document.getElementById('printed');
+        var procesadoSelect = document.getElementById('procesado');
+
+        // Establecer valores de los campos - Siempre establecer, incluso si está vacío
+        if (searchInput) searchInput.value = urlSearch;
+        if (printedSelect) printedSelect.value = urlPrinted;
+        if (procesadoSelect) procesadoSelect.value = urlProcesado;
+
+        // Reemplazar el evento de envío del formulario
+        filterForm.onsubmit = function(e) {
+            e.preventDefault();
+
+            // Obtener valores actuales
+            var searchValue = searchInput ? searchInput.value : '';
+            var printedValue = printedSelect ? printedSelect.value : '';
+            var procesadoValue = procesadoSelect ? procesadoSelect.value : '';
+
+            console.log('Valores de filtro actuales:', {
+                search: searchValue,
+                printed: printedValue,
+                procesado: procesadoValue
+            });
+
+            // Construir URL con URLSearchParams para manejar mejor los parámetros
+            var baseUrl = '<?= $this->url('orders', ['action' => 'orders-detail', 'table' => $table]) ?>';
+            var params = new URLSearchParams();
+
+            // Solo agregar parámetros si tienen valor (importante para search)
+            if (searchValue) params.append('search', searchValue);
+
+            // Siempre incluir estos valores, incluso si están vacíos
+            params.append('printed', printedValue);
+            params.append('procesado', procesadoValue);
+
+            // Incluir filtros avanzados si están visibles y tienen valor
+            if (document.getElementById('advanced-filters').style.display !== 'none') {
+                var dateFrom = document.getElementById('date_from')?.value;
+                var dateTo = document.getElementById('date_to')?.value;
+                var transportista = document.getElementById('transportista')?.value;
+
+                if (dateFrom) params.append('date_from', dateFrom);
+                if (dateTo) params.append('date_to', dateTo);
+                if (transportista) params.append('transportista', transportista);
+            }
+
+            // Reestablecer a la primera página
+            params.append('page', '1');
+
+            // Redirigir con todos los parámetros
+            var url = baseUrl + '?' + params.toString();
+            console.log('Redirigiendo a:', url);
+            window.location.href = url;
+        };
+    }
+
+    // 3. SOLUCIÓN PARA ACCIONES EN LOTE
+    // Reemplazar el evento de los botones de acción
+    var actionButtons = document.querySelectorAll('.bulk-action');
+    for (var i = 0; i < actionButtons.length; i++) {
+        actionButtons[i].onclick = function() {
+            var action = this.getAttribute('data-action');
+            var selectedOrders = [];
+            var checkboxes = document.querySelectorAll('.order-checkbox:checked');
+
+            if (checkboxes.length === 0) {
+                alert('Por favor, selecciona al menos una orden');
+                return;
+            }
+
+            // Recoger órdenes seleccionadas
+            for (var j = 0; j < checkboxes.length; j++) {
+                selectedOrders.push({
+                    id: checkboxes[j].value,
+                    table: checkboxes[j].getAttribute('data-table')
+                });
+            }
+
+            // Crear formulario para procesar
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '<?= $this->url('bulk-orders') ?>';
+            form.target = '_blank';
+
+            // Agregar campo de acción
+            var actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'action';
+            actionInput.value = action;
+            form.appendChild(actionInput);
+
+            // Agregar órdenes seleccionadas
+            for (var k = 0; k < selectedOrders.length; k++) {
+                var idInput = document.createElement('input');
+                idInput.type = 'hidden';
+                idInput.name = 'orderIds[]';
+                idInput.value = selectedOrders[k].id;
+                form.appendChild(idInput);
+
+                var tableInput = document.createElement('input');
+                tableInput.type = 'hidden';
+                tableInput.name = 'orderTables[]';
+                tableInput.value = selectedOrders[k].table;
+                form.appendChild(tableInput);
+            }
+
+            // Enviar formulario
+            document.body.appendChild(form);
+            form.submit();
+            document.body.removeChild(form);
+        };
+    }
+
+    console.log('Soluciones de emergencia aplicadas');
+}
+
+// Ejecutar después de que la página se haya cargado completamente
+document.addEventListener('DOMContentLoaded', emergencyFix);
+</script>
+
+<!-- Estilos personalizados para la página -->
+<style>
+.empty-state {
+    padding: 2rem;
+    text-align: center;
+}
+
+.pagination-container {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.25rem;
+}
+
+.pagination-text {
+    display: flex;
+    align-items: center;
+    font-weight: bold;
+}
+
+/* Corrección para que los dropdowns se muestren por encima de la tabla */
+.dropdown-menu {
+    z-index: 1050 !important;
+    position: absolute;
+}
+
+/* Asegurar que la tabla no oculte elementos */
+.table-responsive {
+    overflow: visible !important;
+}
+
+/* Establecer overflow visible en contenedores necesarios */
+.card-body {
+    overflow: visible !important;
+}
+
+.dropdown-item {
+    cursor: pointer;
+}
+
+.card {
+    overflow: visible !important;
+}
+
+.cursor-pointer {
+    cursor: pointer;
+}
+
+@media (max-width: 767.98px) {
+    .pagination-container {
+        justify-content: center;
+        margin-top: 1rem;
+    }
+}
+</style>

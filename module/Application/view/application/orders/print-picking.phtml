@@ -1,0 +1,374 @@
+<?php
+/**
+ * @var Laminas\View\Renderer\PhpRenderer $this
+ */
+$this->headTitle('Lista de Picking');
+
+// Estilos para vista de impresión
+$this->headStyle()->captureStart();
+?>
+@media print {
+    @page {
+        size: A4 landscape;
+        margin: 10mm;
+    }
+    body {
+        margin: 0;
+        padding: 0;
+    }
+    .no-print {
+        display: none !important;
+    }
+    .print-footer {
+        display: none;
+    }
+    .table-container {
+        overflow: visible !important;
+    }
+    .picking-lista {
+        border: none;
+        box-shadow: none;
+    }
+}
+
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f0f0f0;
+}
+
+.picking-lista {
+    width: 297mm;
+    min-height: 180mm;
+    padding: 10mm;
+    margin: 10mm auto;
+    background-color: white;
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+.cabecera {
+    border-bottom: 2px solid #000;
+    padding-bottom: 5mm;
+    margin-bottom: 8mm;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo-area {
+    width: 40%;
+}
+
+.logo-area img {
+    max-width: 100%;
+    max-height: 40px;
+}
+
+.doc-info {
+    text-align: right;
+}
+
+.doc-title {
+    font-weight: bold;
+    font-size: 18pt;
+    color: #333;
+    margin-bottom: 2mm;
+}
+
+.doc-date {
+    font-size: 10pt;
+}
+
+.instrucciones {
+    margin-bottom: 8mm;
+    padding: 3mm;
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+}
+
+.instrucciones h3 {
+    margin-top: 0;
+    font-size: 12pt;
+}
+
+.instrucciones ul {
+    margin: 0;
+    padding-left: 5mm;
+}
+
+.tabla-productos {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 8mm;
+}
+
+.tabla-productos th {
+    background-color: #f2f2f2;
+    border: 1px solid #ddd;
+    padding: 2.5mm;
+    text-align: left;
+    font-size: 10pt;
+}
+
+.tabla-productos td {
+    border: 1px solid #ddd;
+    padding: 2.5mm;
+    font-size: 10pt;
+}
+
+.tabla-productos .text-right {
+    text-align: right;
+}
+
+.tabla-productos .text-center {
+    text-align: center;
+}
+
+.tabla-productos .check-column {
+    width: 5%;
+}
+
+.tabla-productos .ubicacion-column {
+    width: 10%;
+}
+
+.tabla-productos .sku-column {
+    width: 15%;
+}
+
+.tabla-productos .producto-column {
+    width: 30%;
+}
+
+.tabla-productos .cantidad-column {
+    width: 10%;
+    text-align: center;
+}
+
+.tabla-productos .ordenes-column {
+    width: 30%;
+}
+
+.subtitulo {
+    font-size: 14pt;
+    margin: 8mm 0 4mm 0;
+    padding-bottom: 2mm;
+    border-bottom: 1px solid #ddd;
+}
+
+.resumen {
+    margin-top: 5mm;
+}
+
+.resumen table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.resumen table th {
+    background-color: #f2f2f2;
+    border: 1px solid #ddd;
+    padding: 2mm;
+    text-align: left;
+    font-size: 9pt;
+}
+
+.resumen table td {
+    border: 1px solid #ddd;
+    padding: 2mm;
+    font-size: 9pt;
+}
+
+.footer {
+    margin-top: 10mm;
+    padding-top: 3mm;
+    border-top: 1px solid #ddd;
+    font-size: 8pt;
+    color: #666;
+    text-align: center;
+}
+
+.no-print {
+    text-align: center;
+    margin: 20px 0;
+}
+
+.check-box {
+    width: 4mm;
+    height: 4mm;
+    border: 1px solid #000;
+    display: inline-block;
+    margin-right: 1mm;
+}
+
+.firma-area {
+    margin-top: 15mm;
+    padding-top: 5mm;
+    border-top: 1px solid #ddd;
+    display: flex;
+    justify-content: space-between;
+}
+
+.firma {
+    width: 45%;
+    text-align: center;
+}
+
+.firma-linea {
+    margin: 10mm auto 3mm auto;
+    width: 80%;
+    border-bottom: 1px solid #000;
+}
+
+.table-container {
+    overflow-x: auto;
+}
+
+<?php $this->headStyle()->captureEnd(); ?>
+
+<div class="no-print">
+    <div class="container text-center py-4">
+        <h1>Lista de Picking</h1>
+        <p class="text-muted">Lista para <?= count($orders) ?> órdenes, con un total de <?= count($productList) ?> productos. Generado el <?= date('d/m/Y H:i', strtotime($fechaGeneracion)) ?></p>
+        <button class="btn btn-primary" onclick="window.print()"><i class="fas fa-print me-2"></i> Imprimir Lista de Picking</button>
+        <a href="javascript:history.back()" class="btn btn-outline-secondary ms-2"><i class="fas fa-arrow-left me-2"></i> Volver</a>
+    </div>
+</div>
+
+<div class="picking-lista">
+    <div class="cabecera">
+        <div class="logo-area">
+            <img src="/img/logo.png" alt="Logo">
+            <div>Lodoro Analytics</div>
+        </div>
+        
+        <div class="doc-info">
+            <div class="doc-title">LISTA DE PICKING</div>
+            <div class="doc-date">Fecha: <?= date('d/m/Y', strtotime($fechaGeneracion)) ?></div>
+            <div>Total órdenes: <?= count($orders) ?></div>
+        </div>
+    </div>
+    
+    <div class="instrucciones">
+        <h3>Instrucciones</h3>
+        <ul>
+            <li>Recorre el almacén siguiendo el orden de ubicación.</li>
+            <li>Marca cada producto a medida que lo recoges.</li>
+            <li>Verifica la cantidad requerida de cada producto.</li>
+            <li>Agrupa los productos por orden según la lista de órdenes.</li>
+        </ul>
+    </div>
+    
+    <div class="subtitulo">Productos a Recoger</div>
+    
+    <div class="table-container">
+        <table class="tabla-productos">
+            <thead>
+                <tr>
+                    <th class="check-column">✓</th>
+                    <th class="ubicacion-column">Ubicación</th>
+                    <th class="sku-column">SKU</th>
+                    <th class="producto-column">Producto</th>
+                    <th class="cantidad-column">Cantidad</th>
+                    <th class="ordenes-column">Órdenes</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (empty($productList)): ?>
+                <tr>
+                    <td colspan="6" class="text-center">No hay productos para recoger</td>
+                </tr>
+                <?php else: ?>
+                    <?php foreach ($productList as $producto): ?>
+                    <tr>
+                        <td class="text-center"><div class="check-box"></div></td>
+                        <td><?= $this->escapeHtml($producto['ubicacion'] ?: '--') ?></td>
+                        <td><?= $this->escapeHtml($producto['sku']) ?></td>
+                        <td><?= $this->escapeHtml($producto['nombre']) ?></td>
+                        <td class="text-center"><strong><?= $producto['cantidad'] ?></strong></td>
+                        <td>
+                            <?php foreach ($producto['ordenes'] as $i => $orden): ?>
+                                <?php if ($i < 3): ?>
+                                    #<?= $this->escapeHtml($orden['order_number']) ?> (<?= strtoupper($this->escapeHtml($orden['marketplace'])) ?>)<?= $i < count($producto['ordenes']) - 1 ? ', ' : '' ?>
+                                <?php elseif ($i === 3): ?>
+                                    ... y <?= count($producto['ordenes']) - 3 ?> más
+                                    <?php break; ?>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="subtitulo">Resumen de Órdenes</div>
+    
+    <div class="resumen table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th width="15%">N° Orden</th>
+                    <th width="15%">Marketplace</th>
+                    <th width="15%">Fecha</th>
+                    <th width="55%">Productos</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($orders as $order): ?>
+                <tr>
+                    <td>#<?= $this->escapeHtml($order['order_number']) ?></td>
+                    <td><?= strtoupper($this->escapeHtml($order['marketplace'])) ?></td>
+                    <td><?= date('d/m/Y', strtotime($order['fecha'])) ?></td>
+                    <td>
+                        <?php
+                        // Encontrar productos para esta orden
+                        $orderProducts = [];
+                        foreach ($productList as $product) {
+                            foreach ($product['ordenes'] as $orderInfo) {
+                                if ($orderInfo['id'] == $order['id']) {
+                                    $orderProducts[] = $product['sku'] . ' (' . $product['nombre'] . ')';
+                                    break;
+                                }
+                            }
+                        }
+                        echo implode(', ', array_slice($orderProducts, 0, 3));
+                        if (count($orderProducts) > 3) {
+                            echo '... y ' . (count($orderProducts) - 3) . ' más';
+                        }
+                        ?>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="firma-area">
+        <div class="firma">
+            <div class="firma-linea"></div>
+            <div>Preparado por</div>
+        </div>
+        
+        <div class="firma">
+            <div class="firma-linea"></div>
+            <div>Verificado por</div>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>Documento generado el <?= date('d/m/Y H:i', strtotime($fechaGeneracion)) ?></p>
+        <p>Lodoro Analytics - Sistema de Gestión de Órdenes</p>
+    </div>
+</div>
+
+<div class="print-footer no-print">
+    <div class="container text-center py-4">
+        <button class="btn btn-primary" onclick="window.print()"><i class="fas fa-print me-2"></i> Imprimir Lista de Picking</button>
+        <a href="javascript:history.back()" class="btn btn-outline-secondary ms-2"><i class="fas fa-arrow-left me-2"></i> Volver</a>
+    </div>
+</div>

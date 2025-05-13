@@ -1,0 +1,588 @@
+<?php
+/**
+ * @var Laminas\View\Renderer\PhpRenderer $this
+ */
+?>
+
+<div class="container-fluid px-4">
+    <h1 class="mt-4">Configuración de Integraciones de Marketplaces</h1>
+    <ol class="breadcrumb mb-4">
+        <li class="breadcrumb-item"><a href="<?= $this->url('application', ['action' => 'dashboard']) ?>">Dashboard</a></li>
+        <li class="breadcrumb-item active">Configuración de Marketplaces</li>
+    </ol>
+    
+    <?php if (!empty($message)): ?>
+    <div class="alert alert-<?= $messageType ?> alert-dismissible fade show" role="alert">
+        <?= $this->escapeHtml($message) ?>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    <?php endif; ?>
+    
+    <!-- Cabecera con botón de nueva configuración -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h5 class="mb-0"><i class="fas fa-plug me-2"></i>Integraciones Disponibles</h5>
+            <p class="text-muted mb-0">Gestiona tus conexiones con diferentes marketplaces</p>
+        </div>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newConfigModal">
+            <i class="fas fa-plus me-1"></i> Nuevo Marketplace
+        </button>
+    </div>
+    
+    <!-- Vista de Tarjetas para Marketplaces -->
+    <?php if (empty($configs)): ?>
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>No hay configuraciones de marketplaces disponibles. Crea una nueva para comenzar.
+    </div>
+    <?php else: ?>
+    <div class="row">
+        <?php foreach ($configs as $config): ?>
+        <div class="col-lg-4 col-md-6 mb-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <!-- Cabecera de la tarjeta con el nombre del marketplace -->
+                <div class="card-header bg-gradient-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><?= $this->escapeHtml($config['marketplace']) ?></h5>
+                    <div class="badge bg-light text-dark">ID: <?= $this->escapeHtml($config['id']) ?></div>
+                </div>
+                
+                <div class="card-body">
+                    <div class="d-flex flex-column gap-3">
+                        <!-- URL de API -->
+                        <div class="api-detail">
+                            <div class="text-muted small mb-1"><i class="fas fa-link me-1"></i>URL de API</div>
+                            <div class="input-group">
+                                <input type="text" class="form-control form-control-sm bg-light" value="<?= $this->escapeHtml($config['api_url']) ?>" readonly>
+                                <button class="btn btn-outline-secondary btn-sm copy-btn" type="button" data-clipboard-text="<?= $this->escapeHtml($config['api_url']) ?>">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- API Key -->
+                        <div class="api-detail">
+                            <div class="text-muted small mb-1"><i class="fas fa-key me-1"></i>API Key</div>
+                            <div class="input-group">
+                                <input type="password" class="form-control form-control-sm bg-light" value="<?= $this->escapeHtml($config['api_key']) ?>" readonly>
+                                <button class="btn btn-outline-secondary btn-sm toggle-password" type="button">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm copy-btn" type="button" data-clipboard-text="<?= $this->escapeHtml($config['api_key']) ?>">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Access Token -->
+                        <div class="api-detail">
+                            <div class="text-muted small mb-1"><i class="fas fa-lock me-1"></i>Access Token</div>
+                            <?php if (!empty($config['accesstoken'])): ?>
+                            <div class="input-group">
+                                <input type="password" class="form-control form-control-sm bg-light" value="<?= $this->escapeHtml($config['accesstoken']) ?>" readonly>
+                                <button class="btn btn-outline-secondary btn-sm toggle-password" type="button">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm copy-btn" type="button" data-clipboard-text="<?= $this->escapeHtml($config['accesstoken']) ?>">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                            <?php else: ?>
+                            <div class="text-muted fst-italic">No definido</div>
+                            <?php endif; ?>
+                        </div>
+                        
+                        <!-- Offset -->
+                        <div class="api-detail">
+                            <div class="text-muted small mb-1"><i class="fas fa-sliders-h me-1"></i>Offset</div>
+                            <div class="badge bg-light text-dark"><?= $this->escapeHtml($config['offset']) ?></div>
+                        </div>
+                        
+                        <!-- Fechas -->
+                        <div class="api-detail">
+                            <div class="row gx-2">
+                                <div class="col-6">
+                                    <div class="text-muted small mb-1"><i class="fas fa-calendar-plus me-1"></i>Creado</div>
+                                    <div class="small"><?= $this->escapeHtml($config['created_at']) ?></div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="text-muted small mb-1"><i class="fas fa-calendar-check me-1"></i>Actualizado</div>
+                                    <div class="small"><?= $this->escapeHtml($config['update_at']) ?></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Footer con acciones -->
+                <div class="card-footer bg-light border-0 d-flex justify-content-between">
+                    <button type="button" class="btn btn-info btn-sm test-connection" data-id="<?= $this->escapeHtml($config['id']) ?>">
+                        <i class="fas fa-network-wired me-1"></i>Probar Conexión
+                    </button>
+                    <div>
+                        <button type="button" class="btn btn-warning btn-sm edit-config" 
+                                data-id="<?= $this->escapeHtml($config['id']) ?>"
+                                data-marketplace="<?= $this->escapeHtml($config['marketplace']) ?>"
+                                data-api-url="<?= $this->escapeHtml($config['api_url']) ?>"
+                                data-api-key="<?= $this->escapeHtml($config['api_key']) ?>"
+                                data-accesstoken="<?= $this->escapeHtml($config['accesstoken'] ?? '') ?>"
+                                data-offset="<?= $this->escapeHtml($config['offset']) ?>"
+                                data-bs-toggle="modal" data-bs-target="#editConfigModal">
+                            <i class="fas fa-edit me-1"></i>Editar
+                        </button>
+                        <a href="?delete=<?= $this->escapeHtml($config['id']) ?>" 
+                            class="btn btn-danger btn-sm" 
+                            onclick="return confirm('¿Está seguro de que desea eliminar la configuración para <?= $this->escapeHtml($config['marketplace']) ?>?')">
+                            <i class="fas fa-trash me-1"></i>Eliminar
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
+    
+    <!-- Vista de tabla alternativa (oculta por defecto) -->
+    <div class="card mb-4 mt-4 d-none" id="tableView">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <div>
+                <i class="fas fa-table me-1"></i>
+                Vista de Tabla
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-primary" id="toggleView">
+                <i class="fas fa-th-large me-1"></i>Ver como Tarjetas
+            </button>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Marketplace</th>
+                            <th>URL API</th>
+                            <th>API Key</th>
+                            <th>Access Token</th>
+                            <th>Offset</th>
+                            <th>Creado</th>
+                            <th>Actualizado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($configs)): ?>
+                        <tr>
+                            <td colspan="9" class="text-center">No hay configuraciones disponibles</td>
+                        </tr>
+                        <?php else: ?>
+                        <?php foreach ($configs as $config): ?>
+                        <tr>
+                            <td><?= $this->escapeHtml($config['id']) ?></td>
+                            <td><?= $this->escapeHtml($config['marketplace']) ?></td>
+                            <td><?= $this->escapeHtml($config['api_url']) ?></td>
+                            <td>
+                                <div class="input-group">
+                                    <input type="password" readonly class="form-control form-control-sm" value="<?= $this->escapeHtml($config['api_key']) ?>">
+                                    <button class="btn btn-outline-secondary btn-sm toggle-password" type="button">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                            </td>
+                            <td>
+                                <?php if (!empty($config['accesstoken'])): ?>
+                                <div class="input-group">
+                                    <input type="password" readonly class="form-control form-control-sm" value="<?= $this->escapeHtml($config['accesstoken']) ?>">
+                                    <button class="btn btn-outline-secondary btn-sm toggle-password" type="button">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                                <?php else: ?>
+                                <span class="text-muted">No definido</span>
+                                <?php endif; ?>
+                            </td>
+                            <td><?= $this->escapeHtml($config['offset']) ?></td>
+                            <td><?= $this->escapeHtml($config['created_at']) ?></td>
+                            <td><?= $this->escapeHtml($config['update_at']) ?></td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-info btn-sm test-connection" data-id="<?= $this->escapeHtml($config['id']) ?>">
+                                        <i class="fas fa-network-wired"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-warning btn-sm edit-config" 
+                                            data-id="<?= $this->escapeHtml($config['id']) ?>"
+                                            data-marketplace="<?= $this->escapeHtml($config['marketplace']) ?>"
+                                            data-api-url="<?= $this->escapeHtml($config['api_url']) ?>"
+                                            data-api-key="<?= $this->escapeHtml($config['api_key']) ?>"
+                                            data-accesstoken="<?= $this->escapeHtml($config['accesstoken'] ?? '') ?>"
+                                            data-offset="<?= $this->escapeHtml($config['offset']) ?>"
+                                            data-bs-toggle="modal" data-bs-target="#editConfigModal">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <a href="?delete=<?= $this->escapeHtml($config['id']) ?>" 
+                                       class="btn btn-danger btn-sm" 
+                                       onclick="return confirm('¿Está seguro de que desea eliminar esta configuración?')">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Nueva Configuración -->
+<div class="modal fade" id="newConfigModal" tabindex="-1" aria-labelledby="newConfigModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="newConfigModalLabel">Nueva Configuración de Marketplace</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="marketplace" class="form-label">Nombre del Marketplace</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-shopping-cart"></i></span>
+                            <input type="text" class="form-control" id="marketplace" name="marketplace" placeholder="Ej: Amazon, eBay, MercadoLibre" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="api_url" class="form-label">URL de API</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-link"></i></span>
+                            <input type="url" class="form-control" id="api_url" name="api_url" placeholder="https://api.ejemplo.com/v1" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="api_key" class="form-label">API Key</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-key"></i></span>
+                            <input type="text" class="form-control" id="api_key" name="api_key" placeholder="Ingrese su API Key" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="accesstoken" class="form-label">Access Token (opcional)</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                            <input type="text" class="form-control" id="accesstoken" name="accesstoken" placeholder="Ingrese su Access Token (si aplica)">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="offset" class="form-label">Offset</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-sliders-h"></i></span>
+                            <input type="number" class="form-control" id="offset" name="offset" value="0">
+                        </div>
+                        <div class="form-text">Valor de desplazamiento para la paginación de resultados</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i>Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Editar Configuración -->
+<div class="modal fade" id="editConfigModal" tabindex="-1" aria-labelledby="editConfigModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post">
+                <input type="hidden" id="edit_id" name="id">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title" id="editConfigModalLabel">Editar Configuración de Marketplace</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="edit_marketplace" class="form-label">Nombre del Marketplace</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-shopping-cart"></i></span>
+                            <input type="text" class="form-control" id="edit_marketplace" name="marketplace" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_api_url" class="form-label">URL de API</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-link"></i></span>
+                            <input type="url" class="form-control" id="edit_api_url" name="api_url" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_api_key" class="form-label">API Key</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-key"></i></span>
+                            <input type="text" class="form-control" id="edit_api_key" name="api_key" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_accesstoken" class="form-label">Access Token (opcional)</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                            <input type="text" class="form-control" id="edit_accesstoken" name="accesstoken">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_offset" class="form-label">Offset</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-sliders-h"></i></span>
+                            <input type="number" class="form-control" id="edit_offset" name="offset" value="0">
+                        </div>
+                        <div class="form-text">Valor de desplazamiento para la paginación de resultados</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="fas fa-save me-1"></i>Actualizar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Resultado de Prueba de Conexión -->
+<div class="modal fade" id="connectionTestModal" tabindex="-1" aria-labelledby="connectionTestModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="connectionTestModalLabel">Resultado de Prueba de Conexión</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="connectionTestLoading" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                    <p class="mt-3">Probando conexión, por favor espere...</p>
+                </div>
+                
+                <div id="connectionTestResult" class="d-none">
+                    <div class="alert d-flex align-items-center" id="connectionTestAlert" role="alert">
+                        <div id="connectionTestIcon" class="me-3"></div>
+                        <div id="connectionTestMessage"></div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Código de Respuesta</label>
+                        <input type="text" class="form-control" id="connectionTestStatusCode" readonly>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Detalles de la Respuesta</label>
+                        <textarea class="form-control font-monospace" id="connectionTestResponseBody" rows="8" readonly></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Estilos personalizados -->
+<style>
+.bg-gradient-primary {
+    background: linear-gradient(135deg, var(--primary) 0%, #5E7FEE 100%);
+}
+
+.api-detail {
+    position: relative;
+    padding-bottom: 0.5rem;
+}
+
+.card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1) !important;
+}
+
+.copy-btn:hover {
+    background-color: #e9ecef;
+}
+
+.copy-btn.copied {
+    background-color: #4CAF50;
+    color: white;
+}
+</style>
+
+<!-- JavaScript para la página con mejoras para prueba de conexión -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Función para alternar visibilidad de contraseñas/tokens
+    document.querySelectorAll('.toggle-password').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const input = this.previousElementSibling;
+            const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
+            input.setAttribute('type', type);
+            this.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
+        });
+    });
+    
+    // Configurar modal de edición
+    document.querySelectorAll('.edit-config').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const id = this.getAttribute('data-id');
+            const marketplace = this.getAttribute('data-marketplace');
+            const apiUrl = this.getAttribute('data-api-url');
+            const apiKey = this.getAttribute('data-api-key');
+            const accessToken = this.getAttribute('data-accesstoken');
+            const offset = this.getAttribute('data-offset');
+            
+            document.getElementById('edit_id').value = id;
+            document.getElementById('edit_marketplace').value = marketplace;
+            document.getElementById('edit_api_url').value = apiUrl;
+            document.getElementById('edit_api_key').value = apiKey;
+            document.getElementById('edit_accesstoken').value = accessToken;
+            document.getElementById('edit_offset').value = offset;
+        });
+    });
+    
+    // Función para alternar entre vista de tarjetas y tabla
+    const toggleViewBtn = document.getElementById('toggleView');
+    const tableView = document.getElementById('tableView');
+    const cardsView = document.querySelector('.row'); // Contenedor de tarjetas
+    
+    if (toggleViewBtn) {
+        toggleViewBtn.addEventListener('click', function() {
+            tableView.classList.toggle('d-none');
+            cardsView.classList.toggle('d-none');
+            
+            if (tableView.classList.contains('d-none')) {
+                toggleViewBtn.innerHTML = '<i class="fas fa-table me-1"></i>Ver como Tabla';
+            } else {
+                toggleViewBtn.innerHTML = '<i class="fas fa-th-large me-1"></i>Ver como Tarjetas';
+            }
+        });
+    }
+    
+    // Funcionalidad de botones de copiar
+    document.querySelectorAll('.copy-btn').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const text = this.getAttribute('data-clipboard-text');
+            navigator.clipboard.writeText(text).then(() => {
+                const originalHTML = this.innerHTML;
+                this.innerHTML = '<i class="fas fa-check"></i>';
+                this.classList.add('copied');
+                
+                setTimeout(() => {
+                    this.innerHTML = originalHTML;
+                    this.classList.remove('copied');
+                }, 2000);
+            });
+        });
+    });
+    
+    // Configurar botones de prueba de conexión
+    document.querySelectorAll('.test-connection').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const id = this.getAttribute('data-id');
+            const configElement = button.closest('.card') || button.closest('tr');
+            
+            // Obtener el nombre del marketplace directamente de la UI
+            let marketplace = '';
+            const cardHeader = configElement.querySelector('.card-header h5');
+            const tableCell = configElement.querySelector('td:nth-child(2)');
+            
+            if (cardHeader) {
+                marketplace = cardHeader.textContent.trim();
+            } else if (tableCell) {
+                marketplace = tableCell.textContent.trim();
+            }
+            
+            testConnection(id, marketplace);
+        });
+    });
+    
+    function testConnection(id, marketplace) {
+        // Mostrar modal con loader
+        const connectionTestModal = new bootstrap.Modal(document.getElementById('connectionTestModal'));
+        connectionTestModal.show();
+        
+        // Mostrar cargando y ocultar resultados
+        document.getElementById('connectionTestLoading').classList.remove('d-none');
+        document.getElementById('connectionTestResult').classList.add('d-none');
+        
+        // Determinar si se trata de un marketplace especial para proceso especial
+        let specialParam = '';
+        
+        // Verificar cada marketplace por nombre
+        if (marketplace.toLowerCase().includes('walmart')) {
+            specialParam = 'walmart';
+        } else if (marketplace.toLowerCase().includes('mercadolibre')) {
+            specialParam = 'mercadolibre';
+        }
+        
+        // Construir la URL con parámetros adicionales si es necesario
+        let finalUrl = `<?= $this->url('application', ['action' => 'test-connection']) ?>?id=${id}`;
+        if (specialParam) {
+            finalUrl += `&special=${specialParam}`;
+        }
+        
+        // Realizar solicitud AJAX
+        fetch(finalUrl)
+            .then(response => response.json())
+            .then(data => {
+                // Ocultar cargando y mostrar resultados
+                document.getElementById('connectionTestLoading').classList.add('d-none');
+                document.getElementById('connectionTestResult').classList.remove('d-none');
+                
+                // Mostrar resultados
+                const alertElement = document.getElementById('connectionTestAlert');
+                const iconElement = document.getElementById('connectionTestIcon');
+                const messageElement = document.getElementById('connectionTestMessage');
+                const statusCodeElement = document.getElementById('connectionTestStatusCode');
+                const responseBodyElement = document.getElementById('connectionTestResponseBody');
+                
+                // Limpiar clases anteriores
+                alertElement.classList.remove('alert-success', 'alert-danger');
+                
+                // Configurar el tipo de alerta y el ícono
+                if (data.success) {
+                    alertElement.classList.add('alert-success');
+                    iconElement.innerHTML = '<i class="fas fa-check-circle fa-2x"></i>';
+                } else {
+                    alertElement.classList.add('alert-danger');
+                    iconElement.innerHTML = '<i class="fas fa-exclamation-circle fa-2x"></i>';
+                }
+                
+                // Mostrar mensaje y detalles
+                messageElement.textContent = data.message;
+                statusCodeElement.value = data.statusCode || 'N/A';
+                responseBodyElement.value = data.responseBody || 'No hay datos de respuesta disponibles';
+            })
+            .catch(error => {
+                // Ocultar cargando y mostrar resultados con error
+                document.getElementById('connectionTestLoading').classList.add('d-none');
+                document.getElementById('connectionTestResult').classList.remove('d-none');
+                
+                const alertElement = document.getElementById('connectionTestAlert');
+                const iconElement = document.getElementById('connectionTestIcon');
+                const messageElement = document.getElementById('connectionTestMessage');
+                
+                alertElement.classList.remove('alert-success');
+                alertElement.classList.add('alert-danger');
+                iconElement.innerHTML = '<i class="fas fa-exclamation-triangle fa-2x"></i>';
+                messageElement.textContent = 'Error al realizar la prueba: ' + error.message;
+                
+                document.getElementById('connectionTestStatusCode').value = 'Error';
+                document.getElementById('connectionTestResponseBody').value = 'No se pudo completar la solicitud.';
+            });
+    }
+});
+</script>

@@ -1,22 +1,35 @@
 :root {
     --brand-color: #013755;
 }
+/* Eliminar completamente cualquier backdrop modal */
 .modal-backdrop {
-    z-index: 1040 !important;
+    display: none !important;
+    opacity: 0 !important;
+    background: transparent !important;
 }
 
 .modal {
-    z-index: 1050 !important;
+    position: relative !important;
+    padding: 0 !important;
+    background: transparent !important;
+    z-index: auto !important;
 }
 
 .modal-content {
-    z-index: 1060 !important;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.2) !important;
+    border: 1px solid #ccc !important;
 }
-.modal.show {
-    z-index: 99999 !important;
+
+/* Asegurar que nada está bloqueando la interacción */
+body.modal-open {
+    overflow: auto !important;
+    padding-right: 0 !important;
+    pointer-events: auto !important;
 }
-.modal-backdrop.show {
-    z-index: 9999 !important;
+
+/* Permitir selección en todo el documento */
+body, html, * {
+    pointer-events: auto !important;
 }
 .navbar {
     background-color: var(--brand-color);
@@ -260,7 +273,6 @@ body {
     font-style: italic;
     text-align: center;
     padding: 30px;
-    background-color: rgba(0, 0, 0, 0.03);
     border-radius: 4px;
 }
 
@@ -282,10 +294,6 @@ body {
     z-index: 1040 !important;
 }
 
-.modal-backdrop {
-    background-color: rgba(0, 0, 0, 0.5);
-    z-index: 1040 !important;
-}
 
 #liquidationModal .modal-dialog {
     z-index: 1051 !important;
@@ -310,19 +318,7 @@ body {
     color: #212529;
 }
 
-/* Estilos para el loader */
-.loading-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-}
+
 
 .loading-content {
     background: white;
@@ -1156,35 +1152,203 @@ body {
 }
 
 @media print {
-    .btn, .card-title, .timeline {
+    /* Ocultar elementos innecesarios para impresión */
+    .btn, .card-title, .timeline,
+    .navbar, .header-content, .filters-panel,
+    #eanScanner, #scanEanBtn, #eanResult,
+    #advanced-filters, #toggle-filters, #clear-filters,
+    .action-buttons, .dropdown-menu, .dropdown-toggle,
+    .filters-header, .footer-right, .order-checkbox,
+    .pagination-container, #select-all, .search-box,
+    .form-check, .search-input, .per-page,
+    .table-card-footer, .empty-state-icon, .page-size {
         display: none !important;
     }
-    
+
+    /* Elementos que siempre deben mostrarse */
+    .show-in-print {
+        display: block !important;
+    }
+
+    /* Estilos generales */
+    body {
+        font-size: 12pt;
+        line-height: 1.3;
+        color: #000;
+        background: #fff;
+        margin: 0;
+        padding: 0;
+        width: 100%;
+    }
+
+    /* Ajustar contenedores */
+    .container-fluid, .container {
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
     .card {
         border: none !important;
         box-shadow: none !important;
+        margin-bottom: 10mm !important;
+        break-inside: avoid;
     }
-    
-    .container-fluid {
+
+    .card-body {
         padding: 0 !important;
     }
-    
-    .row {
-        margin: 0 !important;
-    }
-    
-    .col-lg-8, .col-lg-4 {
+
+    /* Ancho de columnas */
+    .col-lg-8, .col-lg-4, .col-md-6, .col-sm-12 {
         width: 100% !important;
         max-width: 100% !important;
+        flex: 0 0 100% !important;
     }
-    
-    #eanScanner, #scanEanBtn, #eanResult {
-        display: none !important;
+
+    /* Tablas */
+    .table {
+        border-collapse: collapse !important;
+        width: 100% !important;
+    }
+
+    .table td,
+    .table th {
+        padding: 8pt !important;
+        border: 1px solid #ddd !important;
+    }
+
+    /* Saltos de página específicos */
+    .page-break-before {
+        page-break-before: always !important;
+    }
+
+    .page-break-after {
+        page-break-after: always !important;
+    }
+
+    .avoid-break {
+        page-break-inside: avoid !important;
+    }
+
+    /* Etiquetas */
+    .label-container {
+        page-break-inside: avoid !important;
+        margin-bottom: 5mm !important;
+        border: 1px solid #000 !important;
+        padding: 5mm !important;
+    }
+
+    /* Documentos de picking y packing */
+    .product-item {
+        page-break-inside: avoid !important;
+    }
+
+    /* Encabezados de facturas y documentos */
+    .invoice-header, .document-header {
+        margin-bottom: 5mm !important;
+        border-bottom: 1px solid #000 !important;
+        padding-bottom: 3mm !important;
+    }
+
+    /* Pie de página */
+    .document-footer {
+        margin-top: 10mm !important;
+        border-top: 1px solid #000 !important;
+        padding-top: 3mm !important;
+        font-size: 8pt !important;
+    }
+
+    /* Fondos de colores */
+    .bg-light, .bg-primary, .bg-success, .bg-info, .bg-warning, .bg-danger {
+        background-color: transparent !important;
+        color: #000 !important;
+    }
+
+    /* Estilos para código de barras */
+    .code {
+        text-align: center !important;
+        margin: 5mm auto !important;
+        padding: 2mm !important;
+        font-size: 16pt !important;
+        font-weight: bold !important;
+        letter-spacing: 0.5mm !important;
     }
 }
 /* Para asegurarse de que los botones dentro de cards también se vean bien */
 .card .btn {
     transition: all var(--transition-speed) ease;
+}
+
+/* Correcciones para dropdowns sobre tablas */
+.dropdown-menu {
+    z-index: 9999 !important;
+    position: absolute !important;
+}
+
+.table-responsive {
+    overflow: visible !important;
+}
+
+.card-body {
+    overflow: visible !important;
+}
+
+.dropdown-toggle::after {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.dropdown {
+    position: relative !important;
+}
+
+.btn-group {
+    position: relative !important;
+    z-index: 1050 !important;
+}
+
+/* Arreglo para botones dropdown en tablas */
+.table .dropdown-menu {
+    margin-top: 0.5rem !important;
+}
+
+.table th {
+    position: relative !important;
+    z-index: 900 !important;
+}
+
+.table td {
+    position: relative !important;
+    z-index: 950 !important;
+}
+
+.table .btn-group {
+    z-index: 1050 !important;
+}
+
+/* Estilos para productos en la tabla */
+.product-listing {
+    font-size: 0.85rem;
+    line-height: 1.2;
+}
+
+.product-listing .product-sku {
+    font-weight: bold;
+    display: block;
+}
+
+/* Estilos para códigos en etiquetas */
+.code {
+    font-family: monospace;
+    font-size: 18px;
+    font-weight: bold;
+    padding: 10px;
+    border: 2px solid #000;
+    background-color: #fff;
+    display: inline-block;
+    margin: 5px 0;
+    letter-spacing: 2px;
 }
 
 

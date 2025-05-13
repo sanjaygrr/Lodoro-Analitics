@@ -1,0 +1,348 @@
+<?php
+/**
+ * @var Laminas\View\Renderer\PhpRenderer $this
+ */
+$this->headTitle('Lista de Packing');
+
+// Estilos para vista de impresión
+$this->headStyle()->captureStart();
+?>
+@media print {
+    @page {
+        size: A4;
+        margin: 10mm;
+    }
+    body {
+        margin: 0;
+        padding: 0;
+    }
+    .order-packing {
+        page-break-after: always;
+    }
+    .no-print {
+        display: none !important;
+    }
+    .print-footer {
+        display: none;
+    }
+    .packing-list {
+        border: none;
+        box-shadow: none;
+    }
+}
+
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f0f0f0;
+}
+
+.packing-list {
+    width: 210mm;
+    min-height: 240mm;
+    padding: 10mm;
+    margin: 10mm auto;
+    background-color: white;
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+.cabecera {
+    border-bottom: 2px solid #000;
+    padding-bottom: 5mm;
+    margin-bottom: 5mm;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo-area {
+    width: 40%;
+}
+
+.logo-area img {
+    max-width: 100%;
+    max-height: 40px;
+}
+
+.doc-info {
+    text-align: right;
+}
+
+.doc-title {
+    font-weight: bold;
+    font-size: 16pt;
+    color: #333;
+    margin-bottom: 2mm;
+}
+
+.order-info {
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    padding: 3mm;
+    margin: 5mm 0;
+}
+
+.order-info-title {
+    font-weight: bold;
+    font-size: 12pt;
+    margin-bottom: 2mm;
+}
+
+.cliente-info {
+    margin: 5mm 0;
+    display: flex;
+    justify-content: space-between;
+}
+
+.cliente-data {
+    width: 48%;
+}
+
+.cliente-label {
+    font-weight: bold;
+    font-size: 9pt;
+    color: #666;
+    text-transform: uppercase;
+}
+
+.cliente-value {
+    font-size: 10pt;
+    margin-bottom: 2mm;
+}
+
+.subtitulo {
+    font-size: 12pt;
+    margin: 8mm 0 3mm 0;
+    padding-bottom: 2mm;
+    border-bottom: 1px solid #ddd;
+}
+
+.tabla-productos {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 8mm;
+}
+
+.tabla-productos th {
+    background-color: #f2f2f2;
+    border: 1px solid #ddd;
+    padding: 2.5mm;
+    text-align: left;
+    font-size: 9pt;
+}
+
+.tabla-productos td {
+    border: 1px solid #ddd;
+    padding: 2.5mm;
+    font-size: 9pt;
+}
+
+.tabla-productos .text-right {
+    text-align: right;
+}
+
+.tabla-productos .text-center {
+    text-align: center;
+}
+
+.tabla-productos .check-column {
+    width: 5%;
+}
+
+.instrucciones-area {
+    margin: 8mm 0;
+    padding: 3mm;
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+}
+
+.instrucciones-area h3 {
+    margin-top: 0;
+    font-size: 11pt;
+}
+
+.notas-area {
+    margin-top: 5mm;
+    padding: 3mm;
+    background-color: #fff9e6;
+    border: 1px solid #ffe0b2;
+    border-radius: 3px;
+}
+
+.firma-area {
+    margin-top: 15mm;
+    padding-top: 5mm;
+    border-top: 1px solid #ddd;
+    display: flex;
+    justify-content: space-between;
+}
+
+.firma {
+    width: 45%;
+    text-align: center;
+}
+
+.firma-linea {
+    margin: 10mm auto 3mm auto;
+    width: 80%;
+    border-bottom: 1px solid #000;
+}
+
+.footer {
+    margin-top: 8mm;
+    padding-top: 3mm;
+    border-top: 1px solid #ddd;
+    font-size: 8pt;
+    color: #666;
+    text-align: center;
+}
+
+.check-box {
+    width: 4mm;
+    height: 4mm;
+    border: 1px solid #000;
+    display: inline-block;
+    margin-right: 1mm;
+}
+
+.no-print {
+    text-align: center;
+    margin: 20px 0;
+}
+
+<?php $this->headStyle()->captureEnd(); ?>
+
+<div class="no-print">
+    <div class="container text-center py-4">
+        <h1>Lista de Packing</h1>
+        <p class="text-muted">Lista de empaque para <?= count($orders) ?> órdenes. Generado el <?= date('d/m/Y H:i', strtotime($fechaGeneracion)) ?></p>
+        <button class="btn btn-primary" onclick="window.print()"><i class="fas fa-print me-2"></i> Imprimir Lista de Packing</button>
+        <a href="javascript:history.back()" class="btn btn-outline-secondary ms-2"><i class="fas fa-arrow-left me-2"></i> Volver</a>
+    </div>
+</div>
+
+<?php foreach ($orders as $i => $order): ?>
+<div class="order-packing packing-list">
+    <div class="cabecera">
+        <div class="logo-area">
+            <img src="/img/logo.png" alt="Logo">
+            <div>Lodoro Analytics</div>
+        </div>
+        
+        <div class="doc-info">
+            <div class="doc-title">HOJA DE PACKING</div>
+            <div>Fecha: <?= date('d/m/Y', strtotime($fechaGeneracion)) ?></div>
+            <div>Orden: <?= $i + 1 ?> de <?= count($orders) ?></div>
+        </div>
+    </div>
+    
+    <div class="order-info">
+        <div class="order-info-title">Información de la Orden</div>
+        <div><strong>Número de Orden:</strong> <?= $this->escapeHtml($order['order_number']) ?></div>
+        <div><strong>Marketplace:</strong> <?= strtoupper($this->escapeHtml($order['marketplace'])) ?></div>
+        <div><strong>Fecha:</strong> <?= date('d/m/Y', strtotime($order['fecha'])) ?></div>
+        <?php if (!empty($order['transportista'])): ?>
+        <div><strong>Transportista:</strong> <?= $this->escapeHtml($order['transportista']) ?></div>
+        <?php endif; ?>
+        <?php if (!empty($order['metodo_envio'])): ?>
+        <div><strong>Método de Envío:</strong> <?= $this->escapeHtml($order['metodo_envio']) ?></div>
+        <?php endif; ?>
+    </div>
+    
+    <div class="cliente-info">
+        <div class="cliente-data">
+            <div class="cliente-label">Cliente:</div>
+            <div class="cliente-value"><?= $this->escapeHtml($order['cliente']['nombre']) ?></div>
+            
+            <div class="cliente-label">RUT:</div>
+            <div class="cliente-value"><?= $this->escapeHtml($order['cliente']['rut'] ?: 'N/A') ?></div>
+        </div>
+        
+        <div class="cliente-data">
+            <div class="cliente-label">Dirección de Envío:</div>
+            <div class="cliente-value"><?= nl2br($this->escapeHtml($order['cliente']['direccion'])) ?></div>
+            
+            <div class="cliente-label">Teléfono:</div>
+            <div class="cliente-value"><?= $this->escapeHtml($order['cliente']['telefono'] ?: 'N/A') ?></div>
+        </div>
+    </div>
+    
+    <div class="subtitulo">Lista de Productos para Empaquetar</div>
+    
+    <table class="tabla-productos">
+        <thead>
+            <tr>
+                <th class="check-column">✓</th>
+                <th width="15%">SKU</th>
+                <th width="40%">Producto</th>
+                <th width="10%" class="text-center">Cantidad</th>
+                <th width="15%" class="text-center">Verificado</th>
+                <th width="15%" class="text-center">Empacado</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php if (empty($order['productos'])): ?>
+            <tr>
+                <td colspan="6" class="text-center">No hay productos para empacar</td>
+            </tr>
+            <?php else: ?>
+                <?php foreach ($order['productos'] as $producto): ?>
+                <tr>
+                    <td class="text-center"><div class="check-box"></div></td>
+                    <td><?= $this->escapeHtml($producto['sku'] ?? '') ?></td>
+                    <td><?= $this->escapeHtml($producto['nombre'] ?? $producto['name'] ?? 'Producto') ?></td>
+                    <td class="text-center"><strong><?= $producto['cantidad'] ?? 1 ?></strong></td>
+                    <td class="text-center"><div class="check-box"></div></td>
+                    <td class="text-center"><div class="check-box"></div></td>
+                </tr>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </tbody>
+    </table>
+    
+    <div class="instrucciones-area">
+        <h3>Instrucciones de Empaque</h3>
+        <ul>
+            <li>Verifica que todos los productos estén en buen estado antes de empacarlos.</li>
+            <li>Utiliza material protector adecuado para productos frágiles.</li>
+            <li>Asegúrate de incluir todos los accesorios y documentación correspondiente.</li>
+            <li>Sella el paquete adecuadamente y adhiere la etiqueta de envío.</li>
+        </ul>
+    </div>
+    
+    <?php if (!empty($order['notas'])): ?>
+    <div class="notas-area">
+        <h3>Notas Especiales</h3>
+        <p><?= nl2br($this->escapeHtml($order['notas'])) ?></p>
+    </div>
+    <?php endif; ?>
+    
+    <div class="firma-area">
+        <div class="firma">
+            <div class="firma-linea"></div>
+            <div>Empacado por</div>
+        </div>
+        
+        <div class="firma">
+            <div class="firma-linea"></div>
+            <div>Verificado por</div>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>Documento generado el <?= date('d/m/Y H:i', strtotime($fechaGeneracion)) ?></p>
+        <p>Lodoro Analytics - Sistema de Gestión de Órdenes</p>
+    </div>
+</div>
+<?php endforeach; ?>
+
+<div class="print-footer no-print">
+    <div class="container text-center py-4">
+        <button class="btn btn-primary" onclick="window.print()"><i class="fas fa-print me-2"></i> Imprimir Lista de Packing</button>
+        <a href="javascript:history.back()" class="btn btn-outline-secondary ms-2"><i class="fas fa-arrow-left me-2"></i> Volver</a>
+    </div>
+</div>

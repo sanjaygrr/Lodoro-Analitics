@@ -779,7 +779,7 @@ html[data-theme="dark"] .tooltip {
                             aria-label="Abrir menú">
                         <i class="fas fa-bars"></i>
                     </button>
-                    <a href="<?= $this->url('application', ['action' => 'index']) ?>" class="app-logo">
+                    <a href="<?= $this->url('home') ?>" class="app-logo">
                         <i class="fas fa-chart-line"></i>
                         <span>Lodoro Analytics</span>
                     </a>
@@ -811,7 +811,7 @@ html[data-theme="dark"] .tooltip {
                         </button>
                         <div id="userDropdownMenu" class="user-dropdown-menu">
                             <?php if ($this->authenticationService()->hasIdentity()): ?>
-                                <a href="<?= $this->url('application', ['action' => 'profile']) ?>">
+                                <a href="<?= $this->url('dashboard') ?>">
                                     <i class="fas fa-user-circle"></i>
                                     <span>Mi Perfil</span>
                                 </a>
@@ -851,37 +851,37 @@ html[data-theme="dark"] .tooltip {
                         </a>
                         <ul class="submenu">
                             <li>
-                                <a href="<?= $this->url('application', ['action' => 'dashboard']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'dashboard']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                                <a href="<?= $this->url('dashboard') ?>" class="submenu-link <?= $this->url('dashboard') === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
                                     Resumen de ventas
                                 </a>
                             </li>
                             <li>
-                                <a href="<?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_WALLMART']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_WALLMART']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                                <a href="<?= $this->url('dashboard', ['action' => 'detail', 'marketplace' => 'MKP_WALLMART']) ?>" class="submenu-link <?= $this->url('dashboard', ['action' => 'detail', 'marketplace' => 'MKP_WALLMART']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
                                     Walmart
                                 </a>
                             </li>
                             <li>
-                                <a href="<?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_RIPLEY']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_RIPLEY']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                                <a href="<?= $this->url('dashboard', ['action' => 'detail', 'marketplace' => 'MKP_RIPLEY']) ?>" class="submenu-link <?= $this->url('dashboard', ['action' => 'detail', 'marketplace' => 'MKP_RIPLEY']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
                                     Ripley
                                 </a>
                             </li>
                             <li>
-                                <a href="<?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_FALABELLA']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_FALABELLA']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                                <a href="<?= $this->url('dashboard', ['action' => 'detail', 'marketplace' => 'MKP_FALABELLA']) ?>" class="submenu-link <?= $this->url('dashboard', ['action' => 'detail', 'marketplace' => 'MKP_FALABELLA']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
                                     Falabella
                                 </a>
                             </li>
                             <li>
-                                <a href="<?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_MERCADO_LIBRE']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_MERCADO_LIBRE']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                                <a href="<?= $this->url('dashboard', ['action' => 'detail', 'marketplace' => 'MKP_MERCADO_LIBRE']) ?>" class="submenu-link <?= $this->url('dashboard', ['action' => 'detail', 'marketplace' => 'MKP_MERCADO_LIBRE']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
                                     Mercado Libre
                                 </a>
                             </li>
                             <li>
-                                <a href="<?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_PARIS']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_PARIS']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                                <a href="<?= $this->url('dashboard', ['action' => 'detail', 'marketplace' => 'MKP_PARIS']) ?>" class="submenu-link <?= $this->url('dashboard', ['action' => 'detail', 'marketplace' => 'MKP_PARIS']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
                                     Paris
                                 </a>
                             </li>
                             <li>
-                                <a href="<?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_WOOCOMMERCE']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'detail', 'table' => 'MKP_WOOCOMMERCE']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                                <a href="<?= $this->url('dashboard', ['action' => 'detail', 'marketplace' => 'MKP_WOOCOMMERCE']) ?>" class="submenu-link <?= $this->url('dashboard', ['action' => 'detail', 'marketplace' => 'MKP_WOOCOMMERCE']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
                                     WooCommerce
                                 </a>
                             </li>
@@ -899,32 +899,32 @@ html[data-theme="dark"] .tooltip {
                         </a>
                         <ul class="submenu">
                             <li>
-                                <a href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_WALLMART']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_WALLMART']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                                <a href="<?= $this->url('orders', ['action' => 'orders-detail', 'table' => 'Orders_WALLMART']) ?>" class="submenu-link <?= $this->url('orders', ['action' => 'orders-detail', 'table' => 'Orders_WALLMART']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
                                     Walmart
                                 </a>
                             </li>
                             <li>
-                                <a href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_RIPLEY']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_RIPLEY']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                                <a href="<?= $this->url('orders', ['action' => 'orders-detail', 'table' => 'Orders_RIPLEY']) ?>" class="submenu-link <?= $this->url('orders', ['action' => 'orders-detail', 'table' => 'Orders_RIPLEY']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
                                     Ripley
                                 </a>
                             </li>
                             <li>
-                                <a href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_FALABELLA']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_FALABELLA']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                                <a href="<?= $this->url('orders', ['action' => 'orders-detail', 'table' => 'Orders_FALABELLA']) ?>" class="submenu-link <?= $this->url('orders', ['action' => 'orders-detail', 'table' => 'Orders_FALABELLA']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
                                     Falabella
                                 </a>
                             </li>
                             <li>
-                                <a href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_MERCADO_LIBRE']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_MERCADO_LIBRE']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                                <a href="<?= $this->url('orders', ['action' => 'orders-detail', 'table' => 'Orders_MERCADO_LIBRE']) ?>" class="submenu-link <?= $this->url('orders', ['action' => 'orders-detail', 'table' => 'Orders_MERCADO_LIBRE']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
                                     Mercado Libre
                                 </a>
                             </li>
                             <li>
-                                <a href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_PARIS']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_PARIS']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                                <a href="<?= $this->url('orders', ['action' => 'orders-detail', 'table' => 'Orders_PARIS']) ?>" class="submenu-link <?= $this->url('orders', ['action' => 'orders-detail', 'table' => 'Orders_PARIS']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
                                     Paris
                                 </a>
                             </li>
                             <li>
-                                <a href="<?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_WOOCOMMERCE']) ?>" class="submenu-link <?= $this->url('application', ['action' => 'orders-detail', 'table' => 'Orders_WOOCOMMERCE']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                                <a href="<?= $this->url('orders', ['action' => 'orders-detail', 'table' => 'Orders_WOOCOMMERCE']) ?>" class="submenu-link <?= $this->url('orders', ['action' => 'orders-detail', 'table' => 'Orders_WOOCOMMERCE']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
                                     WooCommerce
                                 </a>
                             </li>
@@ -941,7 +941,7 @@ html[data-theme="dark"] .tooltip {
                     <li class="nav-category">Sistema</li>
                     
                     <li class="nav-item">
-                        <a href="<?= $this->url('application', ['action' => 'marketplace-config']) ?>" class="nav-link <?= $this->url('application', ['action' => 'marketplace-config']) === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
+                        <a href="<?= $this->url('marketplace') ?>" class="nav-link <?= $this->url('marketplace') === $_SERVER['REQUEST_URI'] ? 'active' : '' ?>">
                             <i class="fas fa-plug nav-icon"></i>
                             <span>Integraciones</span>
                         </a>

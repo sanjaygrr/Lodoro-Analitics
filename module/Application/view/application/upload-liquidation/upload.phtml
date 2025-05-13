@@ -1,0 +1,108 @@
+<?php
+/**
+ * @var Laminas\View\Renderer\PhpRenderer $this
+ */
+?>
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">Cargar Liquidaciones</h3>
+                </div>
+                <div class="card-body">
+                    <form id="uploadLiquidationForm" enctype="multipart/form-data" method="post">
+                        <div class="mb-3">
+                            <label for="liquidationFile" class="form-label">Archivo de Liquidación (Excel)</label>
+                            <input class="form-control" type="file" id="liquidationFile" name="liquidationFile" accept=".xlsx,.xls" required>
+                            <div class="form-text">Seleccione un archivo Excel con la información de liquidación.</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="marketplace" class="form-label">Marketplace</label>
+                            <select class="form-select" id="marketplace" name="marketplace" required>
+                                <option value="">Seleccione un marketplace</option>
+                                <option value="mercadolibre">MercadoLibre</option>
+                                <option value="paris">Paris</option>
+                                <option value="ripley">Ripley</option>
+                                <option value="falabella">Falabella</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="liquidationDate" class="form-label">Fecha de Liquidación</label>
+                            <input type="date" class="form-control" id="liquidationDate" name="liquidationDate" required>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">Cargar Liquidación</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="mt-4" id="uploadResult" style="display: none;">
+                <div class="alert alert-success">
+                    <h4 class="alert-heading">¡Archivo cargado correctamente!</h4>
+                    <p id="resultMessage">El archivo de liquidación ha sido procesado exitosamente.</p>
+                    <hr>
+                    <p class="mb-0">Los datos han sido importados al sistema.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('uploadLiquidationForm');
+    const resultDiv = document.getElementById('uploadResult');
+    const resultMessage = document.getElementById('resultMessage');
+    
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(form);
+        
+        // Show loading state
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalBtnText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Procesando...';
+        submitBtn.disabled = true;
+        
+        fetch('<?= $this->url('upload-liquidation') ?>', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            submitBtn.innerHTML = originalBtnText;
+            submitBtn.disabled = false;
+            
+            if (data.success) {
+                resultDiv.style.display = 'block';
+                resultDiv.querySelector('.alert').className = 'alert alert-success';
+                resultMessage.textContent = data.message || 'El archivo de liquidación ha sido procesado exitosamente.';
+                form.reset();
+            } else {
+                resultDiv.style.display = 'block';
+                resultDiv.querySelector('.alert').className = 'alert alert-danger';
+                resultMessage.textContent = data.message || 'Ocurrió un error al procesar el archivo.';
+            }
+            
+            // Scroll to result
+            resultDiv.scrollIntoView({ behavior: 'smooth' });
+        })
+        .catch(error => {
+            submitBtn.innerHTML = originalBtnText;
+            submitBtn.disabled = false;
+            
+            resultDiv.style.display = 'block';
+            resultDiv.querySelector('.alert').className = 'alert alert-danger';
+            resultMessage.textContent = 'Error de conexión. Por favor, intente nuevamente.';
+            console.error('Error:', error);
+        });
+    });
+});
+</script>
