@@ -417,8 +417,8 @@ return [
             Controller\MarketplaceController::class => Controller\Factory\MarketplaceControllerFactory::class,
             Controller\OrdersController::class => Controller\Factory\OrdersControllerFactory::class,
             Controller\ScanOrdersController::class => Controller\Factory\ScanOrdersControllerFactory::class,
-            Controller\UploadLiquidationController::class => Controller\Factory\UploadLiquidationControllerFactory::class,
             Controller\AuthController::class => Controller\Factory\AuthControllerFactory::class,
+            Controller\UploadLiquidationController::class => Controller\Factory\UploadLiquidationControllerFactory::class,
         ],
     ],
     

@@ -654,7 +654,7 @@ function isDateField($fieldName) {
                     <h5 class="modal-title" id="liquidationModalLabel">Subir Liquidación MKP París</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form id="liquidationForm" method="POST" enctype="multipart/form-data" action="<?= $this->url('application', ['action' => 'upload-liquidation']) ?>">
+                <form id="liquidationForm" method="POST" enctype="multipart/form-data" action="<?= $this->url('upload-liquidation') ?>">
                     <div class="modal-body">
                         <div class="mb-3">
                             <label for="liquidationFile" class="form-label">Seleccionar archivo Excel:</label>

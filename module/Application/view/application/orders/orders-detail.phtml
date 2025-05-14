@@ -44,8 +44,82 @@ $totalPages = $totalPages ?? 1;
 $totalItems = $totalItems ?? 0;
 ?>
 
-<!-- Panel de acciones lateral -->
+<!-- Panel de acciones lateral y estilos personalizados -->
 <style>
+/* Estilo mejorado para productos en la lista de órdenes */
+.product-item {
+    border-radius: 6px;
+    padding: 8px;
+    margin-bottom: 8px !important;
+    background-color: #f8f9fa;
+    border-left: 3px solid #4361ee;
+    transition: all 0.2s ease;
+}
+
+.product-item:hover {
+    background-color: #e9ecef;
+    transform: translateX(2px);
+}
+
+.product-name {
+    font-weight: 600;
+    color: #495057;
+    font-size: 0.85rem;
+    line-height: 1.3;
+    margin-bottom: 3px;
+}
+
+.product-sku {
+    color: #6c757d;
+    font-size: 0.75rem;
+    font-weight: 500;
+    background-color: #e9ecef;
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.product-more {
+    text-align: center;
+    color: #6c757d;
+    font-size: 0.75rem;
+    background-color: #e9ecef;
+    padding: 4px 8px;
+    border-radius: 12px;
+    display: inline-block;
+    margin-top: 5px;
+}
+
+/* Mejora de estilo general para la celda de productos */
+.table td:nth-child(5) {
+    max-width: 400px;
+    padding: 12px 10px;
+}
+
+td small {
+    display: block;
+    margin-bottom: 4px;
+}
+
+td small strong {
+    font-weight: 600;
+    color: #495057;
+}
+
+td small .badge {
+    margin-left: 4px;
+    font-size: 0.7rem;
+    font-weight: normal;
+}
+
+td .badge.bg-light.text-dark {
+    background-color: #e9ecef !important;
+    color: #6c757d !important;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+}
+
+/* Estilos de panel de acciones */
 .action-panel-container {
     position: fixed;
     top: 0;
@@ -262,6 +336,12 @@ $totalItems = $totalItems ?? 0;
                 <i class="fas fa-box"></i>
                 <span>Lista de Packing</span>
             </button>
+            <?php if ($marketplace === 'PARIS'): ?>
+            <a href="<?= $this->url('orders', ['action' => 'print-pdf', 'id' => $order['suborden'] ?? $order['id'], 'table' => 'Orders_PARIS']) ?>" class="action-btn action-print" target="_blank">
+                <i class="fas fa-print"></i>
+                <span>Imprimir Directo (PDF)</span>
+            </a>
+            <?php endif; ?>
         </div>
         <div class="action-category">
             <div class="action-category-title">Exportar</div>
@@ -596,7 +676,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <th>Fecha</th>
                             <th>Fecha Entrega</th>
                             <th>Cliente</th>
-                            <th>Productos</th>
+                            <th style="min-width: 300px; width: 25%;">Productos</th>
                             <th>Estado</th>
                             <th>Transportista</th>
                             <th>Total</th>
@@ -627,11 +707,11 @@ document.addEventListener('DOMContentLoaded', function() {
                                     </td>
                                     <td>
                                         <?php if ($table === 'Orders_PARIS'): ?>
-                                        <a href="/paris-order.php?id=<?= $order['suborden'] ?? $order['id'] ?>" class="fw-semibold">
+                                        <a href="<?= $this->url('orders', ['action' => 'detail', 'id' => $order['suborden'] ?? $order['id'], 'table' => 'Orders_PARIS']) ?>" class="fw-semibold">
                                             <?= $this->escapeHtml($order['suborden'] ?? $order['suborder_number'] ?? $order['id']) ?>
                                         </a>
                                         <?php else: ?>
-                                        <a href="<?= $this->url('order-detail', ['id' => $order['id'], 'table' => $table]) ?>" class="fw-semibold">
+                                        <a href="<?= $this->url('orders', ['action' => 'detail', 'id' => $order['id'], 'table' => $table]) ?>" class="fw-semibold">
                                             <?= $this->escapeHtml($order['suborder_number'] ?? $order['id']) ?>
                                         </a>
                                         <?php endif; ?>
@@ -654,255 +734,10 @@ document.addEventListener('DOMContentLoaded', function() {
                                     </td>
                                     <td>
                                         <?php
-                                            // Mostrar productos si están disponibles
-                                            $productosMostrar = [];
-
-                                            // Primero verificar si hay nombre_producto en la orden (agregado desde MKP_PARIS)
-                                            if (isset($order['nombre_producto']) && !empty($order['nombre_producto'])) {
-                                                // Mostrar el nombre del producto directamente desde la tabla de marketplace
-                                                $nombre = $order['nombre_producto'];
-                                                $productosMostrar[] = "<small><strong>" . $this->escapeHtml(substr($nombre, 0, 60)) .
-                                                                     (strlen($nombre) > 60 ? '...' : '') . "</strong></small>";
-                                            }
-                                            // Si no hay nombre_producto, verificar si hay SKU directo en la orden
-                                            else if (isset($order['sku']) && !empty($order['sku'])) {
-                                                $skus = $order['sku'];
-                                                if (is_string($skus)) {
-                                                    // Buscar nombres de productos en la base de datos si es posible
-                                                    $skuNames = [];
-                                                    try {
-                                                        // Intentar obtener información de productos desde la tabla productos
-                                                        $productsTable = 'productos';
-                                                        $skuList = explode(',', $skus);
-                                                        if (count($skuList) > 0) {
-                                                            // Construir consulta con placeholders para cada SKU
-                                                            $placeholders = implode(',', array_fill(0, count($skuList), '?'));
-                                                            $productList = [];
-
-                                                            // Usar fetch para obtener datos si DatabaseService está disponible
-                                                            if (isset($this->layout()->databaseService)) {
-                                                                $productList = $this->layout()->databaseService->fetchAll(
-                                                                    "SELECT sku, nombre, descripcion FROM $productsTable WHERE sku IN ($placeholders)",
-                                                                    $skuList
-                                                                );
-                                                            }
-
-                                                            // Crear mapa de SKU -> nombre
-                                                            foreach ($productList as $product) {
-                                                                $skuNames[$product['sku']] = $product['nombre'] ?? ($product['descripcion'] ?? '');
-                                                            }
-                                                        }
-                                                    } catch (\Exception $e) {
-                                                        // No hay tabla de productos o error al consultar
-                                                    }
-
-                                                    // Intentar decodificar como JSON
-                                                    $skuArray = json_decode($skus, true);
-                                                    if (json_last_error() !== JSON_ERROR_NONE) {
-                                                        // Si no es JSON, podría ser una lista separada por comas
-                                                        $skuList = explode(',', $skus);
-                                                        foreach (array_slice($skuList, 0, 2) as $sku) {
-                                                            $sku = trim($sku);
-                                                            if (!empty($sku)) {
-                                                                // Si tenemos el nombre del producto desde el controlador, usarlo
-                                                                if (isset($productInfo[$sku]) && !empty($productInfo[$sku]['nombre'])) {
-                                                                    $nombre = $productInfo[$sku]['nombre'];
-                                                                    // Verificar si el nombre NO es genérico (no comienza con "Producto")
-                                                                    if (strpos($nombre, 'Producto') !== 0) {
-                                                                        $productosMostrar[] = "<small>" . $this->escapeHtml(substr($nombre, 0, 30)) .
-                                                                                       (strlen($nombre) > 30 ? '...' : '') .
-                                                                                       " <span class='badge bg-light text-dark'>" . $this->escapeHtml($sku) . "</span></small>";
-                                                                    } else if (isset($skuNames[$sku]) && !empty($skuNames[$sku])) {
-                                                                        // Segundo intento: usar nombre de la consulta local si disponible
-                                                                        $productosMostrar[] = "<small><strong>SKU:</strong> " . $this->escapeHtml($sku) . " - " .
-                                                                                         $this->escapeHtml(substr($skuNames[$sku], 0, 30)) .
-                                                                                         (strlen($skuNames[$sku]) > 30 ? '...' : '') . "</small>";
-                                                                    } else {
-                                                                        // Si solo tenemos el nombre genérico, mostrarlo igual
-                                                                        $productosMostrar[] = "<small>" . $this->escapeHtml(substr($nombre, 0, 30)) .
-                                                                                       (strlen($nombre) > 30 ? '...' : '') .
-                                                                                       " <span class='badge bg-light text-dark'>" . $this->escapeHtml($sku) . "</span></small>";
-                                                                    }
-                                                                } else if (isset($skuNames[$sku]) && !empty($skuNames[$sku])) {
-                                                                    // Usar nombre de la consulta local si el controlador no proporcionó uno
-                                                                    $productosMostrar[] = "<small><strong>SKU:</strong> " . $this->escapeHtml($sku) . " - " .
-                                                                                     $this->escapeHtml(substr($skuNames[$sku], 0, 30)) .
-                                                                                     (strlen($skuNames[$sku]) > 30 ? '...' : '') . "</small>";
-                                                                } else {
-                                                                    // Si no tenemos nombre, mostrar solo el SKU
-                                                                    $productosMostrar[] = "<small><strong>SKU:</strong> " . $this->escapeHtml($sku) . "</small>";
-                                                                }
-                                                            }
-                                                        }
-
-                                                        if (count($skuList) > 2) {
-                                                            $productosMostrar[] = "<small class='text-muted'>+" . (count($skuList) - 2) . " más</small>";
-                                                        }
-                                                    } else {
-                                                        // Es JSON, mostrar los primeros 2 SKUs
-                                                        if (is_array($skuArray)) {
-                                                            foreach (array_slice($skuArray, 0, 2) as $sku) {
-                                                                if (is_string($sku) && !empty($sku)) {
-                                                                    // Si tenemos el nombre del producto desde el controlador, usarlo
-                                                                    if (isset($productInfo[$sku]) && !empty($productInfo[$sku]['nombre'])) {
-                                                                        $nombre = $productInfo[$sku]['nombre'];
-                                                                        // Verificar si el nombre NO es genérico (no comienza con "Producto")
-                                                                        if (strpos($nombre, 'Producto') !== 0) {
-                                                                            $productosMostrar[] = "<small><strong>" . $this->escapeHtml(substr($nombre, 0, 40)) .
-                                                                                            (strlen($nombre) > 40 ? '...' : '') . "</strong></small>";
-                                                                        } else if (isset($skuNames[$sku]) && !empty($skuNames[$sku])) {
-                                                                            // Segundo intento: usar nombre de la consulta local si disponible
-                                                                            $productosMostrar[] = "<small><strong>" . $this->escapeHtml(substr($skuNames[$sku], 0, 40)) .
-                                                                                            (strlen($skuNames[$sku]) > 40 ? '...' : '') . "</strong></small>";
-                                                                        } else {
-                                                                            // Si solo tenemos el nombre genérico, mostrarlo igual
-                                                                            $productosMostrar[] = "<small><strong>" . $this->escapeHtml(substr($nombre, 0, 40)) .
-                                                                                            (strlen($nombre) > 40 ? '...' : '') . "</strong></small>";
-                                                                        }
-                                                                    } else if (isset($skuNames[$sku]) && !empty($skuNames[$sku])) {
-                                                                        // Usar nombre de la consulta local si el controlador no proporcionó uno
-                                                                        $productosMostrar[] = "<small><strong>" . $this->escapeHtml(substr($skuNames[$sku], 0, 40)) .
-                                                                                        (strlen($skuNames[$sku]) > 40 ? '...' : '') . "</strong></small>";
-                                                                    } else {
-                                                                        // Aunque no tengamos nombre, mostrar un nombre genérico
-                                                                        $productosMostrar[] = "<small>Producto: " . $this->escapeHtml($sku) . "</small>";
-                                                                    }
-                                                                } else if (is_array($sku) && isset($sku['sku'])) {
-                                                                    // Si es un objeto con SKU
-                                                                    $skuValue = $sku['sku'];
-                                                                    $nombre = $sku['nombre'] ?? '';
-
-                                                                    // Primero buscar en productos del controlador
-                                                                    if (empty($nombre) && isset($productInfo[$skuValue]) && !empty($productInfo[$skuValue]['nombre'])) {
-                                                                        $nombreProducto = $productInfo[$skuValue]['nombre'];
-                                                                        if (strpos($nombreProducto, 'Producto') !== 0) {
-                                                                            $nombre = $nombreProducto;
-                                                                        }
-                                                                    }
-
-                                                                    // Luego buscar en datos locales si sigue vacío
-                                                                    if (empty($nombre) && isset($skuNames[$skuValue]) && !empty($skuNames[$skuValue])) {
-                                                                        $nombre = $skuNames[$skuValue];
-                                                                    }
-
-                                                                    if (!empty($nombre)) {
-                                                                        $productosMostrar[] = "<small>" . $this->escapeHtml(substr($nombre, 0, 40)) .
-                                                                                        (strlen($nombre) > 40 ? '...' : '') . "</small>";
-                                                                    } else {
-                                                                        // Intento final: mostrar nombre genérico en lugar del SKU
-                                                                        $productosMostrar[] = "<small>Producto: " . $this->escapeHtml($skuValue) . "</small>";
-                                                                    }
-                                                                }
-                                                            }
-
-                                                            if (count($skuArray) > 2) {
-                                                                $productosMostrar[] = "<small class='text-muted'>+" . (count($skuArray) - 2) . " más</small>";
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-
-                                            // Verificación genérica para mostrar productos concatenados (funciona con cualquier marketplace)
-                                            if (!empty($order['productos_bsale']) || !empty($order['product_names']) || !empty($order['product_list'])) {
-                                                $productosMostrar = []; // Reset to show marketplace products
-                                                // Buscar en varios campos posibles según el marketplace
-                                                $productNames = [];
-                                                $skus = [];
-                                                
-                                                // Obtener nombres de productos
-                                                if (!empty($order['productos_bsale'])) {
-                                                    $productNames = explode(' | ', $order['productos_bsale']);
-                                                    if (!empty($order['skus_bsale'])) {
-                                                        $skus = explode(', ', $order['skus_bsale']);
-                                                    }
-                                                } elseif (!empty($order['product_names'])) {
-                                                    $productNames = is_array($order['product_names']) ? $order['product_names'] : explode(',', $order['product_names']);
-                                                    if (!empty($order['product_skus'])) {
-                                                        $skus = is_array($order['product_skus']) ? $order['product_skus'] : explode(',', $order['product_skus']);
-                                                    }
-                                                } elseif (!empty($order['product_list'])) {
-                                                    $productList = is_array($order['product_list']) ? $order['product_list'] : json_decode($order['product_list'], true);
-                                                    if (is_array($productList)) {
-                                                        foreach ($productList as $product) {
-                                                            $productNames[] = $product['name'] ?? $product['nombre'] ?? '';
-                                                            $skus[] = $product['sku'] ?? $product['codigo'] ?? '';
-                                                        }
-                                                    }
-                                                }
-                                                
-                                                // Mostrar los productos encontrados
-                                                foreach (array_slice($productNames, 0, 2) as $index => $productName) {
-                                                    if (empty($productName)) continue;
-                                                    $sku = isset($skus[$index]) ? $skus[$index] : '';
-                                                    $productosMostrar[] = "<small><strong>" . $this->escapeHtml(substr($productName, 0, 40)) .
-                                                                    (strlen($productName) > 40 ? '...' : '') . "</strong>" . 
-                                                                    (!empty($sku) ? " <span class='badge bg-light text-dark'>" . $this->escapeHtml($sku) . "</span>" : "") . 
-                                                                    "</small>";
-                                                }
-                                                
-                                                if (count($productNames) > 2) {
-                                                    $productosMostrar[] = "<small class='text-muted'>+" . (count($productNames) - 2) . " más</small>";
-                                                }
-                                            }
-
-                                            // Luego verificar el campo productos para información detallada
-                                            if (isset($order['productos']) && (empty($productosMostrar) || count($productosMostrar) < 2)) {
-                                                $productos = $order['productos'];
-                                                if (is_string($productos)) {
-                                                    $productos = json_decode($productos, true);
-                                                }
-
-                                                if (is_array($productos)) {
-                                                    // Si ya tenemos SKUs de la columna sku, mostrar solo los productos restantes
-                                                    $maxToShow = empty($productosMostrar) ? 2 : 1;
-
-                                                    foreach (array_slice($productos, 0, $maxToShow) as $producto) {
-                                                        $nombre = $producto['nombre'] ?? $producto['name'] ?? '';
-                                                        $sku = $producto['sku'] ?? '';
-                                                        $cantidad = $producto['cantidad'] ?? 1;
-
-                                                        // Verificar si el nombre actual es genérico o está vacío
-                                                        $isGenericName = empty($nombre) || strpos($nombre, 'Producto') === 0;
-
-                                                        // Si tenemos SKU, intentar obtener un nombre mejor
-                                                        if (!empty($sku)) {
-                                                            // Primero buscar en datos del controlador
-                                                            if ($isGenericName && isset($productInfo[$sku]) && !empty($productInfo[$sku]['nombre'])) {
-                                                                $dbName = $productInfo[$sku]['nombre'];
-                                                                // Usar el nombre de la BD solo si no es genérico
-                                                                if (strpos($dbName, 'Producto') !== 0) {
-                                                                    $nombre = $dbName;
-                                                                    $isGenericName = false;
-                                                                }
-                                                            }
-
-                                                            // Luego intentar con los datos locales
-                                                            if ($isGenericName && isset($skuNames[$sku]) && !empty($skuNames[$sku])) {
-                                                                $nombre = $skuNames[$sku];
-                                                                $isGenericName = false;
-                                                            }
-
-                                                            $productosMostrar[] = "<small>" . $cantidad . "x <strong>" . $this->escapeHtml(substr($nombre, 0, 40)) .
-                                                                (strlen($nombre) > 40 ? '...' : '') . "</strong></small>";
-                                                        } else if (!empty($nombre)) {
-                                                            $productosMostrar[] = "<small>" . $cantidad . "x <strong>" .
-                                                                $this->escapeHtml(substr($nombre, 0, 40)) . (strlen($nombre) > 40 ? '...' : '') . "</strong></small>";
-                                                        }
-                                                    }
-
-                                                    // Mensaje de "más productos" solo si no lo hemos añadido ya
-                                                    if (count($productos) > $maxToShow && strpos(end($productosMostrar), 'más') === false) {
-                                                        $productosMostrar[] = "<small class='text-muted'>+" . (count($productos) - $maxToShow) . " más</small>";
-                                                    }
-                                                }
-                                            }
-
-                                            if (empty($productosMostrar)) {
-                                                echo "<span class='text-muted'>No disponible</span>";
-                                            } else {
-                                                echo implode('<br>', $productosMostrar);
-                                            }
+                                            // Usar lógica simplificada desde archivo separado
+                                            // Este archivo se encarga de la lógica completa de mostrar productos
+                                            // No es necesario código adicional después de incluirlo
+                                            include __DIR__ . '/product-display.php';
                                         ?>
                                     </td>
                                     <td>
@@ -995,11 +830,11 @@ document.addEventListener('DOMContentLoaded', function() {
                                             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="actionDropdown<?= $order['id'] ?>" style="z-index: 1050;">
                                                 <li>
                                                     <?php if ($table === 'Orders_PARIS'): ?>
-                                                    <a class="dropdown-item" href="/paris-order.php?id=<?= $order['suborden'] ?? $order['id'] ?>">
+                                                    <a class="dropdown-item" href="<?= $this->url('orders', ['action' => 'detail', 'id' => $order['suborden'] ?? $order['id'], 'table' => 'Orders_PARIS']) ?>">
                                                         <i class="fas fa-eye me-2 text-primary"></i> Ver detalle
                                                     </a>
                                                     <?php else: ?>
-                                                    <a class="dropdown-item" href="<?= $this->url('order-detail', ['id' => $order['id'], 'table' => $table]) ?>">
+                                                    <a class="dropdown-item" href="<?= $this->url('orders', ['action' => 'detail', 'id' => $order['id'], 'table' => $table]) ?>">
                                                         <i class="fas fa-eye me-2 text-primary"></i> Ver detalle
                                                     </a>
                                                     <?php endif; ?>
@@ -1208,7 +1043,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Para acciones de impresión y exportación, abrir en nueva ventana
         if (['print-labels', 'print-invoice', 'print-picking', 'print-packing', 'export-csv'].includes(action)) {
             const form = document.createElement('form');
-            form.method = 'POST';
+            form.method = 'GET'; // Cambiado a GET para evitar problemas con POST
             form.action = '<?= $this->url('bulk-orders') ?>';
             form.target = '_blank';
 
@@ -1524,13 +1359,21 @@ document.addEventListener('DOMContentLoaded', function() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Accept': 'application/json'
             },
             body: JSON.stringify({
                 id: id,
                 table: table
             })
         })
-        .then(response => response.json())
+        .then(response => {
+            // Verificar si la respuesta es JSON válida
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                return response.json();
+            }
+            throw new Error('La respuesta no es JSON válido');
+        })
         .then(data => {
             if (data.success) {
                 alert('Orden marcada como impresa correctamente');
@@ -1555,13 +1398,21 @@ document.addEventListener('DOMContentLoaded', function() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Accept': 'application/json'
             },
             body: JSON.stringify({
                 id: id,
                 table: table
             })
         })
-        .then(response => response.json())
+        .then(response => {
+            // Verificar si la respuesta es JSON válida
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                return response.json();
+            }
+            throw new Error('La respuesta no es JSON válido');
+        })
         .then(data => {
             if (data.success) {
                 alert('Orden procesada correctamente');
@@ -1628,10 +1479,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Accept': 'application/json'
                 },
                 body: JSON.stringify(data)
             })
-            .then(response => response.json())
+            .then(response => {
+                // Verificar si la respuesta es JSON válida
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    return response.json();
+                }
+                throw new Error('La respuesta no es JSON válido');
+            })
             .then(result => {
                 if (result.success) {
                     completedCount++;

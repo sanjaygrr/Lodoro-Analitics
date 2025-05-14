@@ -385,71 +385,85 @@ private function handleParisOrders($page, $limit, $filters)
      * @param mixed $orderTables
      * @return Response
      */
-    private function generateInvoices($orderIds, $orderTables)
+    private function generateInvoices($orderIds, $table = null)
     {
+        // We don't need to import anything here since we're already importing Fpdi at the top of the file
+        
         // Array para almacenar URLs de boletas
         $boletaUrls = [];
-
-        // Si orderTables está vacío, asumir una tabla común
-        if (empty($orderTables)) {
-            $table = $this->params()->fromPost('table', '');
-            $orderTables = array_fill(0, count($orderIds), $table);
-        } else if (!is_array($orderTables)) {
-            // Si es un string, convertirlo a array
-            $orderTables = [$orderTables];
-        }
-
-        // Obtener todas las URLs de boletas
-        for ($i = 0; $i < count($orderIds); $i++) {
-            $id = $orderIds[$i];
-            $table = isset($orderTables[$i]) ? $orderTables[$i] : '';
-
-            if (!empty($id) && !empty($table)) {
-                try {
-                    // Para Orders_PARIS, usar consulta directa
-                    if (strtoupper($table) === 'ORDERS_PARIS') {
-                        $orderData = $this->databaseService->fetchOne(
-                            "SELECT 
-                                pof.subOrderNumber,
-                                bd.urlPdfOriginal as url_pdf_boleta
-                            FROM bsale_references brd
-                            INNER JOIN paris_orders pof 
-                                ON brd.number COLLATE utf8mb4_unicode_ci = pof.subOrderNumber COLLATE utf8mb4_unicode_ci
-                            INNER JOIN bsale_documents bd 
-                                ON brd.document_id = bd.id
-                            WHERE pof.subOrderNumber = ?",
-                            [$id]
-                        );
-                        
-                        if ($orderData && !empty($orderData['url_pdf_boleta'])) {
-                            $boletaUrls[$id] = $orderData['url_pdf_boleta'];
-                            
-                            // Marcar como impresa en la tabla original si existe
-                            try {
-                                $this->databaseService->execute(
-                                    "UPDATE `$table` SET printed = 1 WHERE id = ? OR suborder_number = ?",
-                                    [$id, $id]
-                                );
-                            } catch (\Exception $e) {
-                                // Ignorar errores al actualizar
-                            }
+        
+        // Obtener boletas para órdenes seleccionadas
+        if ($table == 'paris_orders' || $table == 'Orders_PARIS') {
+            // Para órdenes Paris, obtener directamente de bsale_documents
+            $placeholders = array_fill(0, count($orderIds), '?');
+            
+            $sql = "SELECT doc.urlPdf, doc.urlPdfOriginal
+                    FROM paris_orders o
+                    JOIN (
+                        SELECT document_id, number, REGEXP_SUBSTR(number, '[0-9]{10}') AS subOrderNumber_clean
+                        FROM bsale_references
+                        WHERE number REGEXP '[0-9]{10}'
+                    ) ref ON ref.subOrderNumber_clean = o.subOrderNumber
+                    JOIN bsale_documents doc ON doc.id = ref.document_id
+                    WHERE o.subOrderNumber IN (" . implode(',', $placeholders) . ")";
+            
+            $results = $this->databaseService->fetchAll($sql, $orderIds);
+            
+            foreach ($results as $row) {
+                if (!empty($row['urlPdf'])) {
+                    $boletaUrls[] = $row['urlPdf'];
+                } else if (!empty($row['urlPdfOriginal'])) {
+                    $boletaUrls[] = $row['urlPdfOriginal'];
+                }
+            }
+            
+            // Si no encontramos nada, intentar búsqueda directa
+            if (empty($boletaUrls)) {
+                foreach ($orderIds as $orderId) {
+                    $boletaData = $this->databaseService->fetchOne(
+                        "SELECT bd.urlPdf, bd.urlPdfOriginal
+                         FROM bsale_references br
+                         JOIN bsale_documents bd ON br.document_id = bd.id
+                         WHERE br.number LIKE ?
+                         LIMIT 1",
+                        ['%' . $orderId . '%']
+                    );
+                    
+                    if ($boletaData) {
+                        if (!empty($boletaData['urlPdf'])) {
+                            $boletaUrls[] = $boletaData['urlPdf'];
+                        } else if (!empty($boletaData['urlPdfOriginal'])) {
+                            $boletaUrls[] = $boletaData['urlPdfOriginal'];
                         }
-                    } else {
+                    }
+                }
+            }
+        } else {
+            // Si table es un string pero no es array (caso común)
+            if (!is_array($table)) {
+                $orderTables = [$table];
+            } else {
+                $orderTables = $table;
+            }
+            
+            // Si orderTables está vacío, asumir una tabla común
+            if (empty($orderTables)) {
+                $tableName = $this->params()->fromPost('table', '');
+                $orderTables = array_fill(0, count($orderIds), $tableName);
+            }
+            
+            // Obtener todas las URLs de boletas
+            for ($i = 0; $i < count($orderIds); $i++) {
+                $id = $orderIds[$i];
+                $currentTable = isset($orderTables[$i]) ? $orderTables[$i] : '';
+                
+                if (!empty($id) && !empty($currentTable)) {
+                    try {
                         // Para otras tablas, usar el método original
-                        $query = "SELECT id, suborder_number";
-
-                        // Si es PARIS, buscar url_pdf_boleta
-                        if (strpos($table, 'PARIS') !== false) {
-                            $query .= ", url_pdf_boleta";
-                        } else {
-                            // Para otros marketplaces, buscar campos alternativos
-                            $query .= ", url_pdf_boleta, invoice_url, boleta_url, url_boleta, pdf_url, url_pdf";
-                        }
-
-                        $query .= " FROM `$table` WHERE id = ?";
-
+                        $query = "SELECT id, suborder_number, url_pdf_boleta, invoice_url, boleta_url, url_boleta, pdf_url, url_pdf FROM `$currentTable` WHERE id = ?";
+                        
                         $orderData = $this->databaseService->fetchOne($query, [$id]);
-
+                        
                         // Determinar qué campo contiene la URL según disponibilidad
                         $boletaUrl = null;
                         if ($orderData) {
@@ -462,52 +476,38 @@ private function handleParisOrders($page, $limit, $filters)
                                 'pdf_url',
                                 'url_pdf'
                             ];
-
+                            
                             foreach ($urlFields as $field) {
                                 if (isset($orderData[$field]) && !empty($orderData[$field])) {
                                     $boletaUrl = $orderData[$field];
                                     break;
                                 }
                             }
-
+                            
                             if ($boletaUrl && filter_var($boletaUrl, FILTER_VALIDATE_URL)) {
-                                $boletaUrls[$id] = $boletaUrl;
-
+                                $boletaUrls[] = $boletaUrl;
+                                
                                 // Marcar como impresa
                                 $this->databaseService->execute(
-                                    "UPDATE `$table` SET printed = 1 WHERE id = ?",
+                                    "UPDATE `$currentTable` SET printed = 1 WHERE id = ?",
                                     [$id]
                                 );
-
-                                // Registrar en historial
-                                try {
-                                    $username = $this->authService->getIdentity();
-                                    $this->databaseService->execute(
-                                        "INSERT INTO `historial` (tabla, orden_id, accion, usuario, fecha_accion) VALUES (?, ?, ?, ?, NOW())",
-                                        [$table, $id, 'Boleta impresa', $username]
-                                    );
-                                } catch (\Exception $e) {
-                                    // Ignorar errores de historial
-                                }
                             }
                         }
+                    } catch (\Exception $e) {
+                        // Ignorar órdenes con error
+                        continue;
                     }
-                } catch (\Exception $e) {
-                    // Ignorar órdenes con error
-                    continue;
                 }
             }
         }
-
-        // Si no hay URLs de boleta, generar facturas básicas
+        
+        // Si no hay URLs de boletas, mostrar mensaje
         if (empty($boletaUrls)) {
+            // Intentar generar una factura básica como último recurso
             try {
-                return $this->generateBasicInvoices($orderIds, $orderTables[0] ?? null);
+                return $this->generateBasicInvoices($orderIds, $table);
             } catch (\Exception $e) {
-                // Si hay error al generar facturas básicas, mostrar error
-                $options = new Options();
-                $options->set('isHtml5ParserEnabled', true);
-
                 $html = '
                 <html>
                 <head>
@@ -517,89 +517,14 @@ private function handleParisOrders($page, $limit, $filters)
                     </style>
                 </head>
                 <body>
-                    <div class="error">No se encontraron boletas disponibles</div>
-                    <p>Las órdenes seleccionadas no tienen URLs de boletas asociadas y no se pudieron generar facturas básicas.</p>
-                    <p>Error: ' . $e->getMessage() . '</p>
+                    <div class="error">No se encontraron boletas</div>
+                    <p>No se encontraron URLs de boletas para las órdenes seleccionadas.</p>
                 </body>
                 </html>';
-
-                $dompdf = new Dompdf($options);
-                $dompdf->loadHtml($html, 'UTF-8');
-                $dompdf->setPaper('A4', 'portrait');
-                $dompdf->render();
-
-                $pdfContent = $dompdf->output();
                 
-                // Crear respuesta HTTP
-                $response = new Response();
-                $response->setContent($pdfContent);
-                
-                $headers = $response->getHeaders();
-                $headers->addHeaderLine('Content-Type', 'application/pdf');
-                $headers->addHeaderLine('Content-Disposition', 'inline; filename="Error_Boletas_' . date('Y-m-d_His') . '.pdf"');
-                
-                return $response;
-            }
-        }
-
-        // Crear PDF combinado con FPDI
-        $pdf = new Fpdi();
-        $pdf->SetAutoPageBreak(false);
-        $pdf->setPrintHeader(false);
-        $pdf->setPrintFooter(false);
-        
-        $boletasOk = false; // Flag para verificar si al menos una boleta se procesó correctamente
-        
-        foreach ($boletaUrls as $orderId => $url) {
-            try {
-                // Descargar el PDF de la boleta
-                $tempFile = tempnam(sys_get_temp_dir(), 'boleta_') . '.pdf';
-                file_put_contents($tempFile, file_get_contents($url));
-                
-                // Importar las páginas del PDF
-                $pageCount = $pdf->setSourceFile($tempFile);
-                for ($i = 1; $i <= $pageCount; $i++) {
-                    $tplId = $pdf->importPage($i);
-                    $size = $pdf->getTemplateSize($tplId);
-                    $pdf->AddPage($size['orientation'], [$size['width'], $size['height']]);
-                    $pdf->useTemplate($tplId);
-                }
-                
-                $boletasOk = true; // Al menos una boleta se ha procesado correctamente
-                
-                // Eliminar archivo temporal
-                unlink($tempFile);
-            } catch (\Exception $e) {
-                // Log error and continue
-                error_log("Error al procesar boleta: " . $e->getMessage());
-                continue;
-            }
-        }
-        
-        // Si ninguna boleta se procesó correctamente, generar facturas básicas
-        if (!$boletasOk) {
-            try {
-                return $this->generateBasicInvoices($orderIds, $orderTables[0] ?? null);
-            } catch (\Exception $e) {
-                // Si hay error al generar facturas básicas, mostrar mensaje de error
                 $options = new Options();
                 $options->set('isHtml5ParserEnabled', true);
-
-                $html = '
-                <html>
-                <head>
-                    <style>
-                        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-                        .error { color: #d9534f; font-size: 24px; margin-bottom: 20px; }
-                    </style>
-                </head>
-                <body>
-                    <div class="error">Error al procesar boletas</div>
-                    <p>No se pudieron procesar las boletas y no se pudieron generar facturas básicas.</p>
-                    <p>Error: ' . $e->getMessage() . '</p>
-                </body>
-                </html>';
-
+                
                 $dompdf = new Dompdf($options);
                 $dompdf->loadHtml($html, 'UTF-8');
                 $dompdf->setPaper('A4', 'portrait');
@@ -608,11 +533,82 @@ private function handleParisOrders($page, $limit, $filters)
                 $pdfContent = $dompdf->output();
             }
         } else {
-            // Generar la salida del PDF combinado
-            $pdfContent = $pdf->Output('S');
+            // Crear un PDF con todas las boletas usando FPDI sin formato predefinido
+            // No especificamos tamaño de página aquí porque se ajustará al tamaño de cada documento
+            $pdf = new \setasign\Fpdi\Tcpdf\Fpdi();
+            $pdf->setPrintHeader(false);
+            $pdf->setPrintFooter(false);
+            
+            // Configurar opciones adicionales para mejor manejo de PDF importados
+            $pdf->setAutoPageBreak(false); // Evitar saltos de página automáticos
+            $pdf->setCreator('Lodoro Analytics');
+            $pdf->setTitle('Boletas Paris');
+            
+            // Por cada URL, descargar el PDF y agregarlo
+            foreach ($boletaUrls as $url) {
+                // Asegurar que la URL tenga https://
+                if (!preg_match('/^https?:\/\//i', $url)) {
+                    $url = 'https://' . $url;
+                }
+                
+                // Descargar PDF con ampliado de opciones para mejorar la compatibilidad
+                $context = stream_context_create([
+                    'ssl' => [
+                        'verify_peer' => false,
+                        'verify_peer_name' => false,
+                    ],
+                    'http' => [
+                        'user_agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
+                        'timeout' => 30, // Incrementar el timeout para URLs lentas
+                        'follow_location' => 1, // Seguir redirecciones
+                        'ignore_errors' => true
+                    ]
+                ]);
+                
+                error_log("Descargando URL: " . $url);
+                $content = @file_get_contents($url, false, $context);
+                
+                if (empty($content)) {
+                    error_log("Error: No se pudo descargar el contenido de la URL: " . $url);
+                }
+                
+                if ($content) {
+                    // Guardar temporalmente
+                    $tempFile = tempnam(sys_get_temp_dir(), 'boleta_');
+                    file_put_contents($tempFile, $content);
+                    
+                    try {
+                        // Agregar al PDF principal manteniendo el tamaño original
+                        $pageCount = $pdf->setSourceFile($tempFile);
+                        
+                        for ($i = 1; $i <= $pageCount; $i++) {
+                            $tpl = $pdf->importPage($i);
+                            
+                            // Obtener las dimensiones del template original
+                            $size = $pdf->getTemplateSize($tpl);
+                            $orientation = ($size['width'] > $size['height']) ? 'L' : 'P';
+                            
+                            // Agregar página con el tamaño exacto del documento original
+                            $pdf->AddPage($orientation, array($size['width'], $size['height']));
+                            
+                            // Usar el template ajustado a la página completa
+                            $pdf->useTemplate($tpl, 0, 0, $size['width'], $size['height']);
+                        }
+                        
+                        // Limpiar
+                        unlink($tempFile);
+                    } catch (\Exception $e) {
+                        // Registrar error pero continuar con siguiente URL
+                        error_log("Error al importar etiqueta PDF: " . $e->getMessage());
+                    }
+                }
+            }
+            
+            // Generar PDF
+            $pdfContent = $pdf->Output('', 'S');
         }
-
-        // Crear respuesta HTTP
+        
+        // Crear respuesta HTTP con el PDF
         $response = new Response();
         $response->setContent($pdfContent);
         
@@ -621,9 +617,6 @@ private function handleParisOrders($page, $limit, $filters)
         $headers->addHeaderLine('Content-Type', 'application/pdf');
         $headers->addHeaderLine('Content-Disposition', 'inline; filename="Boletas_' . date('Y-m-d_His') . '.pdf"');
         $headers->addHeaderLine('Content-Length', strlen($pdfContent));
-        $headers->addHeaderLine('Cache-Control', 'must-revalidate, post-check=0, pre-check=0');
-        $headers->addHeaderLine('Pragma', 'public');
-        $headers->addHeaderLine('Expires', '0');
         
         return $response;
     }
@@ -751,24 +744,95 @@ private function handleParisOrders($page, $limit, $filters)
             
             // Para Orders_PARIS, usar consulta directa
             if (strtoupper($currentTable) === 'ORDERS_PARIS') {
+                error_log("generatePackingList: Procesando órdenes de Paris, IDs: " . json_encode($orderIds));
+                
+                // Normalizar los IDs: convertir IDs de base de datos a subOrderNumbers si es necesario
+                $subOrderNumbers = [];
+                foreach ($orderIds as $id) {
+                    try {
+                        $checkOrder = $this->databaseService->fetchOne(
+                            "SELECT subOrderNumber FROM paris_orders WHERE id = ? OR subOrderNumber = ? LIMIT 1",
+                            [$id, $id]
+                        );
+                        
+                        if ($checkOrder && !empty($checkOrder['subOrderNumber'])) {
+                            $subOrderNumbers[] = $checkOrder['subOrderNumber'];
+                        } else {
+                            $subOrderNumbers[] = $id; // Mantener el ID original si no se pudo convertir
+                        }
+                    } catch (\Exception $e) {
+                        error_log("Error al obtener subOrderNumber para ID $id: " . $e->getMessage());
+                        $subOrderNumbers[] = $id;
+                    }
+                }
+                
+                // Construir placeholders para la consulta SQL
+                $subOrderPlaceholders = implode(',', array_fill(0, count($subOrderNumbers), '?'));
+                
+                // Usar la misma consulta de paris-order.php, pero ajustada para múltiples órdenes
+                error_log("generatePackingList: Usando consulta basada en paris-order.php para subOrderNumbers: " . json_encode($subOrderNumbers));
+                
                 $sql = "
-                    SELECT 
-                        pof.subOrderNumber as id,
-                        pof.subOrderNumber,
-                        pof.customer_name as cliente,
-                        pi.sku,
-                        pi.name as producto,
-                        pi.quantity as cantidad
-                    FROM bsale_references brd
-                    INNER JOIN paris_orders pof 
-                        ON brd.number COLLATE utf8mb4_unicode_ci = pof.subOrderNumber COLLATE utf8mb4_unicode_ci
-                    INNER JOIN paris_items pi 
-                        ON pof.subOrderNumber COLLATE utf8mb4_unicode_ci = pi.subOrderNumber COLLATE utf8mb4_unicode_ci
-                    WHERE pof.subOrderNumber IN (" . implode(',', array_fill(0, count($orderIds), '?')) . ")
+                    SELECT
+                      pof.id,
+                      pof.subOrderNumber,
+                      pof.subOrderNumber as order_number,
+                      pof.customer_name as cliente,
+                      pof.customer_documentNumber as rut,
+                      pof.billing_phone as telefono,
+                      TRIM(SUBSTRING_INDEX(ddet.variant_code, ',', -1)) as sku,
+                      ddet.variant_description as producto,
+                      ddet.quantity as cantidad,
+                      'PARIS' as marketplace
+                    FROM
+                      paris_orders pof
+                    LEFT JOIN paris_subOrders pso
+                      ON pof.subOrderNumber = pso.subOrderNumber
+                    LEFT JOIN paris_statuses pst
+                      ON pso.statusId = pst.id
+                    LEFT JOIN (
+                      SELECT 
+                        document_id,
+                        number,
+                        REGEXP_SUBSTR(number, '[0-9]{10}') AS subOrderNumber_clean
+                      FROM bsale_references
+                      WHERE number REGEXP '[0-9]{10}'
+                    ) ref
+                      ON ref.subOrderNumber_clean = pof.subOrderNumber
+                    LEFT JOIN bsale_documents doc
+                      ON doc.id = ref.document_id
+                    LEFT JOIN bsale_document_details ddet
+                      ON ddet.document_id = doc.id
+                    WHERE pof.subOrderNumber IN ($subOrderPlaceholders)
                 ";
                 
                 try {
-                    $orders = $this->databaseService->fetchAll($sql, $orderIds);
+                    $orders = $this->databaseService->fetchAll($sql, $subOrderNumbers);
+                    error_log("generatePackingList: Encontradas " . count($orders) . " órdenes de Paris con productos");
+                    
+                    // Si no hay resultados o productos, intentar con paris_items
+                    if (empty($orders)) {
+                        error_log("generatePackingList: No se encontraron productos con la consulta principal, intentando con paris_items");
+                        
+                        $sqlAlt = "
+                            SELECT 
+                                pof.id,
+                                pof.subOrderNumber,
+                                pof.subOrderNumber as order_number,
+                                pof.customer_name as cliente,
+                                pi.sku,
+                                pi.name as producto,
+                                pi.quantity as cantidad,
+                                'PARIS' as marketplace
+                            FROM paris_orders pof
+                            LEFT JOIN paris_items pi ON pof.subOrderNumber = pi.subOrderNumber
+                            WHERE pof.subOrderNumber IN ($subOrderPlaceholders)
+                        ";
+                        
+                        $orders = $this->databaseService->fetchAll($sqlAlt, $subOrderNumbers);
+                        error_log("generatePackingList: Encontradas " . count($orders) . " órdenes de Paris con paris_items");
+                    }
+                    
                     $tableOrders = [];
                     foreach ($orders as $row) {
                         $tableOrders[] = $row;
@@ -1112,28 +1176,100 @@ private function handleParisOrders($page, $limit, $filters)
 
             // Para Orders_PARIS, usar consulta directa
             if (strtoupper($currentTable) === 'ORDERS_PARIS') {
+                error_log("generatePickingList: Procesando órdenes de Paris, IDs: " . json_encode($orderIds));
+                
+                // Normalizar los IDs: convertir IDs de base de datos a subOrderNumbers si es necesario
+                $subOrderNumbers = [];
+                foreach ($orderIds as $id) {
+                    try {
+                        $checkOrder = $this->databaseService->fetchOne(
+                            "SELECT subOrderNumber FROM paris_orders WHERE id = ? OR subOrderNumber = ? LIMIT 1",
+                            [$id, $id]
+                        );
+                        
+                        if ($checkOrder && !empty($checkOrder['subOrderNumber'])) {
+                            $subOrderNumbers[] = $checkOrder['subOrderNumber'];
+                        } else {
+                            $subOrderNumbers[] = $id; // Mantener el ID original si no se pudo convertir
+                        }
+                    } catch (\Exception $e) {
+                        error_log("Error al obtener subOrderNumber para ID $id: " . $e->getMessage());
+                        $subOrderNumbers[] = $id;
+                    }
+                }
+                
+                // Construir placeholders para la consulta SQL
+                $subOrderPlaceholders = implode(',', array_fill(0, count($subOrderNumbers), '?'));
+                
+                // Usar la misma consulta de paris-order-handler.php, pero ajustada para múltiples órdenes
+                error_log("generatePickingList: Usando consulta basada en paris-order-handler.php para subOrderNumbers: " . json_encode($subOrderNumbers));
+                
                 $sql = "
-                    SELECT 
-                        pof.subOrderNumber as id,
-                        pof.subOrderNumber,
-                        pof.customer_name as cliente,
-                        pof.createdAt as fecha_creacion,
-                        pfo.shipping_address as direccion,
-                        pi.sku,
-                        pi.name as producto,
-                        pi.quantity as cantidad
-                    FROM bsale_references brd
-                    INNER JOIN paris_orders pof 
-                        ON brd.number COLLATE utf8mb4_unicode_ci = pof.subOrderNumber COLLATE utf8mb4_unicode_ci
-                    LEFT JOIN paris_orders_full pfo
-                        ON pof.subOrderNumber = pfo.subOrderNumber
-                    INNER JOIN paris_items pi 
-                        ON pof.subOrderNumber COLLATE utf8mb4_unicode_ci = pi.subOrderNumber COLLATE utf8mb4_unicode_ci
-                    WHERE pof.subOrderNumber IN (" . implode(',', array_fill(0, count($orderIds), '?')) . ")
+                    SELECT
+                      pof.id,
+                      pof.subOrderNumber,
+                      pof.subOrderNumber as order_number,
+                      pof.customer_name as cliente,
+                      pof.customer_documentNumber as rut,
+                      pof.billing_phone as telefono,
+                      pof.createdAt as fecha_creacion,
+                      ddet.variant_code as sku,
+                      ddet.variant_description as producto,
+                      ddet.quantity as cantidad,
+                      pso.effectiveArrivalDate as fecha_entrega,
+                      pso.fulfillment,
+                      pst.translate as estado,
+                      'PARIS' as marketplace
+                    FROM
+                      paris_orders pof
+                    LEFT JOIN paris_subOrders pso
+                      ON pof.subOrderNumber = pso.subOrderNumber
+                    LEFT JOIN paris_statuses pst
+                      ON pso.statusId = pst.id
+                    LEFT JOIN (
+                      SELECT 
+                        document_id,
+                        number,
+                        REGEXP_SUBSTR(number, '[0-9]{10}') AS subOrderNumber_clean
+                      FROM bsale_references
+                      WHERE number REGEXP '[0-9]{10}'
+                    ) ref
+                      ON ref.subOrderNumber_clean = pof.subOrderNumber
+                    LEFT JOIN bsale_documents doc
+                      ON doc.id = ref.document_id
+                    LEFT JOIN bsale_document_details ddet
+                      ON ddet.document_id = doc.id
+                    WHERE pof.subOrderNumber IN ($subOrderPlaceholders)
                 ";
                 
                 try {
-                    $orders = $this->databaseService->fetchAll($sql, $orderIds);
+                    $orders = $this->databaseService->fetchAll($sql, $subOrderNumbers);
+                    error_log("generatePickingList: Encontradas " . count($orders) . " órdenes de Paris con productos");
+                    
+                    // Si no hay resultados o productos, intentar con paris_items
+                    if (empty($orders)) {
+                        error_log("generatePickingList: No se encontraron productos con la consulta principal, intentando con paris_items");
+                        
+                        $sqlAlt = "
+                            SELECT 
+                                pof.id,
+                                pof.subOrderNumber,
+                                pof.subOrderNumber as order_number,
+                                pof.customer_name as cliente,
+                                pof.createdAt as fecha_creacion,
+                                '' as direccion,
+                                pi.sku,
+                                pi.name as producto,
+                                pi.quantity as cantidad,
+                                'PARIS' as marketplace
+                            FROM paris_orders pof
+                            LEFT JOIN paris_items pi ON pof.subOrderNumber = pi.subOrderNumber
+                            WHERE pof.subOrderNumber IN ($subOrderPlaceholders)
+                        ";
+                        
+                        $orders = $this->databaseService->fetchAll($sqlAlt, $subOrderNumbers);
+                        error_log("generatePickingList: Encontradas " . count($orders) . " órdenes de Paris con paris_items");
+                    }
                 } catch (\Exception $e) {
                     error_log("Error al obtener órdenes de París: " . $e->getMessage());
                     continue;
@@ -3056,14 +3192,22 @@ private function handleParisOrders($page, $limit, $filters)
             return $redirect;
         }
 
-        if (!$this->getRequest()->isPost()) {
+        // Aceptar tanto GET como POST para facilitar la depuración y el acceso directo
+        // Eliminar esta verificación por ahora para permitir acceso más fácil
+        /*if (!$this->getRequest()->isPost()) {
             return $this->jsonResponse(['success' => false, 'message' => 'Se requiere método POST']);
-        }
+        }*/
 
-        $orderIds = $this->params()->fromPost('orderIds', []);
-        $orderTables = $this->params()->fromPost('orderTables', []);
-        $table = $this->params()->fromPost('table', null);
-        $action = $this->params()->fromPost('action', null);
+        // También aceptar parámetros de GET para permitir URLs directas
+        $orderIds = $this->params()->fromPost('orderIds', $this->params()->fromQuery('orderIds', []));
+        $orderTables = $this->params()->fromPost('orderTables', $this->params()->fromQuery('orderTables', []));
+        $table = $this->params()->fromPost('table', $this->params()->fromQuery('table', null));
+        $action = $this->params()->fromPost('action', $this->params()->fromQuery('action', null));
+        
+        // Asegurarse de que orderIds sea un array
+        if (!is_array($orderIds) && !empty($orderIds)) {
+            $orderIds = [$orderIds];
+        }
 
         // Determinar una tabla común para usar en los métodos que requieren una sola tabla
         $commonTable = null;
@@ -3249,101 +3393,179 @@ private function handleParisOrders($page, $limit, $filters)
      */
     private function generateLabels(array $orderIds, $table = null)
     {
-        // Determinar la tabla a usar o aplicarlo para todas
-        $tables = [];
-        if ($table && $table !== 'all') {
-            $tables[] = $table;
-        } else {
-            $tables = [
-                'Orders_WALLMART',
-                'Orders_RIPLEY',
-                'Orders_FALABELLA',
-                'Orders_MERCADO_LIBRE',
-                'Orders_PARIS',
-                'Orders_WOOCOMMERCE'
-            ];
-        }
+        // We don't need to import anything here since we're already importing Fpdi at the top of the file
         
-        // Recolectar URLs de etiquetas
+        // Array para almacenar URLs de etiquetas
         $labelUrls = [];
         
-        foreach ($tables as $currentTable) {
-            // Para Orders_PARIS, no hay etiquetas físicas
-            if (strtoupper($currentTable) === 'ORDERS_PARIS') {
-                continue;
+        // Obtener etiquetas para órdenes seleccionadas
+        if ($table == 'paris_orders' || $table == 'Orders_PARIS') {
+            // Para órdenes Paris, obtener directamente de paris_subOrders
+            $placeholders = array_fill(0, count($orderIds), '?');
+            
+            $sql = "SELECT so.labelUrl 
+                    FROM paris_orders o
+                    JOIN paris_subOrders so ON o.subOrderNumber = so.subOrderNumber
+                    WHERE o.subOrderNumber IN (" . implode(',', $placeholders) . ")";
+            
+            $results = $this->databaseService->fetchAll($sql, $orderIds);
+            
+            foreach ($results as $row) {
+                if (!empty($row['labelUrl'])) {
+                    $labelUrls[] = $row['labelUrl'];
+                }
+            }
+        } else {
+            // Para otras tablas, determinar la tabla a usar
+            $tables = [];
+            if ($table && $table !== 'all') {
+                $tables[] = $table;
+            } else {
+                $tables = [
+                    'Orders_WALLMART',
+                    'Orders_RIPLEY',
+                    'Orders_FALABELLA',
+                    'Orders_MERCADO_LIBRE',
+                    'Orders_WOOCOMMERCE'
+                ];
             }
             
-            $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
-            $sql = "SELECT id, label_url FROM `$currentTable` WHERE id IN ($placeholders)";
-            $statement = $this->dbAdapter->createStatement($sql);
-            $result = $statement->execute($orderIds);
-            
-            foreach ($result as $row) {
-                if (!empty($row['label_url']) && filter_var($row['label_url'], FILTER_VALIDATE_URL)) {
-                    $labelUrls[$row['id']] = $row['label_url'];
-                    
-                    // Marcar como impresa
-                    try {
-                        $this->databaseService->execute(
-                            "UPDATE `$currentTable` SET printed = 1 WHERE id = ?",
-                            [$row['id']]
-                        );
-                    } catch (\Exception $e) {
-                        // Ignorar errores al actualizar
-                        error_log("Error al marcar etiqueta como impresa: " . $e->getMessage());
+            // Recolectar URLs de etiquetas
+            foreach ($tables as $currentTable) {
+                $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
+                $sql = "SELECT id, label_url FROM `$currentTable` WHERE id IN ($placeholders)";
+                $statement = $this->dbAdapter->createStatement($sql);
+                $result = $statement->execute($orderIds);
+                
+                foreach ($result as $row) {
+                    if (!empty($row['label_url']) && filter_var($row['label_url'], FILTER_VALIDATE_URL)) {
+                        $labelUrls[] = $row['label_url'];
+                        
+                        // Marcar como impresa
+                        try {
+                            $this->databaseService->execute(
+                                "UPDATE `$currentTable` SET printed = 1 WHERE id = ?",
+                                [$row['id']]
+                            );
+                        } catch (\Exception $e) {
+                            // Ignorar errores al actualizar
+                            error_log("Error al marcar etiqueta como impresa: " . $e->getMessage());
+                        }
                     }
                 }
             }
         }
         
+        // Si no hay URLs de etiquetas, mostrar mensaje
         if (empty($labelUrls)) {
-            throw new \Exception("No se encontraron etiquetas para las órdenes seleccionadas.");
-        }
-        
-        // Crear PDF combinado con FPDI
-        $pdf = new Fpdi();
-        $pdf->SetAutoPageBreak(false);
-        $pdf->setPrintHeader(false);
-        $pdf->setPrintFooter(false);
-        
-        foreach ($labelUrls as $orderId => $url) {
-            try {
-                // Descargar el PDF de la etiqueta
-                $tempFile = tempnam(sys_get_temp_dir(), 'etiqueta_') . '.pdf';
-                file_put_contents($tempFile, file_get_contents($url));
-                
-                // Importar las páginas del PDF
-                $pageCount = $pdf->setSourceFile($tempFile);
-                for ($i = 1; $i <= $pageCount; $i++) {
-                    $tplId = $pdf->importPage($i);
-                    $size = $pdf->getTemplateSize($tplId);
-                    $pdf->AddPage($size['orientation'], [$size['width'], $size['height']]);
-                    $pdf->useTemplate($tplId);
+            $html = '
+            <html>
+            <head>
+                <style>
+                    body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+                    .error { color: #d9534f; font-size: 24px; margin-bottom: 20px; }
+                </style>
+            </head>
+            <body>
+                <div class="error">No se encontraron etiquetas</div>
+                <p>No se encontraron URLs de etiquetas para las órdenes seleccionadas.</p>
+            </body>
+            </html>';
+            
+            $options = new Options();
+            $options->set('isHtml5ParserEnabled', true);
+            
+            $dompdf = new Dompdf($options);
+            $dompdf->loadHtml($html, 'UTF-8');
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->render();
+            
+            $pdfContent = $dompdf->output();
+        } else {
+            // Crear un PDF con todas las etiquetas usando FPDI sin formato predefinido
+            // No especificamos tamaño de página aquí porque se ajustará al tamaño de cada documento
+            $pdf = new \setasign\Fpdi\Tcpdf\Fpdi();
+            $pdf->setPrintHeader(false);
+            $pdf->setPrintFooter(false);
+            
+            // Configurar opciones adicionales para mejor manejo de PDF importados
+            $pdf->setAutoPageBreak(false); // Evitar saltos de página automáticos
+            $pdf->setCreator('Lodoro Analytics');
+            $pdf->setTitle('Etiquetas Paris');
+            
+            // Por cada URL, descargar el PDF y agregarlo
+            foreach ($labelUrls as $url) {
+                // Asegurar que la URL tenga https://
+                if (!preg_match('/^https?:\/\//i', $url)) {
+                    $url = 'https://' . $url;
                 }
                 
-                // Eliminar archivo temporal
-                unlink($tempFile);
-            } catch (\Exception $e) {
-                // Continuar con la siguiente etiqueta si hay error
-                continue;
+                // Descargar PDF con ampliado de opciones para mejorar la compatibilidad
+                $context = stream_context_create([
+                    'ssl' => [
+                        'verify_peer' => false,
+                        'verify_peer_name' => false,
+                    ],
+                    'http' => [
+                        'user_agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
+                        'timeout' => 30, // Incrementar el timeout para URLs lentas
+                        'follow_location' => 1, // Seguir redirecciones
+                        'ignore_errors' => true
+                    ]
+                ]);
+                
+                error_log("Descargando URL: " . $url);
+                $content = @file_get_contents($url, false, $context);
+                
+                if (empty($content)) {
+                    error_log("Error: No se pudo descargar el contenido de la URL: " . $url);
+                }
+                
+                if ($content) {
+                    // Guardar temporalmente
+                    $tempFile = tempnam(sys_get_temp_dir(), 'label_');
+                    file_put_contents($tempFile, $content);
+                    
+                    try {
+                        // Agregar al PDF principal manteniendo el tamaño original
+                        $pageCount = $pdf->setSourceFile($tempFile);
+                        
+                        for ($i = 1; $i <= $pageCount; $i++) {
+                            $tpl = $pdf->importPage($i);
+                            
+                            // Obtener las dimensiones del template original
+                            $size = $pdf->getTemplateSize($tpl);
+                            $orientation = ($size['width'] > $size['height']) ? 'L' : 'P';
+                            
+                            // Agregar página con el tamaño exacto del documento original
+                            $pdf->AddPage($orientation, array($size['width'], $size['height']));
+                            
+                            // Usar el template ajustado a la página completa
+                            $pdf->useTemplate($tpl, 0, 0, $size['width'], $size['height']);
+                        }
+                        
+                        // Limpiar
+                        unlink($tempFile);
+                    } catch (\Exception $e) {
+                        // Registrar error pero continuar con siguiente URL
+                        error_log("Error al importar etiqueta PDF: " . $e->getMessage());
+                    }
+                }
             }
+            
+            // Generar PDF
+            $pdfContent = $pdf->Output('', 'S');
         }
         
-        // Generar la salida del PDF
-        $pdfContent = $pdf->Output('S');
-        
-        // Crear respuesta HTTP
+        // Crear respuesta HTTP con el PDF
         $response = new Response();
         $response->setContent($pdfContent);
         
         // Configurar cabeceras
         $headers = $response->getHeaders();
         $headers->addHeaderLine('Content-Type', 'application/pdf');
-        $headers->addHeaderLine('Content-Disposition', 'inline; filename="Etiquetas_' . date('Y-m-d') . '.pdf"');
+        $headers->addHeaderLine('Content-Disposition', 'inline; filename="Etiquetas_' . date('Y-m-d_His') . '.pdf"');
         $headers->addHeaderLine('Content-Length', strlen($pdfContent));
-        $headers->addHeaderLine('Cache-Control', 'must-revalidate, post-check=0, pre-check=0');
-        $headers->addHeaderLine('Pragma', 'public');
-        $headers->addHeaderLine('Expires', '0');
         
         return $response;
     }
@@ -3964,5 +4186,52 @@ private function handleParisOrders($page, $limit, $filters)
                 'error' => $e->getMessage()
             ];
         }
+    }
+
+    /**
+     * Acción para imprimir PDF de una orden
+     *
+     * @return ViewModel
+     */
+    public function printPdfAction()
+    {
+        // Verificar autenticación
+        $redirect = $this->checkAuth();
+        if ($redirect !== null) {
+            return $redirect;
+        }
+
+        // Obtener parámetros
+        $id = $this->params()->fromRoute('id');
+        $table = $this->params()->fromRoute('table');
+
+        if (!$id || !$table) {
+            return $this->notFoundAction();
+        }
+
+        // Obtener detalles de la orden
+        $order = $this->databaseService->fetchOne(
+            "SELECT * FROM `$table` WHERE id = ?",
+            [$id]
+        );
+
+        if (!$order) {
+            return $this->notFoundAction();
+        }
+
+        // Preparar datos para la vista
+        $viewModel = new ViewModel([
+            'order' => $order,
+            'table' => $table,
+            'marketplace' => str_replace('Orders_', '', $table)
+        ]);
+
+        // Usar una plantilla específica para PDF
+        $viewModel->setTemplate('application/orders/print-pdf');
+        
+        // Configurar para generar PDF
+        $viewModel->setTerminal(true);
+
+        return $viewModel;
     }
 }

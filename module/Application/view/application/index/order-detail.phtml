@@ -1106,7 +1106,8 @@ if (markOrderProcessedBtn) {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest' // Añadir este encabezado para identificar como AJAX
+                    'X-Requested-With': 'XMLHttpRequest', // Añadir este encabezado para identificar como AJAX
+                    'Accept': 'application/json'
                 },
                 body: JSON.stringify({
                     orderId: orderId,
@@ -1114,7 +1115,14 @@ if (markOrderProcessedBtn) {
                     allProcessed: true
                 })
             })
-            .then(response => response.json())
+            .then(response => {
+                // Verificar si la respuesta es JSON válida
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    return response.json();
+                }
+                throw new Error('La respuesta no es JSON válido');
+            })
             .then(data => {
                 if (data.success) {
                     // Actualizar badge de estado de procesado en la página

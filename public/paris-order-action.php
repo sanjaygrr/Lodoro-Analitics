@@ -9,7 +9,9 @@ $app = require __DIR__ . '/../config/container.php';
 session_start();
 
 // Aceptar tanto GET como POST para simplificar
+// Asegurarse de que el contenido sea JSON y establecer los encabezados adecuados
 header('Content-Type: application/json');
+header('X-Content-Type-Options: nosniff'); // Evitar que los navegadores intenten adivinar el tipo de contenido
 
 // Extraer parámetros (primero de GET, luego de POST, finalmente de datos JSON)
 $content = file_get_contents('php://input');
@@ -98,5 +100,12 @@ try {
     }
 } catch (\Exception $e) {
     error_log("Error al procesar la solicitud: " . $e->getMessage());
-    echo json_encode(['success' => false, 'message' => 'Error al procesar la solicitud: ' . $e->getMessage()]);
+    // Asegurarse de que la respuesta sea JSON válido bajo cualquier circunstancia
+    try {
+        echo json_encode(['success' => false, 'message' => 'Error al procesar la solicitud: ' . $e->getMessage()]);
+    } catch (\Exception $jsonError) {
+        // Si hay un error al codificar JSON, enviamos una respuesta simple
+        header('Content-Type: application/json');
+        echo '{"success":false,"message":"Error interno del servidor"}';
+    }
 }

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <title>Orden #<?= $order['id'] ?> - <?= $marketplace ?></title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .order-info {
+            margin-bottom: 20px;
+        }
+        .customer-info {
+            margin-bottom: 20px;
+        }
+        .products-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .products-table th,
+        .products-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .products-table th {
+            background-color: #f5f5f5;
+        }
+        .totals {
+            text-align: right;
+            margin-top: 20px;
+        }
+        .marketplace-badge {
+            background-color: <?= $marketplace === 'PARIS' ? '#e71785' : '#4361ee' ?>;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Orden #<?= $order['id'] ?></h1>
+        <span class="marketplace-badge"><?= $marketplace ?></span>
+    </div>
+
+    <div class="order-info">
+        <h2>Información de la Orden</h2>
+        <p><strong>Fecha de Creación:</strong> <?= date('d/m/Y H:i', strtotime($order['createdAt'] ?? $order['fecha_creacion'] ?? '')) ?></p>
+        <p><strong>Estado:</strong> <?= $order['estado'] ?? 'N/A' ?></p>
+    </div>
+
+    <div class="customer-info">
+        <h2>Información del Cliente</h2>
+        <p><strong>Nombre:</strong> <?= $order['cliente'] ?? $order['customer_name'] ?? 'N/A' ?></p>
+        <p><strong>RUT:</strong> <?= $order['rut_cliente'] ?? $order['customer_documentNumber'] ?? 'N/A' ?></p>
+        <p><strong>Teléfono:</strong> <?= $order['telefono'] ?? $order['billing_phone'] ?? 'N/A' ?></p>
+        <p><strong>Dirección:</strong> <?= $order['direccion'] ?? $order['shipping_address'] ?? 'N/A' ?></p>
+    </div>
+
+    <div class="products">
+        <h2>Productos</h2>
+        <table class="products-table">
+            <thead>
+                <tr>
+                    <th>SKU</th>
+                    <th>Producto</th>
+                    <th>Cantidad</th>
+                    <th>Precio</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php
+                $productos = [];
+                if (isset($order['productos'])) {
+                    if (is_string($order['productos'])) {
+                        $productos = json_decode($order['productos'], true) ?? [];
+                    } else {
+                        $productos = $order['productos'];
+                    }
+                }
+
+                $subtotal = 0;
+                foreach ($productos as $producto): 
+                    $precio = floatval($producto['precio'] ?? 0);
+                    $cantidad = intval($producto['cantidad'] ?? 0);
+                    $total = $precio * $cantidad;
+                    $subtotal += $total;
+                ?>
+                <tr>
+                    <td><?= $producto['sku'] ?? 'N/A' ?></td>
+                    <td><?= $producto['nombre'] ?? $producto['producto'] ?? 'N/A' ?></td>
+                    <td><?= $cantidad ?></td>
+                    <td>$<?= number_format($precio, 0, ',', '.') ?></td>
+                    <td>$<?= number_format($total, 0, ',', '.') ?></td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="totals">
+        <p><strong>Subtotal:</strong> $<?= number_format($subtotal, 0, ',', '.') ?></p>
+        <p><strong>Envío:</strong> $<?= number_format(floatval($order['envio'] ?? $order['shipping_cost'] ?? 0), 0, ',', '.') ?></p>
+        <p><strong>Impuesto:</strong> $<?= number_format(floatval($order['impuesto'] ?? $order['tax'] ?? 0), 0, ',', '.') ?></p>
+        <p><strong>Total:</strong> $<?= number_format(floatval($order['total'] ?? $order['total_amount'] ?? 0), 0, ',', '.') ?></p>
+    </div>
+</body>
+</html> 
